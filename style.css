@@ -1,0 +1,254 @@
+@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&display=swap');
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body { height: 100%; }
+
+body {
+  font-family: 'Poppins', -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+  background: #e8e9ec;
+  min-height: 100vh;
+  min-height: 100dvh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  padding-top: max(24px, env(safe-area-inset-top));
+  padding-bottom: max(24px, env(safe-area-inset-bottom));
+  overflow-y: auto;
+}
+
+/* Full-screen, edge-to-edge card on phones (<600px); centered rounded
+   card on desktop, matching the app shell's own phone-card treatment.
+   The card just scrolls with the page when the on-screen keyboard opens —
+   nothing shrinks or hides. */
+.card {
+  width: 100%;
+  max-width: 420px;
+  background: #ffffff;
+  border-radius: 32px;
+  padding: 40px 28px 32px;
+  box-shadow: 0 20px 60px rgba(20, 30, 60, 0.12);
+  margin: auto;
+}
+@media (max-width: 600px) {
+  body { padding: 0; align-items: flex-start; }
+  .card {
+    max-width: 100%;
+    min-height: 100vh;
+    min-height: 100dvh;
+    border-radius: 0;
+    box-shadow: none;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    padding: 40px 24px;
+  }
+}
+
+/* ---- Brand mark: graduation cap in the signature navy square, with a
+   green "verified / trusted" badge and a subtle float animation. ---- */
+.brand-mark {
+  position: relative;
+  width: 72px;
+  height: 72px;
+  margin: 0 auto 16px;
+  background: #14213d;
+  border-radius: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  animation: brand-float 3.2s ease-in-out infinite;
+}
+@keyframes brand-float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-6px); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .brand-mark { animation: none; }
+}
+.verified-badge {
+  position: absolute;
+  bottom: -4px;
+  right: -4px;
+  width: 24px;
+  height: 24px;
+  background: #1f9d55;
+  border: 3px solid #fff;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.verified-badge svg { width: 11px; height: 11px; stroke: #fff; stroke-width: 3; }
+
+.wordmark {
+  text-align: center;
+  font-size: 24px;
+  font-weight: 800;
+  color: #14213d;
+  margin-bottom: 6px;
+}
+.tagline {
+  text-align: center;
+  font-size: 13.5px;
+  color: #8b93a7;
+  margin-bottom: 28px;
+  line-height: 1.4;
+}
+
+h1 {
+  font-size: 24px;
+  font-weight: 800;
+  color: #14213d;
+  margin-bottom: 6px;
+}
+
+.subtitle {
+  color: #8b93a7;
+  font-size: 14px;
+  margin-bottom: 24px;
+}
+
+.field {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: #f1f2f5;
+  border-radius: 16px;
+  padding: 16px 18px;
+  margin-bottom: 16px;
+  border: 1.5px solid transparent;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.field:focus-within {
+  border-color: #14213d;
+  background: #ffffff;
+}
+
+.field svg { flex-shrink: 0; color: #8b93a7; }
+
+.field input {
+  border: none;
+  background: none;
+  outline: none;
+  font-size: 16px;
+  color: #14213d;
+  width: 100%;
+  min-width: 0;
+}
+
+.field input::placeholder { color: #a3aabb; }
+
+.field .toggle-visibility {
+  cursor: pointer;
+  flex-shrink: 0;
+  position: relative;
+  width: 18px;
+  height: 18px;
+  display: inline-block;
+}
+
+.field .toggle-visibility svg {
+  position: absolute;
+  top: 0;
+  left: 0;
+}
+
+.field .toggle-visibility .icon-hidden {
+  display: none;
+}
+
+.submit-btn {
+  width: 100%;
+  padding: 18px;
+  background: #14213d;
+  color: #fff;
+  border: none;
+  border-radius: 999px;
+  font-size: 16px;
+  font-weight: 700;
+  cursor: pointer;
+  margin: 8px 0 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+.submit-btn svg { width: 17px; height: 17px; stroke: #fff; flex-shrink: 0; }
+.submit-btn:hover { background: #1c2d52; }
+.submit-btn:disabled { opacity: 0.7; cursor: default; }
+
+.switch-link {
+  text-align: center;
+  font-size: 14px;
+  color: #a3aabb;
+}
+
+.switch-link a {
+  color: #14213d;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.auth-footer {
+  text-align: center;
+  font-size: 11.5px;
+  color: #c3c8d3;
+  margin-top: 22px;
+}
+
+/* ---- OTP / verification code boxes (verify.html) ---- */
+.verify-email {
+  display: inline-block;
+  font-weight: 700;
+  color: #14213d;
+  word-break: break-all;
+}
+
+.otp-row {
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+  margin: 4px 0 20px;
+}
+
+.otp-box {
+  width: 42px;
+  height: 54px;
+  text-align: center;
+  font-size: 22px;
+  font-weight: 700;
+  color: #14213d;
+  background: #f1f2f5;
+  border-radius: 14px;
+  border: 1.5px solid transparent;
+  outline: none;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.otp-box:focus { border-color: #14213d; background: #ffffff; }
+.otp-box.filled { border-color: #14213d; }
+
+.resend-row {
+  text-align: center;
+  font-size: 14px;
+  color: #8b93a7;
+  margin: -8px 0 20px;
+}
+
+.resend-link {
+  color: #14213d;
+  font-weight: 700;
+  text-decoration: none;
+  cursor: pointer;
+  background: none;
+  border: none;
+  font-size: 14px;
+  font-family: inherit;
+  padding: 0;
+}
+
+.resend-link:disabled { color: #a3aabb; cursor: default; font-weight: 600; }
