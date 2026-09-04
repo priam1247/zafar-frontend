@@ -1,0 +1,17 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta http-equiv="refresh" content="0; url=login.html">
+<title>Zafar</title>
+<script>
+// Fires the instant this page loads, before the redirect even completes —
+// so a sleeping Koyeb free-tier instance is already waking up in the
+// background while the browser navigates to login.html and the user
+// starts typing. No-op cost if the instance was already warm.
+try { fetch('https://bloody-brigitta-ahzafar-de9b1709.koyeb.app/health'); } catch (e) {}
+window.location.replace('login.html' + window.location.search);
+</script>
+</head>
+<body></body>
+</html>

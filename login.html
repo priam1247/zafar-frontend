@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sign In — Zafar</title>
+<link rel="stylesheet" href="style.css?v=20260901b">
+<script>
+// Same warm-up ping as index.html — covers anyone who lands here directly
+// (bookmark, typed URL) instead of via the index.html redirect.
+try { fetch('https://bloody-brigitta-ahzafar-de9b1709.koyeb.app/health'); } catch (e) {}
+</script>
+</head>
+<body>
+  <div class="card">
+    <div class="brand-mark">
+      <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.42 10.922a1 1 0 0 0-.019-1.838L12.83 5.18a2 2 0 0 0-1.66 0L2.6 9.08a1 1 0 0 0 0 1.837l8.57 3.908a2 2 0 0 0 1.66 0z"/><path d="M22 10v6"/><path d="M6 12.5V16a6 3 0 0 0 12 0v-3.5"/></svg>
+      <span class="verified-badge">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
+      </span>
+    </div>
+    <div class="wordmark">Zafar</div>
+    <p class="tagline">Past papers, notes &amp; marking keys for MANEB success</p>
+
+    <h1>Welcome back</h1>
+    <p class="subtitle">Sign in to continue revising.</p>
+
+    <form id="loginForm">
+      <div class="field">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/></svg>
+        <input type="email" placeholder="Email address" required autocomplete="email" id="email">
+      </div>
+      <div class="field">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V7a4 4 0 018 0v4"/></svg>
+        <input type="password" placeholder="Password" required id="pw" autocomplete="current-password">
+        <span class="toggle-visibility" id="pwToggle" role="button" aria-label="Show password" tabindex="0"><svg class="eye-open icon-hidden" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/></svg><svg class="eye-off" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9.88 9.88a3 3 0 1 0 4.24 4.24"/><path d="M10.73 5.08A10.43 10.43 0 0 1 12 5c7 0 10 7 10 7a13.16 13.16 0 0 1-1.67 2.68"/><path d="M6.61 6.61A13.526 13.526 0 0 0 2 12s3 7 10 7a9.74 9.74 0 0 0 5.39-1.61"/><line x1="2" y1="2" x2="22" y2="22"/></svg></span>
+      </div>
+
+      <p id="formSuccess" style="color:#0f9d72; font-size:14px; margin:4px 0 16px; display:none;"></p>
+      <p id="formError" style="color:#c0392b; font-size:14px; margin:4px 0 16px; display:none;"></p>
+
+      <button type="submit" class="submit-btn">
+        <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" y1="12" x2="3" y2="12"/></svg>
+        <span class="btn-label">Sign in</span>
+      </button>
+    </form>
+
+    <p class="switch-link">New to Zafar? <a href="register.html">Create an account</a></p>
+    <p class="auth-footer">© 2026 Zafar · Built for Malawian students</p>
+  </div>
+
+  <script src="config.js?v=20260901b"></script>
+  <script src="app.js?v=20260901b"></script>
+</body>
+</html>
