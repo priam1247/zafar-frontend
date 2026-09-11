@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#0c3a2d">
+<title>Help &amp; FAQ — Zafar</title>
+<meta name="description" content="Answers to common questions about downloads, limits and favorites on Zafar.">
+<link rel="stylesheet" href="assets/css/app.css">
+<script>try{var t=localStorage.getItem("zafar_theme");if(t)document.documentElement.setAttribute("data-theme",t);}catch(e){}</script>
+</head>
+<body>
+  <div id="app"></div>
+
+  <script src="assets/js/config.js"></script>
+  <script src="assets/js/demo.js"></script>
+  <script src="assets/js/i18n.js"></script>
+  <script src="assets/js/shell.js"></script>
+  <script>
+    document.addEventListener("DOMContentLoaded", function () {
+      var t = ZafarI18n.t;
+      var p = t("pages.help");
+      var shell = ZafarShell.init({ active: "help", title: p.title, crumb: p.crumb });
+      if (!shell) return;
+
+      var QA = t("help.qa");
+
+      shell.content.innerHTML =
+        '<section class="hero"><div><h2>' + t("help.heroTitle") + "</h2>" +
+        "<p>" + t("help.heroBody") + "</p></div>" +
+        '<div class="hero-actions"><a class="btn btn-primary" href="dashboard.html">' + t("help.backToPapers") + "</a></div></section>" +
+
+        '<div class="grid grid-stats">' +
+          '<div class="stat"><div class="stat-head"><span class="stat-glyph">' + ZafarShell.svg("bolt", 17) +
+          '</span><span class="stat-label">' + t("help.dailyLimitLabel") + '</span></div><div class="stat-value">' + DAILY_PAPER_LIMIT +
+          '</div><div class="stat-foot">' + t("help.dailyLimitFoot") + "</div></div>" +
+          '<div class="stat"><div class="stat-head"><span class="stat-glyph">' + ZafarShell.svg("clock", 17) +
+          '</span><span class="stat-label">' + t("help.limitResetsLabel") + '</span></div><div class="stat-value">00:00</div>' +
+          '<div class="stat-foot">' + t("help.limitResetsFoot") + "</div></div>" +
+          '<div class="stat"><div class="stat-head"><span class="stat-glyph">' + ZafarShell.svg("layers", 17) +
+          '</span><span class="stat-label">' + t("help.sectionsLabel") + '</span></div><div class="stat-value">4</div>' +
+          '<div class="stat-foot">' + t("help.sectionsFoot") + "</div></div>" +
+        "</div>" +
+
+        '<section class="stack"><div class="section-head"><h2>' + t("help.faqTitle") + "</h2></div>" +
+        '<div class="panel">' +
+          QA.map(function (item) {
+            return '<details class="qa" id="' + item.id + '"><summary>' + item.q +
+              '</summary><div class="qa-body">' + item.a + "</div></details>";
+          }).join("") +
+        "</div></section>" +
+
+        '<section class="stack"><div class="section-head"><h2>' + t("help.shortcutsTitle") + "</h2></div>" +
+        '<div class="panel list">' +
+          '<div class="list-row"><span class="lines"><span class="name">/</span>' +
+          '<span class="sub">' + t("help.shortcutSlash") + '</span></span></div>' +
+          '<div class="list-row"><span class="lines"><span class="name">Esc</span>' +
+          '<span class="sub">' + t("help.shortcutEsc") + "</span></span></div>" +
+        "</div></section>";
+
+      shell.count.textContent = t("help.answers", QA.length);
+
+      // Deep links like help.html#password open the matching question.
+      if (location.hash) {
+        var target = document.querySelector(location.hash);
+        if (target && target.tagName === "DETAILS") {
+          target.open = true;
+          target.scrollIntoView({ block: "center" });
+        }
+      }
+    });
+  </script>
+</body>
+</html>

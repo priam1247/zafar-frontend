@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#0c3a2d">
+<title>Notes — Zafar</title>
+<meta name="description" content="Condensed subject notes for every form.">
+<link rel="stylesheet" href="assets/css/app.css">
+<script>try{var t=localStorage.getItem("zafar_theme");if(t)document.documentElement.setAttribute("data-theme",t);}catch(e){}</script>
+</head>
+<body>
+  <div id="app"></div>
+
+  <script src="assets/js/config.js"></script>
+  <script src="assets/js/demo.js"></script>
+  <script src="assets/js/i18n.js"></script>
+  <script src="assets/js/shell.js"></script>
+  <script src="assets/js/list.js"></script>
+  <script>
+    document.addEventListener("DOMContentLoaded", function () {
+      var p = ZafarI18n.t("pages.notes");
+      var shell = ZafarShell.init({ active: "notes", title: p.title, crumb: p.crumb });
+      if (!shell) return;
+      ZafarList.init({
+        section: "notes",
+        quotaKey: null,
+        itemLabel: p.itemLabel,
+        searchPlaceholder: p.searchPlaceholder,
+        categories: ["Senior", "Junior"],
+      }, shell);
+    });
+  </script>
+</body>
+</html>
