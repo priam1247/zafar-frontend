@@ -30,7 +30,6 @@ var ZafarAuth = (function () {
       switchCreate: 'New to ZAFAR? <button type="button" class="link-btn" data-goto="create">Create an account</button>',
       switchSignin: 'Already have an account? <button type="button" class="link-btn" data-goto="signin">Sign in</button>',
       footer: "12+ years archived&nbsp;&nbsp;•&nbsp;&nbsp;Daily downloads",
-      demoLine: "Just looking? Explore the demo library",
       errName: "Enter your full name.", errEmail: "Enter a valid email address.",
       errPassword: "At least 6 characters.", errConfirm: "Passwords don't match.",
       verifiedBanner: "Email verified — sign in to continue.",
@@ -147,7 +146,6 @@ var ZafarAuth = (function () {
               "</button>" +
               '<div class="switch-line" id="switchLine"></div>' +
             "</form>" +
-            '<div class="demo-line"><a href="dashboard.html?demo=1" id="txt-demo"></a></div>' +
           "</div>" +
 
           /* ---------- forgot ---------- */
@@ -315,7 +313,6 @@ var ZafarAuth = (function () {
 
     el("submitBtn").querySelector(".submit-label").textContent = isCreate ? t.createBtn : t.continueBtn;
     el("switchLine").innerHTML = isCreate ? t.switchSignin : t.switchCreate;
-    el("txt-demo").textContent = t.demoLine;
     el("txt-footer").innerHTML = t.footer;
 
     el("err-name").textContent = t.errName;

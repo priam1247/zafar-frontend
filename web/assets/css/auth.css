@@ -419,12 +419,3 @@ body.auth-body {
 .success-wrap h2 { margin: 0 0 8px; font-size: 20px; }
 .success-wrap p { margin: 0 0 22px; font-size: 13.5px; color: var(--text-mute); line-height: 1.5; }
 
-/* Demo shortcut, kept visually quieter than the real action. */
-.demo-line { margin-top: 14px; text-align: center; }
-.demo-line a {
-  font-size: 13px;
-  color: var(--text-mute);
-  text-decoration: underline;
-  text-underline-offset: 2px;
-}
-.demo-line a:hover { color: var(--text-soft); }

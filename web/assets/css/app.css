@@ -467,6 +467,22 @@ h1, h2, h3, h4 {
 .file-meta .type { font-size: 12px; color: var(--text-mute); }
 .doc-foot .btn { margin-left: auto; }
 
+/* Download button micro-interaction — a quiet spinner while the signed
+   link is prepared, then a check and a green flash once the file is
+   handed to the browser. Purposeful motion, nothing more. */
+.btn-spinner {
+  width: 14px; height: 14px; flex: none; border-radius: 50%;
+  border: 2px solid rgba(255, 255, 255, 0.35);
+  border-top-color: #fff;
+  animation: btn-spin 0.7s linear infinite;
+}
+@keyframes btn-spin { to { transform: rotate(360deg); } }
+.btn.is-done {
+  background: var(--ok-500); border-color: var(--ok-500);
+  animation: btn-pop 0.3s var(--ease);
+}
+@keyframes btn-pop { 0% { transform: scale(1); } 45% { transform: scale(1.07); } 100% { transform: scale(1); } }
+
 /* Stat card */
 .stat {
   background: var(--surface);
@@ -848,9 +864,28 @@ h1, h2, h3, h4 {
 }
 
 @media (max-width: 560px) {
-  .grid, .skeleton { grid-template-columns: 1fr; }
+  .grid, .skeleton { grid-template-columns: repeat(2, 1fr); gap: 10px; }
   .topbar .crumb { display: none; }
   .landing-hero { padding: 48px 0 32px; }
+
+  /* Compact document cards so a phone fits a real grid instead of
+     one towering card per row. */
+  .doc { padding: 12px; gap: 9px; }
+  .doc-top { gap: 6px; }
+  .doc-top .badge {
+    max-width: calc(100% - 34px);
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    font-size: 10.5px; padding: 3px 7px;
+  }
+  .fav-btn { width: 28px; height: 28px; }
+  .doc-title { font-size: 13px; min-height: 2.4em; letter-spacing: 0; }
+  .doc-foot { gap: 8px; padding-top: 10px; }
+  .file-meta { gap: 7px; }
+  .file-glyph { width: 28px; height: 28px; }
+  .file-meta .size { font-size: 11.5px; }
+  .file-meta .type { display: none; }
+  .doc-foot .btn { padding: 8px; }
+  .doc-foot .btn .btn-label { display: none; }
 
   /* Dashboard: at one card per row the shortcut shelves read as oversized
      empty tiles on a phone. Pack them two-up instead, like the desktop

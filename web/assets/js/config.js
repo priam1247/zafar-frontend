@@ -26,22 +26,6 @@ var Zafar = {
   BOOKMARKS_KEY: "zafar_bookmarks",
   RECENT_DOWNLOADS_KEY: "zafar_recent_downloads",
   RECENT_DOWNLOADS_MAX: 20,
-  DEMO_KEY: "zafar_demo",
-
-  /* ---------- Demo mode ----------------------------------------------
-     The backend isn't always reachable (local dev, offline sandbox, a
-     cold Koyeb instance). Rather than showing an error wall, the API
-     client transparently falls back to ZafarDemo — the UI stays fully
-     explorable and every page clearly labels itself as demo data. */
-  isDemo: function () {
-    return sessionStorage.getItem(this.DEMO_KEY) === "1";
-  },
-  setDemo: function (on) {
-    if (on) sessionStorage.setItem(this.DEMO_KEY, "1");
-    else sessionStorage.removeItem(this.DEMO_KEY);
-    if (on && typeof ZafarShell !== "undefined") ZafarShell.markDemo();
-  },
-
   /* ---------- Token -------------------------------------------------- */
   // Remember Me on  -> localStorage (survives closing the browser)
   // Remember Me off -> sessionStorage (cleared when the tab closes)
@@ -60,7 +44,6 @@ var Zafar = {
   clearToken: function () {
     localStorage.removeItem(this.TOKEN_KEY);
     sessionStorage.removeItem(this.TOKEN_KEY);
-    sessionStorage.removeItem(this.DEMO_KEY);
   },
 
   // Bookmarks / recent downloads are per-account, not per-device: two
@@ -250,27 +233,17 @@ var Zafar = {
 
   authGet: function (path) {
     var self = this;
-    if (this.isDemo()) return ZafarDemo.get(path);
     return fetch(API_BASE_URL + path, {
       headers: { Authorization: "Bearer " + this.getToken() },
     })
       .then(function (res) {
         if (res.status === 401) return self._unauthorized();
         return self._json(res);
-      })
-      .catch(function (err) {
-        // Network-level failure (backend asleep/unreachable) -> demo data.
-        if (err instanceof TypeError) {
-          self.setDemo(true);
-          return ZafarDemo.get(path);
-        }
-        throw err;
       });
   },
 
   authPostJSON: function (path, body) {
     var self = this;
-    if (this.isDemo()) return ZafarDemo.post(path);
     return fetch(API_BASE_URL + path, {
       method: "POST",
       headers: {
@@ -282,13 +255,6 @@ var Zafar = {
       .then(function (res) {
         if (res.status === 401) return self._unauthorized();
         return self._json(res);
-      })
-      .catch(function (err) {
-        if (err instanceof TypeError) {
-          self.setDemo(true);
-          return ZafarDemo.post(path);
-        }
-        throw err;
       });
   },
 };
