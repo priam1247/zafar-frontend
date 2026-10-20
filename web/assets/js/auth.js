@@ -102,8 +102,8 @@ var ZafarAuth = (function () {
             '<div class="banner" id="authBanner"></div>' +
             '<div class="segment" role="tablist">' +
               '<span class="segment-thumb" data-segment-thumb></span>' +
-              '<button type="button" class="tab active" data-tab="signin" id="tab-signin"></button>' +
-              '<button type="button" class="tab" data-tab="create" id="tab-create"></button>' +
+              '<button type="button" role="tab" aria-selected="true" class="tab active" data-tab="signin" id="tab-signin"></button>' +
+              '<button type="button" role="tab" aria-selected="false" class="tab" data-tab="create" id="tab-create"></button>' +
             "</div>" +
             '<form class="auth-form" id="authForm" novalidate>' +
               '<div class="field" id="field-name" hidden>' +
@@ -363,7 +363,9 @@ var ZafarAuth = (function () {
   function setMode(next) {
     mode = next;
     document.querySelectorAll(".tab").forEach(function (tab) {
-      tab.classList.toggle("active", tab.dataset.tab === mode);
+      var on = tab.dataset.tab === mode;
+      tab.classList.toggle("active", on);
+      tab.setAttribute("aria-selected", String(on));
     });
     clearErrors(el("authForm"));
     render();
