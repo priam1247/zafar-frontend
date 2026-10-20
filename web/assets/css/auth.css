@@ -56,7 +56,9 @@ body.auth-body {
   object-fit: cover;
   object-position: top center;
   display: block;
+  animation: heroZoom 1.6s var(--ease);
 }
+@keyframes heroZoom { from { transform: scale(1.07); } to { transform: scale(1); } }
 /* Deep green scrim so the headline always clears contrast, whatever the
    photo is doing underneath. */
 .auth-hero::after {
@@ -101,34 +103,6 @@ body.auth-body {
   letter-spacing: 2.5px;
 }
 
-.lang-toggle {
-  position: absolute;
-  top: 22px;
-  right: 22px;
-  z-index: 2;
-  display: flex;
-  gap: 2px;
-  background: rgba(6, 20, 15, 0.4);
-  border: 1px solid rgba(255, 255, 255, 0.28);
-  border-radius: var(--r-full);
-  padding: 3px;
-  backdrop-filter: blur(6px);
-}
-.lang-toggle button {
-  border: 0;
-  background: transparent;
-  color: rgba(255, 255, 255, 0.72);
-  font-size: 12px;
-  font-weight: 700;
-  letter-spacing: 0.5px;
-  padding: 6px 11px;
-  border-radius: var(--r-full);
-  cursor: pointer;
-  transition: background 0.15s var(--ease), color 0.15s var(--ease);
-}
-.lang-toggle button:hover { color: #fff; }
-.lang-toggle button.active { background: rgba(255, 255, 255, 0.94); color: var(--text); }
-
 .hero-copy {
   position: absolute;
   left: 22px;
@@ -161,7 +135,9 @@ body.auth-body {
   border-radius: var(--r-xl) var(--r-xl) 0 0;
   padding: 22px 22px 28px;
   overflow: hidden;
+  animation: sheetUp 0.45s var(--ease);
 }
+@keyframes sheetUp { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: none; } }
 .sheet::before {
   content: "";
   display: block;
@@ -214,13 +190,28 @@ body.auth-body {
 /* ---------- Segmented tabs ---------- */
 
 .segment {
+  position: relative;
   display: flex;
   background: color-mix(in srgb, var(--text) 5%, transparent);
   border-radius: 14px;
   padding: 4px;
   margin-bottom: 22px;
 }
+.segment-thumb {
+  position: absolute;
+  top: 4px;
+  bottom: 4px;
+  left: 4px;
+  width: 0;
+  background: var(--surface);
+  border-radius: 11px;
+  box-shadow: 0 2px 8px rgba(29, 29, 27, 0.1);
+  transition: left 0.22s var(--ease), width 0.22s var(--ease);
+  z-index: 0;
+}
 .segment button {
+  position: relative;
+  z-index: 1;
   flex: 1;
   border: 0;
   background: transparent;
@@ -230,14 +221,10 @@ body.auth-body {
   font-weight: 600;
   color: var(--text-mute);
   cursor: pointer;
-  transition: background 0.18s var(--ease), color 0.18s var(--ease), box-shadow 0.18s var(--ease);
+  transition: color 0.18s var(--ease);
 }
 .segment button:hover { color: var(--text); }
-.segment button.active {
-  background: var(--surface);
-  color: var(--text);
-  box-shadow: 0 2px 8px rgba(29, 29, 27, 0.1);
-}
+.segment button.active { color: var(--text); }
 
 /* ---------- Panel head (back button + title) ---------- */
 
@@ -301,7 +288,6 @@ body.auth-body {
   padding: 8px;
   border-radius: var(--r-sm);
 }
-html[data-theme="dark"] .toggle-show { color: var(--brand-400); }
 .toggle-show:hover { background: color-mix(in srgb, var(--text) 5%, transparent); }
 .input-wrap input { padding-right: 62px !important; }
 
@@ -319,7 +305,6 @@ html[data-theme="dark"] .toggle-show { color: var(--brand-400); }
   text-underline-offset: 2px;
   cursor: pointer;
 }
-html[data-theme="dark"] .link-btn { color: var(--brand-400); }
 
 .submit {
   width: 100%;
@@ -386,6 +371,28 @@ html[data-theme="dark"] .link-btn { color: var(--brand-400); }
 }
 .otp-row input:focus { border-color: var(--brand-500); box-shadow: 0 0 0 3px var(--ring); }
 .otp-row.has-error input { border-color: var(--danger-500); }
+.otp-row input.filled { border-color: var(--brand-500); background: var(--brand-50); }
+
+/* ---------- Hero stat strip ---------- */
+.hero-stats { display: flex; flex-wrap: wrap; align-items: center; margin-top: 16px; }
+.hero-stats .stat-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: rgba(255, 255, 255, 0.92);
+  font-size: 12.5px;
+  font-weight: 600;
+}
+.hero-stats .stat-item svg { width: 14px; height: 14px; opacity: 0.9; }
+.hero-stats .stat-item + .stat-item { margin-left: 12px; padding-left: 12px; border-left: 1px solid rgba(255, 255, 255, 0.28); }
+
+/* ---------- Password strength ---------- */
+.strength { display: flex; gap: 5px; margin-top: 7px; }
+.strength i { height: 4px; flex: 1; border-radius: var(--r-full); background: var(--border); transition: background 0.2s var(--ease); }
+.strength[data-score="1"] i:nth-child(1) { background: var(--danger-500); }
+.strength[data-score="2"] i:nth-child(-n+2) { background: var(--warn-500); }
+.strength[data-score="3"] i:nth-child(-n+3) { background: var(--ok-500); }
+.strength-label { font-size: 12px; color: var(--text-mute); margin-top: 5px; min-height: 1em; }
 
 .resend-row { text-align: center; font-size: 13px; color: var(--text-mute); }
 .resend-row button.disabled {

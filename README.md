@@ -10,22 +10,20 @@ web/                     static frontend (no build step, no framework)
   login.html             sign in          }  entry point — the site now
   register.html          create account   }  starts here, not on a
   verify.html            email code       }  marketing landing page
-  home.html              signed-in dashboard overview
   dashboard.html         past papers
   books.html             textbooks
   notes.html             summary notes
   marking-keys.html      marking keys
   favorites.html         saved documents, across every section
   help.html              FAQ
-  assets/css/app.css     the whole design system, token driven, light + dark
+  assets/css/app.css     the whole design system, token driven, light theme
   assets/css/auth.css    the authentication screen
   assets/img/hero.jpg    brand photograph (auth hero)
   assets/js/config.js    API client, token storage, favorites, formatting
-  assets/js/i18n.js      EN/Chichewa string tables for the signed-in app
-  assets/js/shell.js     sidebar + topbar + theme + drawer + toasts
+  assets/js/i18n.js      the English string table for the signed-in app
+  assets/js/shell.js     sidebar + topbar + drawer + toasts
   assets/js/list.js      the shared document-list page
-  assets/js/home.js      dashboard overview
-  assets/js/auth.js      sign in / create account / verify, EN + Chichewa
+  assets/js/auth.js      sign in / create account / verify
   assets/js/demo.js      offline demo catalogue (fallback when the API is down)
 server.js                zero-dependency static server for local development
 worker.js                Cloudflare Worker that signs + streams Drive downloads
@@ -42,9 +40,9 @@ panel opens first.
 
 Colours live in `web/assets/css/app.css` as tokens and derive from the
 authentication screen: deep forest green `#0c3a2d` on warm cream `#f7f2e8`,
-with a single ochre accent (`#b4762a`) taken from the bookshelves in
-`assets/img/hero.jpg`. Dark mode is the same green dropped to near-black with
-cream text. Nothing in the app hard-codes a colour outside those tokens.
+with white as the single bright accent on the green surfaces. The app is
+light-only and English-only. Nothing in the app hard-codes a colour outside
+those tokens.
 
 ## Running locally
 
@@ -96,8 +94,8 @@ a same-origin blob so the filename survives.
   yet. The sign-in screen has both panels built and wired to validation, but
   submitting says so plainly instead of faking success — swap the banner in
   `wireForgot()` for the real calls when the endpoints land.
-- The EN/Chichewa toggle now covers the signed-in app too (sidebar, topbar,
-  list pages, dashboard, help), via `assets/js/i18n.js`, which reuses the
-  same `zafar_lang` key `auth.js` already writes. The Help & FAQ question
-  bodies are translated for the toggle; the "Known gaps" list above and this
-  README stay English-only.
+- The app is English-only and light-only. The former EN/Chichewa toggle and
+  the dark-mode toggle were removed; `assets/js/i18n.js` is now a plain
+  English string table, and the theme boots straight to the light palette.
+  The separate dashboard overview page was also removed — signing in now
+  lands directly on Past Papers.

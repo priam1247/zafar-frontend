@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en" data-theme="light">
+<html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -7,7 +7,6 @@
 <title>Help &amp; FAQ — Zafar</title>
 <meta name="description" content="Answers to common questions about downloads, limits and favorites on Zafar.">
 <link rel="stylesheet" href="assets/css/app.css">
-<script>try{var t=localStorage.getItem("zafar_theme");if(t)document.documentElement.setAttribute("data-theme",t);}catch(e){}</script>
 </head>
 <body>
   <div id="app"></div>
@@ -42,13 +41,28 @@
           '<div class="stat-foot">' + t("help.sectionsFoot") + "</div></div>" +
         "</div>" +
 
+        (SUPPORT_WHATSAPP
+          ? '<a class="panel contact-card" href="https://wa.me/' + encodeURIComponent(SUPPORT_WHATSAPP) +
+            '" target="_blank" rel="noopener">' +
+              '<span class="stat-glyph">' + ZafarShell.svg("help", 18) + "</span>" +
+              "<div><h3>" + t("help.contactTitle") + "</h3><p>" + t("help.contactBody") + "</p></div>" +
+              '<span class="contact-cta">' + t("help.contactCta") + ZafarShell.svg("bolt", 15) + "</span>" +
+            "</a>"
+          : "") +
+
         '<section class="stack"><div class="section-head"><h2>' + t("help.faqTitle") + "</h2></div>" +
-        '<div class="panel">' +
+        '<label class="search">' + ZafarShell.svg("search", 18) +
+          '<input type="search" data-faq-search placeholder="' + Zafar.escapeHTML(t("help.searchPlaceholder")) + '" aria-label="Search questions">' +
+        "</label>" +
+        '<div class="panel" data-faq-list>' +
           QA.map(function (item) {
             return '<details class="qa" id="' + item.id + '"><summary>' + item.q +
               '</summary><div class="qa-body">' + item.a + "</div></details>";
           }).join("") +
-        "</div></section>" +
+        "</div>" +
+        '<div class="state" data-faq-empty>' + ZafarShell.svg("search", 40) +
+          "<h3>" + t("help.noMatchesTitle") + "</h3><p>" + t("help.noMatchesBody") + "</p></div>" +
+        "</section>" +
 
         '<section class="stack"><div class="section-head"><h2>' + t("help.shortcutsTitle") + "</h2></div>" +
         '<div class="panel list">' +
@@ -58,7 +72,30 @@
           '<span class="sub">' + t("help.shortcutEsc") + "</span></span></div>" +
         "</div></section>";
 
-      shell.count.textContent = t("help.answers", QA.length);
+      function renderCount(n) {
+        shell.count.textContent = t("help.answers", n);
+      }
+      renderCount(QA.length);
+
+      /* ---------- Live FAQ filter ---------- */
+      var searchInput = shell.content.querySelector("[data-faq-search]");
+      var faqList = shell.content.querySelector("[data-faq-list]");
+      var faqEmpty = shell.content.querySelector("[data-faq-empty]");
+      var items = Array.prototype.slice.call(faqList.querySelectorAll(".qa"));
+
+      function filterFaq() {
+        var q = (searchInput.value || "").trim().toLowerCase();
+        var visible = 0;
+        items.forEach(function (row) {
+          var show = !q || row.textContent.toLowerCase().indexOf(q) !== -1;
+          row.style.display = show ? "" : "none";
+          if (show) visible++;
+        });
+        faqList.style.display = visible ? "" : "none";
+        faqEmpty.classList.toggle("show", visible === 0);
+        renderCount(visible);
+      }
+      searchInput.addEventListener("input", filterFaq);
 
       // Deep links like help.html#password open the matching question.
       if (location.hash) {

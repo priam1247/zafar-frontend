@@ -64,59 +64,8 @@ var ZafarAuth = (function () {
 
       offline: "Could not reach the server. Check your connection.",
     },
-    ny: {
-      langName: "Chichewa",
-      headline: "Kupeza mzeru.",
-      subtitle: "Onani mapepala akale a MSCE ndi JCE a zaka 12+, mayankho ndi zolemba.",
-      signin: "Lowani", create: "Kutsakula akaunti",
-      nameLabel: "Dzina lonse", namePh: "mwachitsanzo: Chikondi Banda",
-      emailLabel: "Imelo", emailPh: "mwachitsanzo: dzina@gmail.com",
-      passLabel: "Mawu achinsinsi", passPhSignin: "Lembani mawu achinsinsi", passPhCreate: "Zilembo 6 kapena kuposera",
-      confirmLabel: "Tsimikizani mawu achinsinsi", confirmPh: "Lembaninso mawu achinsinsi",
-      show: "Onetsa", hide: "Bisa",
-      stay: "Khalanibe olowa", forgot: "Mwaiwala mawu achinsinsi?",
-      continueBtn: "Pitirizani", createBtn: "Tsakulani akaunti",
-      signingIn: "Mukulowa…", creatingAccount: "Kutsakula akaunti…",
-      switchCreate: 'Ndinu wa ZAFAR chatsopano? <button type="button" class="link-btn" data-goto="create">Tsakulani akaunti</button>',
-      switchSignin: 'Muli ndi akaunti kale? <button type="button" class="link-btn" data-goto="signin">Lowani</button>',
-      footer: "Zaka 12+ zasungidwa&nbsp;&nbsp;•&nbsp;&nbsp;Kutsitsa tsiku ndi tsiku",
-      demoLine: "Mukungoyang'ana? Onani laibulale yachitsanzo",
-      errName: "Lembani dzina lanu lonse.", errEmail: "Lembani imelo yovomerezeka.",
-      errPassword: "Zilembo 6 kapena kuposera.", errConfirm: "Mawu achinsinsi sagwirizana.",
-      verifiedBanner: "Imelo yatsimikizika — lowani kuti mupitirize.",
-      registeredBanner: "Akaunti yapangidwa — lowani kuti mupitirize.",
-
-      forgotTitle: "Sinthani mawu achinsinsi",
-      forgotSubtitle: "Lembani imelo yolumikizidwa ndi akaunti yanu. Tikutumizirani nambala yotsimikizira.",
-      sendCode: "Tumizani nambala", sendingCode: "Tikutumiza…",
-      rememberLine: 'Mwakumbukira mawu achinsinsi? <button type="button" class="link-btn" data-back="auth">Lowani</button>',
-      errForgotEmail: "Lembani imelo yovomerezeka.",
-      forgotNotAvailable: "Kusintha mawu achinsinsi sikungathe pano. Chonde funsani thandizo.",
-
-      verifyTitle: "Onani imelo yanu",
-      verifySubtitle: "Tatumiza nambala ya zizindikiro 6 ku",
-      verifyBtn: "Tsimikizani nambala", verifying: "Tikutsimikiza…",
-      errCode: "Lembani nambala ya zizindikiro 6.",
-      resendPrefix: "Simunalandire?", resendLink: "Tumizaninso nambala",
-      resendWait: function (s) { return "Tumizaninso pa masekondi " + s; },
-      resendSent: "Nambala yatsopano yatumizidwa — onani Gmail yanu.",
-
-      resetTitle: "Pangani mawu achinsinsi atsopano",
-      resetSubtitle: "Sankhani mawu achinsinsi atsopano a akaunti yanu.",
-      resetCodeLabel: "Nambala 6", errResetCode: "Lowetsani nambala 6 zomwe zili mu imelo yanu.",
-      newPasswordLabel: "Mawu achinsinsi atsopano", confirmNewLabel: "Tsimikizani mawu achinsinsi atsopano",
-      resetBtn: "Sinthani mawu achinsinsi", resetting: "Tikusintha…",
-      errNewPassword: "Zilembo 6 kapena kuposera.", errConfirmNew: "Mawu achinsinsi sagwirizana.",
-
-      successTitle: "Mawu achinsinsi asinthidwa",
-      successSubtitle: "Mutha kulowa tsopano ndi mawu achinsinsi atsopano.",
-      backToSignin: "Bwererani ku kulowa",
-
-      offline: "Sitinathe kufikira seva. Onani intaneti yanu.",
-    },
   };
 
-  var LANG_KEY = "zafar_lang";
   var mode = "signin";
   var lang = "en";
   var resendTimer = null;
@@ -138,11 +87,13 @@ var ZafarAuth = (function () {
             "</span>" +
             '<span class="name">ZAFAR</span>' +
           "</a>" +
-          '<div class="lang-toggle" role="group" aria-label="Language">' +
-            '<button type="button" data-lang="en" class="active">EN</button>' +
-            '<button type="button" data-lang="ny">CH</button>' +
-          "</div>" +
-          '<div class="hero-copy"><h1 id="txt-headline"></h1><p id="txt-subtitle"></p></div>' +
+          '<div class="hero-copy"><h1 id="txt-headline"></h1><p id="txt-subtitle"></p>' +
+            '<div class="hero-stats">' +
+              '<span class="stat-item"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 7v5l3 2"/></svg><span>12+ years archived</span></span>' +
+              '<span class="stat-item"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v16"/><path d="M20.001 19A2 2 0 0022 17V5a2 2 0 00-1.999-2L16 3.002A5 5 0 0012 5a5 5 0 00-4-2H4a2 2 0 00-2 2v12a2 2 0 001.999 2H8a5 5 0 014 2 5 5 0 014-2z"/></svg><span>MSCE &amp; JCE</span></span>' +
+              '<span class="stat-item"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l2.4 7.2L22 12l-7.6 2.8L12 22l-2.4-7.2L2 12l7.6-2.8z"/></svg><span>Free to use</span></span>' +
+            '</div>' +
+          '</div>' +
         "</div>" +
 
         '<div class="sheet">' +
@@ -151,6 +102,7 @@ var ZafarAuth = (function () {
           '<div class="panel" id="panel-auth">' +
             '<div class="banner" id="authBanner"></div>' +
             '<div class="segment" role="tablist">' +
+              '<span class="segment-thumb" data-segment-thumb></span>' +
               '<button type="button" class="tab active" data-tab="signin" id="tab-signin"></button>' +
               '<button type="button" class="tab" data-tab="create" id="tab-create"></button>' +
             "</div>" +
@@ -171,6 +123,10 @@ var ZafarAuth = (function () {
                   '<input type="password" id="password" autocomplete="current-password" minlength="6">' +
                   '<button type="button" class="toggle-show" data-target="password"></button>' +
                 "</div>" +
+                '<div class="strength-wrap" id="strengthWrap" hidden>' +
+                  '<div class="strength" id="strengthMeter" data-score="0"><i></i><i></i><i></i></div>' +
+                  '<div class="strength-label" id="strengthLabel"></div>' +
+                '</div>' +
                 '<div class="error-msg" id="err-password"></div>' +
               "</div>" +
               '<div class="field" id="field-confirm" hidden>' +
@@ -191,7 +147,7 @@ var ZafarAuth = (function () {
               "</button>" +
               '<div class="switch-line" id="switchLine"></div>' +
             "</form>" +
-            '<div class="demo-line"><a href="home.html?demo=1" id="txt-demo"></a></div>' +
+            '<div class="demo-line"><a href="dashboard.html?demo=1" id="txt-demo"></a></div>' +
           "</div>" +
 
           /* ---------- forgot ---------- */
@@ -319,6 +275,15 @@ var ZafarAuth = (function () {
   function isValidEmail(v) { return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v); }
 
   /* ---------------- render ---------------- */
+  // Slide the pill behind whichever tab is active.
+  function moveThumb() {
+    var active = document.querySelector(".segment button.active");
+    var thumb = document.querySelector("[data-segment-thumb]");
+    if (!active || !thumb) return;
+    thumb.style.left = active.offsetLeft + "px";
+    thumb.style.width = active.offsetWidth + "px";
+  }
+
   function render() {
     var t = T[lang];
     var isCreate = mode === "create";
@@ -360,6 +325,8 @@ var ZafarAuth = (function () {
 
     el("field-name").hidden = !isCreate;
     el("field-confirm").hidden = !isCreate;
+    el("strengthWrap").hidden = !isCreate;
+    if (!isCreate) { el("strengthMeter").setAttribute("data-score", "0"); el("strengthLabel").textContent = ""; }
     el("password").setAttribute("autocomplete", isCreate ? "new-password" : "current-password");
 
     el("txt-forgotTitle").textContent = t.forgotTitle;
@@ -393,6 +360,7 @@ var ZafarAuth = (function () {
     el("txt-successTitle").textContent = t.successTitle;
     el("txt-successSubtitle").textContent = t.successSubtitle;
     el("txt-backToSignin").textContent = t.backToSignin;
+    moveThumb();
   }
 
   function setMode(next) {
@@ -403,19 +371,10 @@ var ZafarAuth = (function () {
     clearErrors(el("authForm"));
     render();
   }
-  function setLang(next) {
-    lang = T[next] ? next : "en";
-    try { localStorage.setItem(LANG_KEY, lang); } catch (e) {}
-    document.querySelectorAll(".lang-toggle button").forEach(function (b) {
-      b.classList.toggle("active", b.dataset.lang === lang);
-    });
-    render();
-  }
-
   /* ---------------- OTP ---------------- */
   function otpInputs() { return Array.prototype.slice.call(document.querySelectorAll("[data-otp]")); }
   function clearOtp() {
-    otpInputs().forEach(function (i) { i.value = ""; });
+    otpInputs().forEach(function (i) { i.value = ""; i.classList.remove("filled"); });
     el("otpRow").classList.remove("has-error");
     el("err-code").style.display = "none";
   }
@@ -426,7 +385,12 @@ var ZafarAuth = (function () {
     inputs.forEach(function (inp, i) {
       inp.addEventListener("input", function () {
         inp.value = inp.value.replace(/[^0-9]/g, "").slice(0, 1);
+        inp.classList.toggle("filled", inp.value.length > 0);
         if (inp.value && i < inputs.length - 1) inputs[i + 1].focus();
+        // All six digits in — submit on the user's behalf.
+        if (inputs.every(function (x) { return x.value; })) {
+          el("verifyForm").requestSubmit();
+        }
       });
       inp.addEventListener("keydown", function (e) {
         if (e.key === "Backspace" && !inp.value && i > 0) inputs[i - 1].focus();
@@ -481,6 +445,25 @@ var ZafarAuth = (function () {
     }
   }
 
+  /* ---------------- password strength ---------------- */
+  function passwordStrength(v) {
+    if (!v) return 0;
+    var s = 1;
+    if (v.length >= 8 && /[0-9]/.test(v) && /[a-zA-Z]/.test(v)) s = 2;
+    if (v.length >= 8 && /[a-z]/.test(v) && /[A-Z]/.test(v) && /[0-9]/.test(v) && /[^A-Za-z0-9]/.test(v)) s = 3;
+    return s;
+  }
+  function strengthLabel(s) { return ["", "Weak", "Fair", "Strong"][s] || ""; }
+  function wireStrength() {
+    var input = el("password"), meter = el("strengthMeter"), label = el("strengthLabel");
+    input.addEventListener("input", function () {
+      if (mode !== "create") { meter.setAttribute("data-score", "0"); label.textContent = ""; return; }
+      var s = passwordStrength(input.value);
+      meter.setAttribute("data-score", String(s));
+      label.textContent = input.value ? strengthLabel(s) : "";
+    });
+  }
+
   /* ---------------- flows ---------------- */
   function wireAuthForm() {
     var form = el("authForm");
@@ -517,7 +500,7 @@ var ZafarAuth = (function () {
         Zafar.postForm("/auth/login", { email: email, password: password })
           .then(function (data) {
             Zafar.setToken(data.access_token, el("staySignedIn").checked);
-            location.href = "home.html";
+            location.href = "dashboard.html";
           })
           .catch(function (err) {
             busy(false, t.continueBtn);
@@ -683,9 +666,6 @@ var ZafarAuth = (function () {
     document.querySelectorAll(".tab").forEach(function (tab) {
       tab.addEventListener("click", function () { setMode(tab.dataset.tab); });
     });
-    document.querySelectorAll(".lang-toggle button").forEach(function (b) {
-      b.addEventListener("click", function () { setLang(b.dataset.lang); });
-    });
     document.body.addEventListener("click", function (e) {
       var goto = e.target.closest("[data-goto]");
       if (goto) return setMode(goto.dataset.goto);
@@ -749,13 +729,8 @@ var ZafarAuth = (function () {
     wireForgot();
     wireVerify();
     wireReset();
-
-    var stored = null;
-    try { stored = localStorage.getItem(LANG_KEY); } catch (e) {}
-    lang = T[stored] ? stored : "en";
-    document.querySelectorAll(".lang-toggle button").forEach(function (b) {
-      b.classList.toggle("active", b.dataset.lang === lang);
-    });
+    wireStrength();
+    window.addEventListener("resize", moveThumb);
 
     var page = (location.pathname.split("/").pop() || "login.html").replace(/^$/, "login.html");
     var params = new URLSearchParams(location.search);
@@ -777,7 +752,7 @@ var ZafarAuth = (function () {
       // Already signed in and landing on the sign-in page? Skip the form.
       // register.html stays reachable so a second account can be made.
       if (page === "login.html" && Zafar.getToken() && !params.get("switch") && !params.get("verified")) {
-        location.replace("home.html");
+        location.replace("dashboard.html");
       }
     }
 
