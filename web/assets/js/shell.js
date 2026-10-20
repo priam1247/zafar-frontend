@@ -1,8 +1,9 @@
 /* ============================================================
    Zafar — app shell
-   Renders the sidebar + topbar for every signed-in page from one place
-   (previously each page hand-copied ~90 lines of identical markup),
-   and owns theme, the mobile drawer, toasts and the auth guard.
+   Renders the sidebar + topbar for every signed-in page from one
+   place, and owns the mobile drawer, toasts and the auth guard.
+   (Theme and language toggles were removed — the app is now
+   light-only and English-only.)
    ============================================================ */
 
 var ZafarShell = (function () {
@@ -29,6 +30,8 @@ var ZafarShell = (function () {
     empty: '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M9 15h6"/>',
     clock: '<circle cx="12" cy="12" r="10"/><path d="M12 7v5l3 2"/>',
     layers: '<path d="m12.83 2.18a2 2 0 0 0-1.66 0L2.6 6.08a1 1 0 0 0 0 1.83l8.58 3.91a2 2 0 0 0 1.66 0l8.58-3.9a1 1 0 0 0 0-1.83z"/><path d="m6.08 12-3.5 1.6a1 1 0 0 0 0 1.81l8.6 3.91a2 2 0 0 0 1.65 0l8.58-3.9a1 1 0 0 0 0-1.83L17.9 12"/>',
+    grid: '<rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/>',
+    list: '<line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/>',
   };
 
   function svg(name, size) {
@@ -40,24 +43,11 @@ var ZafarShell = (function () {
     );
   }
 
-  /* ---------- Theme (applied before paint by inline script in <head>) ---------- */
-  function currentTheme() {
-    return document.documentElement.getAttribute("data-theme") || "light";
-  }
-  function applyTheme(theme) {
-    document.documentElement.setAttribute("data-theme", theme);
-    try { localStorage.setItem("zafar_theme", theme); } catch (e) {}
-    document.querySelectorAll("[data-theme-switch]").forEach(function (el) {
-      el.setAttribute("aria-checked", theme === "dark" ? "true" : "false");
-    });
-  }
-
   /* ---------- Nav model ---------- */
   function navModel() {
     var t = ZafarI18n.t;
     return [
-      { label: t("nav.overview") },
-      { id: "home", icon: "home", text: t("nav.dashboard"), href: "home.html" },
+      { label: t("nav.library") },
       {
         id: "papers", icon: "file", text: t("nav.pastPapers"), href: "dashboard.html",
         children: [
@@ -114,12 +104,11 @@ var ZafarShell = (function () {
 
   function shellHTML(opts) {
     var t = ZafarI18n.t;
-    var lang = ZafarI18n.getLang();
     return (
       '<div class="overlay" data-overlay></div>' +
       '<aside class="sidebar" data-sidebar>' +
         '<div class="sidebar-header">' +
-          '<a class="brand" href="home.html">' +
+          '<a class="brand" href="dashboard.html">' +
             '<span class="brand-mark">' + svg("logo", 19) + "</span>" +
             '<span class="brand-text"><span class="brand-name">ZAFAR</span>' +
             '<span class="brand-sub">' + t("nav.studyLibrary") + "</span></span>" +
@@ -128,15 +117,6 @@ var ZafarShell = (function () {
         "</div>" +
         '<nav class="nav">' + navHTML(opts.active, opts.activeCategory) + "</nav>" +
         '<div class="sidebar-footer">' +
-          '<div class="theme-row">' + svg("sun", 16) + "<span>" + t("nav.darkMode") + "</span>" +
-            '<button class="switch" data-theme-switch role="switch" aria-checked="false" aria-label="Toggle dark mode"></button>' +
-          "</div>" +
-          '<div class="theme-row">' +
-            '<div class="lang-toggle" role="group" aria-label="Language">' +
-              '<button type="button" data-lang="en" class="' + (lang === "en" ? "active" : "") + '">EN</button>' +
-              '<button type="button" data-lang="ny" class="' + (lang === "ny" ? "active" : "") + '">CH</button>' +
-            "</div>" +
-          "</div>" +
           '<a class="nav-item" data-logout href="login.html">' + svg("logout") + "<span>" + t("nav.logOut") + "</span></a>" +
         "</div>" +
       "</aside>" +
@@ -174,7 +154,7 @@ var ZafarShell = (function () {
   function init(opts) {
     opts = opts || {};
 
-    // `?demo=1` (from the landing page's "Explore the demo" button) opens a
+    // `?demo=1` (from the sign-in screen's demo link) opens a
     // read-only tour of the app without a backend round-trip.
     var params = new URLSearchParams(location.search);
     if (params.get("demo") === "1") {
@@ -196,7 +176,6 @@ var ZafarShell = (function () {
       crumb: opts.crumb,
     });
 
-    applyTheme(currentTheme());
     Zafar.updateFavCountPill();
 
     var sidebar = root.querySelector("[data-sidebar]");
@@ -224,19 +203,6 @@ var ZafarShell = (function () {
       });
     });
 
-    root.querySelectorAll("[data-theme-switch]").forEach(function (sw) {
-      sw.addEventListener("click", function () {
-        applyTheme(currentTheme() === "dark" ? "light" : "dark");
-      });
-    });
-
-    root.querySelectorAll("[data-lang]").forEach(function (btn) {
-      btn.addEventListener("click", function () {
-        if (btn.classList.contains("active")) return;
-        ZafarI18n.setLang(btn.dataset.lang); // reloads the page
-      });
-    });
-
     root.querySelector("[data-logout]").addEventListener("click", function () {
       Zafar.clearToken();
     });
@@ -251,5 +217,5 @@ var ZafarShell = (function () {
     };
   }
 
-  return { init: init, svg: svg, showToast: showToast, applyTheme: applyTheme, markDemo: markDemo };
+  return { init: init, svg: svg, showToast: showToast, markDemo: markDemo };
 })();

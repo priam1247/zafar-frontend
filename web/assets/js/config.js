@@ -11,6 +11,11 @@ var API_BASE_URL = "https://bloody-brigitta-ahzafar-de9b1709.koyeb.app";
 // Keep in sync with the backend's daily_paper_limit (config.py default: 10).
 var DAILY_PAPER_LIMIT = 10;
 
+// The admin's WhatsApp number in international format — digits only,
+// country code included, no "+" (e.g. "265991234567"). Leave empty to
+// hide the "Still stuck?" contact card on the Help page.
+var SUPPORT_WHATSAPP = "";
+
 (function () {
   var override = new URLSearchParams(location.search).get("api");
   if (override) API_BASE_URL = override.replace(/\/+$/, "");

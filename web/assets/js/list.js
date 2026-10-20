@@ -24,12 +24,21 @@ var ZafarList = (function () {
     "size-asc":  function (a, b) { return (a.size_bytes || 0) - (b.size_bytes || 0); },
   };
 
+  /* Category -> spine colour. A curated green/grey family so the card
+     grid keeps a visual rhythm without breaking the brand palette. */
+  var SPINE = {
+    "MSCE Maneb":        "#0c3a2d",
+    "JCE Maneb":         "#2a7259",
+    "Mock":              "#4a7c6a",
+    "Other Past Papers": "#8a8071",
+    "Senior":            "#175946",
+    "Junior":            "#4a7c6a",
+  };
+  function spineColor(cat) { return SPINE[cat] || "#a9c6b8"; }
+
   function layout(cfg) {
     var t = ZafarI18n.t;
-    var cats = (cfg.categories || []).map(function (c) {
-      return '<option value="' + Zafar.escapeHTML(c) + '">' + Zafar.escapeHTML(c) + "</option>";
-    }).join("");
-
+    var activeCat = (new URLSearchParams(location.search).get("category")) || "";
     return (
       (cfg.quotaKey
         ? '<div class="row"><span class="badge badge-ok" data-limit>' + svg("bolt", 14) +
@@ -42,17 +51,21 @@ var ZafarList = (function () {
           '<input type="search" data-search placeholder="' +
           Zafar.escapeHTML(cfg.searchPlaceholder || t("list.allCategories")) + '" aria-label="Search">' +
         "</label>" +
-        (cats
-          ? '<select class="select" data-category aria-label="Filter by category">' +
-            '<option value="">' + t("list.allCategories") + "</option>" + cats + "</select>"
-          : "") +
         '<select class="select" data-sort aria-label="Sort results">' +
           '<option value="name-asc">' + t("list.sortNameAsc") + "</option>" +
           '<option value="name-desc">' + t("list.sortNameDesc") + "</option>" +
           '<option value="size-desc">' + t("list.sortSizeDesc") + "</option>" +
           '<option value="size-asc">' + t("list.sortSizeAsc") + "</option>" +
         "</select>" +
+        '<div class="view-toggle" role="group" aria-label="View">' +
+          '<button type="button" class="view-btn" data-view="grid" aria-label="Grid view" aria-pressed="true">' + svg("grid", 16) + "</button>" +
+          '<button type="button" class="view-btn" data-view="list" aria-label="List view" aria-pressed="false">' + svg("list", 16) + "</button>" +
+        "</div>" +
       "</div>" +
+
+      (cfg.categories && cfg.categories.length
+        ? '<div class="cat-chips" data-cat-chips></div>'
+        : "") +
 
       '<div class="chips" data-chips style="display:none"></div>' +
 
@@ -81,6 +94,20 @@ var ZafarList = (function () {
     return new Array(n).fill(one).join("");
   }
 
+  function catChipsHTML(categories, activeCat) {
+    var chips = [
+      '<button type="button" class="cat-chip' + (activeCat ? "" : " active") + '" data-cat="" aria-pressed="' + (!activeCat) + '">' +
+        ZafarI18n.t("list.allCategories") + "</button>",
+    ];
+    categories.forEach(function (c) {
+      chips.push(
+        '<button type="button" class="cat-chip' + (activeCat === c ? " active" : "") + '" data-cat="' +
+        Zafar.escapeHTML(c) + '" aria-pressed="' + (activeCat === c) + '">' + Zafar.escapeHTML(c) + "</button>"
+      );
+    });
+    return chips.join("");
+  }
+
   function cardHTML(doc) {
     var t = ZafarI18n.t;
     var title = Zafar.escapeHTML(doc.name.replace(/\.pdf$/i, ""));
@@ -88,6 +115,7 @@ var ZafarList = (function () {
     var saved = Zafar.getBookmarks().indexOf(doc.id) !== -1;
     return (
       '<article class="doc" data-id="' + Zafar.escapeHTML(doc.id) + '">' +
+        '<span class="doc-spine" style="background:' + spineColor(doc.category) + '"></span>' +
         '<div class="doc-top">' +
           '<span class="badge">' + Zafar.escapeHTML(doc.category || t("list.document")) + "</span>" +
           '<button class="fav-btn' + (saved ? " on" : "") + '" data-fav="' + Zafar.escapeHTML(doc.id) +
@@ -121,8 +149,8 @@ var ZafarList = (function () {
       error: root.querySelector("[data-error]"),
       offline: root.querySelector("[data-offline]"),
       chips: root.querySelector("[data-chips]"),
+      catChips: root.querySelector("[data-cat-chips]"),
       search: root.querySelector("[data-search]"),
-      category: root.querySelector("[data-category]"),
       sort: root.querySelector("[data-sort]"),
       limit: root.querySelector("[data-limit]"),
       limitText: root.querySelector("[data-limit-text]"),
@@ -134,8 +162,53 @@ var ZafarList = (function () {
       q: params.get("q") || "",
       sort: "name-asc",
     };
-    if (el.category) el.category.value = state.category;
     if (state.q) el.search.value = state.q;
+
+    /* ---------- View: grid / list ---------- */
+    var view = "grid";
+    try { view = localStorage.getItem("zafar_view") === "list" ? "list" : "grid"; } catch (e) {}
+    function applyView() {
+      el.grid.classList.toggle("list-view", view === "list");
+      root.querySelectorAll("[data-view]").forEach(function (b) {
+        var on = b.dataset.view === view;
+        b.classList.toggle("active", on);
+        b.setAttribute("aria-pressed", String(on));
+      });
+    }
+    root.querySelectorAll("[data-view]").forEach(function (b) {
+      b.addEventListener("click", function () {
+        view = b.dataset.view;
+        try { localStorage.setItem("zafar_view", view); } catch (e) {}
+        applyView();
+      });
+    });
+    applyView();
+
+    /* ---------- Favorites: group by section ---------- */
+    var SECTION_LABELS = {
+      papers: "Past Papers",
+      books: "Books",
+      notes: "Notes",
+      "marking-keys": "Marking Keys",
+    };
+    function groupedBySection(docs) {
+      var groups = {};
+      docs.forEach(function (d) {
+        var key = d._section || "other";
+        if (!groups[key]) groups[key] = [];
+        groups[key].push(d);
+      });
+      var keys = Object.keys(SECTION_LABELS).filter(function (k) { return groups[k]; });
+      Object.keys(groups).forEach(function (k) {
+        if (!SECTION_LABELS[k]) keys.push(k);
+      });
+      return keys.map(function (key) {
+        var label = SECTION_LABELS[key] || key;
+        return '<h3 class="group-title">' + Zafar.escapeHTML(label) +
+          '<span class="group-count">' + groups[key].length + "</span></h3>" +
+          '<div class="grid">' + groups[key].map(cardHTML).join("") + "</div>";
+      }).join("");
+    }
 
     /* ---------- Quota badge ---------- */
     var left = null;
@@ -180,8 +253,8 @@ var ZafarList = (function () {
       if (cfg.favoritesOnly && !on) setTimeout(load, 300);
     });
 
-    /* ---------- Downloads ----------
-       The list response never carries a download URL — a permanent link
+    /* ---------- Downloads ---------- */
+    /* The list response never carries a download URL — a permanent link
        there would let the daily quota be bypassed straight from the
        network tab. Every click first calls POST /drive/download/{id},
        which enforces + logs the quota and returns a short-lived signed
@@ -265,16 +338,27 @@ var ZafarList = (function () {
         });
     });
 
-    /* ---------- Chips ---------- */
+    /* ---------- Category chips ---------- */
+    function renderCatChips() {
+      if (!el.catChips) return;
+      el.catChips.innerHTML = catChipsHTML(cfg.categories || [], state.category);
+    }
+    if (el.catChips) {
+      el.catChips.addEventListener("click", function (e) {
+        var chip = e.target.closest("[data-cat]");
+        if (!chip) return;
+        state.category = chip.dataset.cat;
+        load();
+      });
+    }
+
+    /* ---------- Active-filter chips (search only; category lives in
+       its own chip row above) ---------- */
     function renderChips() {
       var chips = [];
-      if (state.category) {
-        chips.push('<span class="chip" data-chip="category">' + Zafar.escapeHTML(state.category) +
-          '<button aria-label="' + t("list.clearCategory") + '">✕</button></span>');
-      }
       if (state.q) {
         chips.push('<span class="chip" data-chip="q">“' + Zafar.escapeHTML(state.q) +
-          '”<button aria-label="' + t("list.clearSearch") + '">✕</button></span>');
+          '<button aria-label="' + t("list.clearSearch") + '">✕</button></span>');
       }
       if (chips.length) chips.push('<span class="chip clear" data-chip-clear>' + t("list.clearAll") + "</span>");
       el.chips.innerHTML = chips.join("");
@@ -286,15 +370,11 @@ var ZafarList = (function () {
         state.category = "";
         state.q = "";
         el.search.value = "";
-        if (el.category) el.category.value = "";
         return load();
       }
       var chip = e.target.closest("[data-chip]");
       if (!chip || e.target.tagName !== "BUTTON") return;
-      if (chip.dataset.chip === "category") {
-        state.category = "";
-        if (el.category) el.category.value = "";
-      } else {
+      if (chip.dataset.chip === "q") {
         state.q = "";
         el.search.value = "";
       }
@@ -312,7 +392,7 @@ var ZafarList = (function () {
 
     function show(which) {
       el.skeleton.style.display = which === "loading" ? "grid" : "none";
-      el.grid.style.display = which === "grid" ? "grid" : "none";
+      el.grid.style.display = which === "grid" ? (cfg.favoritesOnly ? "" : "grid") : "none";
       el.empty.classList.toggle("show", which === "empty");
       el.error.classList.toggle("show", which === "error");
       el.offline.classList.toggle("show", which === "offline");
@@ -321,6 +401,7 @@ var ZafarList = (function () {
     /* ---------- Load ---------- */
     function load() {
       renderChips();
+      renderCatChips();
       syncURL();
 
       if (!navigator.onLine) {
@@ -345,7 +426,16 @@ var ZafarList = (function () {
 
       Promise.all(requests)
         .then(function (results) {
-          var docs = [].concat.apply([], results);
+          // Tag each doc with the section it came from, so the
+          // Favorites page can group by section without the
+          // backend having to send one.
+          var docs = [];
+          results.forEach(function (rows, i) {
+            (rows || []).forEach(function (d) {
+              d._section = sections[i];
+              docs.push(d);
+            });
+          });
           if (Zafar.isDemo()) ZafarShell.markDemo();
           if (cfg.favoritesOnly) {
             var saved = Zafar.getBookmarks();
@@ -360,7 +450,7 @@ var ZafarList = (function () {
           if (!docs.length) {
             var p = el.empty.querySelector("p");
             var h = el.empty.querySelector("h3");
-            if (cfg.favoritesOnly) {
+            if (cfg.favoritesOnly && !state.q && !state.category) {
               h.textContent = t("list.noFavoritesTitle");
               p.innerHTML = t("list.noFavoritesBody");
             } else if (state.category || state.q) {
@@ -374,7 +464,13 @@ var ZafarList = (function () {
             return;
           }
 
-          el.grid.innerHTML = docs.map(cardHTML).join("");
+          if (cfg.favoritesOnly) {
+            el.grid.classList.add("grouped");
+            el.grid.innerHTML = groupedBySection(docs);
+          } else {
+            el.grid.classList.remove("grouped");
+            el.grid.innerHTML = docs.map(cardHTML).join("");
+          }
           show("grid");
         })
         .catch(function (err) {
@@ -389,12 +485,6 @@ var ZafarList = (function () {
       state.q = (el.search.value || "").trim();
       load();
     }, 320));
-    if (el.category) {
-      el.category.addEventListener("change", function () {
-        state.category = el.category.value;
-        load();
-      });
-    }
     el.sort.addEventListener("change", function () {
       state.sort = el.sort.value;
       load();
