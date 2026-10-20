@@ -42,9 +42,8 @@ var ZafarList = (function () {
     return (
       (cfg.quotaKey
         ? '<div class="row"><span class="badge badge-ok" data-limit>' + svg("bolt", 14) +
-          '<span data-limit-text>' + t("list.checkingLimit") + "</span></span>" +
-          '<span class="badge badge-warn" data-demo-tag style="display:none">' + t("list.demoData") + "</span></div>"
-        : '<div class="row"><span class="badge badge-warn" data-demo-tag style="display:none">' + t("list.demoData") + "</span></div>") +
+          '<span data-limit-text>' + t("list.checkingLimit") + "</span></span></div>"
+        : "") +
 
       '<div class="toolbar">' +
         '<label class="search">' + svg("search", 18) +
@@ -130,7 +129,8 @@ var ZafarList = (function () {
             '</span><br><span class="type">' + t("list.pdfDocument") + "</span></span>" +
           "</div>" +
           '<button class="btn btn-primary btn-sm" data-download="' + Zafar.escapeHTML(doc.id) +
-            '" data-filename="' + Zafar.escapeHTML(filename) + '">' + svg("download", 15) + t("list.download") + "</button>" +
+            '" data-filename="' + Zafar.escapeHTML(filename) + '" aria-label="' + t("list.download") + '">' +
+            svg("download", 15) + '<span class="btn-label">' + t("list.download") + "</span></button>" +
         "</div>" +
       "</article>"
     );
@@ -140,7 +140,6 @@ var ZafarList = (function () {
     var t = ZafarI18n.t;
     var root = shell.content;
     root.innerHTML = layout(cfg);
-    if (Zafar.isDemo()) ZafarShell.markDemo();
 
     var el = {
       grid: root.querySelector("[data-grid]"),
@@ -272,15 +271,29 @@ var ZafarList = (function () {
       }
 
       var id = btn.dataset.download;
+      var original = btn.innerHTML;
       btn.dataset.pending = "true";
       btn.setAttribute("aria-disabled", "true");
-      var restore = btn.innerHTML;
-      btn.innerHTML = svg("clock", 15) + t("list.preparing");
+      btn.disabled = true;
+      btn.classList.add("is-loading");
+      btn.innerHTML =
+        '<span class="btn-spinner" aria-hidden="true"></span>' +
+        '<span class="btn-label">' + t("list.preparing") + "</span>";
 
-      function done() {
+      function restore() {
         btn.dataset.pending = "false";
         btn.removeAttribute("aria-disabled");
-        btn.innerHTML = restore;
+        btn.disabled = false;
+        btn.classList.remove("is-loading", "is-done");
+        btn.innerHTML = original;
+      }
+
+      function markSaved() {
+        btn.classList.remove("is-loading");
+        btn.classList.add("is-done");
+        btn.innerHTML =
+          svg("check", 15) + '<span class="btn-label">' + t("list.saved") + "</span>";
+        setTimeout(restore, 1800);
       }
 
       Zafar.authPostJSON(
@@ -298,9 +311,9 @@ var ZafarList = (function () {
             category: card ? card.querySelector(".badge").textContent : "",
           });
 
-          if (data.demo || !data.url) {
-            done();
-            shell.showToast(t("list.demoNoFile"), "alert");
+          if (!data.url) {
+            restore();
+            shell.showToast(t("list.downloadFailed"), "alert");
             return;
           }
 
@@ -319,7 +332,7 @@ var ZafarList = (function () {
               a.click();
               a.remove();
               URL.revokeObjectURL(url);
-              done();
+              markSaved();
               // Tell the backend the bytes actually arrived, so this counts
               // permanently against today's quota. A reservation that never
               // gets confirmed (network drop, tab closed mid-fetch) ages out
@@ -327,12 +340,12 @@ var ZafarList = (function () {
               Zafar.authPostJSON("/drive/confirm/" + data.download_id).catch(function () {});
             })
             .catch(function () {
-              done();
+              restore();
               shell.showToast(t("list.downloadFailed"), "alert");
             });
         })
         .catch(function (err) {
-          done();
+          restore();
           if (err && err.status === 429) shell.showToast(t("list.limitReached"), "alert");
           else shell.showToast((err && err.message) || t("list.downloadStartFailed"), "alert");
         });
@@ -436,7 +449,6 @@ var ZafarList = (function () {
               docs.push(d);
             });
           });
-          if (Zafar.isDemo()) ZafarShell.markDemo();
           if (cfg.favoritesOnly) {
             var saved = Zafar.getBookmarks();
             docs = docs.filter(function (d) { return saved.indexOf(d.id) !== -1; });

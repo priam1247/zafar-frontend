@@ -24,7 +24,6 @@ web/                     static frontend (no build step, no framework)
   assets/js/shell.js     sidebar + topbar + drawer + toasts
   assets/js/list.js      the shared document-list page
   assets/js/auth.js      sign in / create account / verify
-  assets/js/demo.js      offline demo catalogue (fallback when the API is down)
 server.js                zero-dependency static server for local development
 worker.js                Cloudflare Worker that signs + streams Drive downloads
 ```
@@ -74,10 +73,9 @@ backend. Endpoints used:
 
 Override the backend per-session with `?api=https://…` on any page.
 
-When the backend can't be reached, the client transparently falls back to the
-bundled demo catalogue and every page shows a **Demo data** badge, so the UI is
-always explorable. `?demo=1` (or the landing page's "Explore the demo" button)
-forces that mode on.
+There is no demo mode — the app always talks to the real backend. When it
+can't be reached, each page shows a clear error or offline state instead of
+fake data, so what you see is always what's actually published.
 
 ## Downloads
 

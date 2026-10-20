@@ -143,24 +143,13 @@ var ZafarShell = (function () {
     toastTimer = setTimeout(function () { el.classList.remove("show"); }, 2600);
   }
 
-  function markDemo() {
-    var tag = document.querySelector("[data-demo-tag]");
-    if (tag) tag.style.display = "inline-flex";
-  }
-
   /* ---------- Init ---------- */
   // Returns null when the visitor isn't signed in (page is already
   // navigating to login.html), so page scripts can bail out early.
   function init(opts) {
     opts = opts || {};
 
-    // `?demo=1` (from the sign-in screen's demo link) opens a
-    // read-only tour of the app without a backend round-trip.
     var params = new URLSearchParams(location.search);
-    if (params.get("demo") === "1") {
-      Zafar.setDemo(true);
-      if (!Zafar.getToken()) Zafar.setToken("demo.eyJzdWIiOiJndWVzdCJ9.demo", false);
-    }
 
     if (!Zafar.getToken()) {
       location.href = "login.html";
@@ -207,8 +196,6 @@ var ZafarShell = (function () {
       Zafar.clearToken();
     });
 
-    if (Zafar.isDemo()) markDemo();
-
     return {
       content: root.querySelector("[data-content]"),
       count: root.querySelector("[data-count]"),
@@ -217,5 +204,5 @@ var ZafarShell = (function () {
     };
   }
 
-  return { init: init, svg: svg, showToast: showToast, markDemo: markDemo };
+  return { init: init, svg: svg, showToast: showToast };
 })();

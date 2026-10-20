@@ -7,10 +7,14 @@
    Colours all come from app.css tokens.
    ============================================================ */
 
+/* Apple-style reset: predictable sizing, no accidental sideways scroll. */
+*, *::before, *::after { box-sizing: border-box; }
+
 body.auth-body {
   min-height: 100vh;
   display: flex;
   justify-content: center;
+  overflow-x: hidden;
   background: var(--bg);
 }
 
@@ -133,7 +137,7 @@ body.auth-body {
   margin-top: -28px;
   background: var(--surface-2);
   border-radius: var(--r-xl) var(--r-xl) 0 0;
-  padding: 22px 22px 28px;
+  padding: 24px;
   overflow: hidden;
   animation: sheetUp 0.45s var(--ease);
 }
@@ -160,7 +164,7 @@ body.auth-body {
 }
 
 @media (min-width: 760px) {
-  .sheet { border-radius: var(--r-xl); padding: 22px 26px 26px; }
+  .sheet { border-radius: var(--r-xl); padding: 32px; }
 }
 
 .panel { position: relative; z-index: 1; }
@@ -192,10 +196,13 @@ body.auth-body {
 .segment {
   position: relative;
   display: flex;
+  width: 100%;
+  box-sizing: border-box;
   background: color-mix(in srgb, var(--text) 5%, transparent);
   border-radius: 14px;
   padding: 4px;
   margin-bottom: 22px;
+  overflow: hidden;
 }
 .segment-thumb {
   position: absolute;
@@ -212,19 +219,29 @@ body.auth-body {
 .segment button {
   position: relative;
   z-index: 1;
-  flex: 1;
+  /* flex-basis 0 + min-width 0 keeps both tabs equal and lets a long
+     label shrink instead of pushing the bar off-center or clipping. */
+  flex: 1 1 0;
+  min-width: 0;
   border: 0;
   background: transparent;
-  padding: 11px 0;
+  padding: 11px 6px;
   border-radius: 11px;
   font-size: 14.5px;
   font-weight: 600;
-  color: var(--text-mute);
+  text-align: center;
+  white-space: nowrap;
+  color: var(--text-soft);
   cursor: pointer;
   transition: color 0.18s var(--ease);
 }
 .segment button:hover { color: var(--text); }
 .segment button.active { color: var(--text); }
+
+/* Very narrow phones: keep both labels comfortable, never clipped. */
+@media (max-width: 380px) {
+  .segment button { font-size: 13.5px; padding: 11px 2px; }
+}
 
 /* ---------- Panel head (back button + title) ---------- */
 
@@ -250,7 +267,7 @@ body.auth-body {
 
 /* ---------- Form ---------- */
 
-.auth-form { display: flex; flex-direction: column; gap: 16px; position: relative; z-index: 1; }
+.auth-form { display: flex; flex-direction: column; gap: 18px; position: relative; z-index: 1; }
 .auth-form .field label { margin-bottom: 7px; display: block; }
 .input-wrap { position: relative; }
 .auth-form .field input {
@@ -316,7 +333,7 @@ body.auth-body {
   font-weight: 700;
   padding: 16px 0;
   min-height: 52px;
-  margin-top: 4px;
+  margin-top: 6px;
   cursor: pointer;
   display: flex;
   align-items: center;
@@ -340,15 +357,15 @@ body.auth-body {
 .submit.loading .spinner { display: inline-block; }
 @keyframes spin { to { transform: rotate(360deg); } }
 
-.switch-line { text-align: center; font-size: 13.5px; color: var(--text-mute); margin-top: 16px; }
+.switch-line { text-align: center; font-size: 14px; color: var(--text-soft); margin-top: 18px; }
 .switch-line button { font-size: inherit; }
 
 .sheet-footer {
   position: relative;
   z-index: 1;
   text-align: center;
-  font-size: 12.5px;
-  color: var(--text-mute);
+  font-size: 13px;
+  color: var(--text-soft);
   margin-top: 18px;
 }
 .sheet-footer a { color: var(--text-soft); text-decoration: underline; text-underline-offset: 2px; }
@@ -419,12 +436,3 @@ body.auth-body {
 .success-wrap h2 { margin: 0 0 8px; font-size: 20px; }
 .success-wrap p { margin: 0 0 22px; font-size: 13.5px; color: var(--text-mute); line-height: 1.5; }
 
-/* Demo shortcut, kept visually quieter than the real action. */
-.demo-line { margin-top: 14px; text-align: center; }
-.demo-line a {
-  font-size: 13px;
-  color: var(--text-mute);
-  text-decoration: underline;
-  text-underline-offset: 2px;
-}
-.demo-line a:hover { color: var(--text-soft); }
