@@ -81,6 +81,18 @@ node server.js            # http://localhost:4173
 
 Zero dependencies — `server.js` only serves `web/` and refuses paths outside it.
 
+### Reviewing the app without an account
+
+```
+http://localhost:4173/?demo=1
+```
+
+sets a cookie and injects a stand-in for the backend — a fake session plus a
+sample catalogue — so every screen can be walked without credentials or a
+network. It lives entirely inside `server.js`: nothing is added to `web/`, and
+the deployed site never sees it. Sign in normally by appending
+`login.html?switch=1`, or drop the cookie to talk to the real API again.
+
 ## Backend
 
 `API_BASE_URL` in `web/assets/js/config.js` points at the deployed FastAPI
