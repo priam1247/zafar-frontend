@@ -3,9 +3,10 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="theme-color" content="#0c3a2d">
-<title>Help &amp; FAQ — Zafar</title>
-<meta name="description" content="Answers to common questions about downloads, limits and favorites on Zafar.">
+<meta name="theme-color" content="#006D7C">
+<title>Help &amp; FAQ — ZAFAR</title>
+<meta name="description" content="Answers to common questions about downloads, limits and favorites on ZAFAR.">
+<link rel="preload" href="assets/fonts/instrument-sans.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="assets/css/app.css">
 </head>
 <body>
@@ -22,54 +23,63 @@
       if (!shell) return;
 
       var QA = t("help.qa");
+      var icon = ZafarShell.svg;
 
       shell.content.innerHTML =
-        '<section class="hero"><div><h2>' + t("help.heroTitle") + "</h2>" +
-        "<p>" + t("help.heroBody") + "</p></div>" +
-        '<div class="hero-actions"><a class="btn btn-primary" href="dashboard.html">' + t("help.backToPapers") + "</a></div></section>" +
+        '<section class="folio">' +
+          '<h2>' + t("help.heroTitle") + "</h2>" +
+          "<p>" + t("help.heroBody") + "</p>" +
+          '<a class="btn btn-on-teal btn-sm" href="dashboard.html">' + t("help.backToPapers") + "</a>" +
+        "</section>" +
 
-        '<div class="grid grid-stats">' +
-          '<div class="stat"><div class="stat-head"><span class="stat-glyph">' + ZafarShell.svg("bolt", 17) +
-          '</span><span class="stat-label">' + t("help.dailyLimitLabel") + '</span></div><div class="stat-value">' + DAILY_PAPER_LIMIT +
-          '</div><div class="stat-foot">' + t("help.dailyLimitFoot") + "</div></div>" +
-          '<div class="stat"><div class="stat-head"><span class="stat-glyph">' + ZafarShell.svg("clock", 17) +
-          '</span><span class="stat-label">' + t("help.limitResetsLabel") + '</span></div><div class="stat-value">00:00</div>' +
+        '<div class="stats">' +
+          '<div class="stat"><div class="stat-head"><span class="stat-glyph">' + icon("bolt", 14) +
+          '</span><span class="stat-label">' + t("help.dailyLimitLabel") + '</span></div>' +
+          '<div class="stat-value">' + DAILY_PAPER_LIMIT + "</div>" +
+          '<div class="stat-foot">' + t("help.dailyLimitFoot") + "</div></div>" +
+
+          '<div class="stat"><div class="stat-head"><span class="stat-glyph">' + icon("clock", 14) +
+          '</span><span class="stat-label">' + t("help.limitResetsLabel") + '</span></div>' +
+          '<div class="stat-value">00:00</div>' +
           '<div class="stat-foot">' + t("help.limitResetsFoot") + "</div></div>" +
-          '<div class="stat"><div class="stat-head"><span class="stat-glyph">' + ZafarShell.svg("layers", 17) +
-          '</span><span class="stat-label">' + t("help.sectionsLabel") + '</span></div><div class="stat-value">4</div>' +
+
+          '<div class="stat"><div class="stat-head"><span class="stat-glyph">' + icon("layers", 14) +
+          '</span><span class="stat-label">' + t("help.sectionsLabel") + '</span></div>' +
+          '<div class="stat-value">4</div>' +
           '<div class="stat-foot">' + t("help.sectionsFoot") + "</div></div>" +
         "</div>" +
 
         (SUPPORT_WHATSAPP
           ? '<a class="panel contact-card" href="https://wa.me/' + encodeURIComponent(SUPPORT_WHATSAPP) +
             '" target="_blank" rel="noopener">' +
-              '<span class="stat-glyph">' + ZafarShell.svg("help", 18) + "</span>" +
+              '<span class="stat-glyph">' + icon("help", 15) + "</span>" +
               "<div><h3>" + t("help.contactTitle") + "</h3><p>" + t("help.contactBody") + "</p></div>" +
-              '<span class="contact-cta">' + t("help.contactCta") + ZafarShell.svg("bolt", 15) + "</span>" +
+              '<span class="contact-cta">' + t("help.contactCta") + icon("bolt", 13) + "</span>" +
             "</a>"
           : "") +
 
-        '<section class="stack"><div class="section-head"><h2>' + t("help.faqTitle") + "</h2></div>" +
-        '<label class="search">' + ZafarShell.svg("search", 18) +
-          '<input type="search" data-faq-search placeholder="' + Zafar.escapeHTML(t("help.searchPlaceholder")) + '" aria-label="Search questions">' +
-        "</label>" +
-        '<div class="panel" data-faq-list>' +
-          QA.map(function (item) {
-            return '<details class="qa" id="' + item.id + '"><summary>' + item.q +
-              '</summary><div class="qa-body">' + item.a + "</div></details>";
-          }).join("") +
-        "</div>" +
-        '<div class="state" data-faq-empty>' + ZafarShell.svg("search", 40) +
-          "<h3>" + t("help.noMatchesTitle") + "</h3><p>" + t("help.noMatchesBody") + "</p></div>" +
+        '<section class="stack">' +
+          '<div class="section-head"><h2>' + t("help.faqTitle") + "</h2></div>" +
+          '<label class="search">' + icon("search", 18) +
+            '<input type="search" data-faq-search placeholder="' + Zafar.escapeHTML(t("help.searchPlaceholder")) + '" aria-label="Search questions">' +
+          "</label>" +
+          '<div class="panel" data-faq-list>' +
+            QA.map(function (item) {
+              return '<details class="qa" id="' + item.id + '"><summary>' + item.q +
+                '</summary><div class="qa-body">' + item.a + "</div></details>";
+            }).join("") +
+          "</div>" +
+          '<div class="state" data-faq-empty>' + icon("search", 38) +
+            "<h3>" + t("help.noMatchesTitle") + "</h3><p>" + t("help.noMatchesBody") + "</p></div>" +
         "</section>" +
 
-        '<section class="stack"><div class="section-head"><h2>' + t("help.shortcutsTitle") + "</h2></div>" +
-        '<div class="panel list">' +
-          '<div class="list-row"><span class="lines"><span class="name">/</span>' +
-          '<span class="sub">' + t("help.shortcutSlash") + '</span></span></div>' +
-          '<div class="list-row"><span class="lines"><span class="name">Esc</span>' +
-          '<span class="sub">' + t("help.shortcutEsc") + "</span></span></div>" +
-        "</div></section>";
+        '<section class="stack">' +
+          '<div class="section-head"><h2>' + t("help.shortcutsTitle") + "</h2></div>" +
+          '<div class="panel">' +
+            '<div class="list-row"><span class="lines"><span class="name">/</span>' +
+            '<span class="sub">' + t("help.shortcutSlash") + "</span></span></div>" +
+          "</div>" +
+        "</section>";
 
       function renderCount(n) {
         shell.count.textContent = t("help.answers", n);

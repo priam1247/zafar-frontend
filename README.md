@@ -16,22 +16,22 @@ web/                     static frontend (no build step, no framework)
   marking-keys.html      marking keys
   favorites.html         saved documents, across every section
   help.html              FAQ
-  assets/css/app.css     design system for the signed-in app, token driven
+  assets/css/app.css     the signed-in app — same system as auth.css
   assets/css/auth.css    the authentication screen — self-contained, so the
                          app stylesheet can be re-skinned without touching it
   assets/fonts/…         Instrument Sans, 29 KB variable (the only webfont)
   assets/img/hero.jpg    brand photograph — no longer used by the auth screen
   assets/js/config.js    API client, token storage, favorites, formatting
   assets/js/i18n.js      the English string table for the signed-in app
-  assets/js/shell.js     sidebar + topbar + drawer + toasts
+  assets/js/shell.js     top bar + bottom tabs + toasts
   assets/js/list.js      the shared document-list page
   assets/js/auth.js      sign in / create account / verify
 server.js                zero-dependency static server for local development
 worker.js                Cloudflare Worker that signs + streams Drive downloads
 ```
 
-The sidebar and topbar are rendered once from `shell.js`, and every list page
-(papers, books, notes, marking keys, favorites) is one call to
+The bar and the bottom tabs are rendered once from `shell.js`, and every list
+page (papers, books, notes, marking keys, favorites) is one call to
 `ZafarList.init({...})` — so a change to a card or a filter lands everywhere.
 Likewise `auth.js` builds the whole sign-in screen, and `login.html`,
 `register.html` and `verify.html` are 20-line shells that differ only in which
@@ -60,9 +60,18 @@ The mobile header carries a CSS-drawn library — floating past-paper cards over
 a shelf of book spines — which costs zero bytes. Phones therefore never
 download a hero image.
 
-**The signed-in app** (past papers, books, notes, marking keys, favourites,
-help) still runs on the previous forest-green/cream tokens in `app.css`. It has
-not been re-skinned to the new system yet.
+**The signed-in app** (`app.css`) is the same system, built the same way. A
+teal bar carries the wordmark, the page title and a running count; the white
+sheet carries the catalogue; five tabs pinned to the bottom hold the sections
+(Past Papers, Books, Notes, Marking Keys, Favorites). There is no sidebar and
+no drawer — categories are chips that scroll sideways on the list pages, and
+Help / Log out sit as two round buttons in the bar.
+
+Cards keep the same discipline as the auth screen: one hairline, no shadow, a
+mint tile for the file mark, the title, a category chip, then size and a single
+pill CTA. List view collapses the same card to one row. States (empty, error,
+offline) and the skeleton loader are shared, so every section fails the same
+way and loads the same way.
 
 ## Running locally
 
@@ -105,10 +114,6 @@ a same-origin blob so the filename survives.
 
 ## Known gaps
 
-- **The app still uses the old palette.** The auth screen is on teal/mint;
-  past papers, books, notes, marking keys, favourites and help are still on
-  forest green over cream in `app.css`. Signing in therefore changes colour
-  scheme. Porting the tokens across is the next piece of work.
 - `assets/img/hero.jpg` (1.5 MB) is no longer used by any page. It is kept for
   a future landing page; nothing loads it today.
 
