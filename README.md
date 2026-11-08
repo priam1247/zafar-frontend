@@ -49,9 +49,12 @@ teal on the sheet 5.9:1, cream on the teal CTA 5.9:1, mint on teal 4.8:1.
 
 One webfont, self-hosted: Instrument Sans, 29 KB, variable 100–900. No shadows
 anywhere — depth comes from the teal block against the sheet and one hairline.
-Mobile is the design: the sheet fills whatever height is left, the form is
-centred with `margin-block: auto` and the footer is pinned, so no screen ends
-in a dead band. Desktop is the same system at width.
+The design is **phone-only**. The sheet fills whatever height is left, the
+form is centred with `margin-block: auto` and the footer is pinned, so no
+screen ends in a dead band. There is no desktop layout at all: on a wide screen
+the column keeps its 470px phone width and centres itself, so what you see on a
+phone is what you see everywhere. Type is fixed in px — nothing scales with the
+viewport — so the two never drift apart.
 
 The mobile header carries a CSS-drawn library — floating past-paper cards over
 a shelf of book spines — which costs zero bytes. Phones therefore never
