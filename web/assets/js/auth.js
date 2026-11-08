@@ -1,68 +1,78 @@
 /* ============================================================
    Zafar — authentication screen
    One module drives login.html, register.html and verify.html: the markup
-   is built here so the three pages can't drift apart (the previous version
-   was the same 838 lines copied three times).
+   is built here so the three pages can't drift apart.
 
    Backend endpoints used:
-     POST /auth/register  {email, password, name}
-     POST /auth/login     form: email, password   -> {access_token}
-     POST /auth/verify    {email, code}
-     POST /auth/resend    {email}
+     POST /auth/register         {email, password, name}
+     POST /auth/login            form: email, password   -> {access_token}
+     POST /auth/verify           {email, code}
+     POST /auth/resend           {email}
+     POST /auth/forgot-password  {email}
+     POST /auth/reset-password   {email, code, new_password}
    ============================================================ */
 
 var ZafarAuth = (function () {
-  /* ---------------- translations ---------------- */
+  /* ---------------- strings ---------------- */
   var T = {
     en: {
-      langName: "English",
-      headline: "Acquire knowledge.",
-      subtitle: "Access 12+ years of MSCE &amp; JCE past papers, keys and notes.",
-      signin: "Sign in", create: "Create account",
-      nameLabel: "Full name", namePh: "e.g. Chikondi Banda",
-      emailLabel: "Email address", emailPh: "e.g. name@gmail.com",
-      passLabel: "Password", passPhSignin: "Enter your password", passPhCreate: "At least 6 characters",
-      confirmLabel: "Confirm password", confirmPh: "Re-enter your password",
-      show: "Show", hide: "Hide",
-      stay: "Stay signed in", forgot: "Forgot password?",
-      continueBtn: "Continue", createBtn: "Create account",
-      signingIn: "Signing in…", creatingAccount: "Creating account…",
-      switchCreate: 'New to ZAFAR? <button type="button" class="link-btn" data-goto="create">Create an account</button>',
-      switchSignin: 'Already have an account? <button type="button" class="link-btn" data-goto="signin">Sign in</button>',
-      footer: "12+ years archived&nbsp;&nbsp;•&nbsp;&nbsp;Daily downloads",
-      errName: "Enter your full name.", errEmail: "Enter a valid email address.",
-      errPassword: "At least 6 characters.", errConfirm: "Passwords don't match.",
-      verifiedBanner: "Email verified — sign in to continue.",
-      registeredBanner: "Account created — sign in to continue.",
+      headline: "Welcome to ZAFAR.",
+      subtitle: "Twelve years of <b>MSCE &amp; JCE past papers</b>, books, notes and " +
+        "<b>marking keys</b> &mdash; free for every Malawian student.",
 
-      forgotTitle: "Reset your password",
-      forgotSubtitle: "Enter the email linked to your account. We'll send a verification code.",
-      sendCode: "Send code", sendingCode: "Sending code…",
-      rememberLine: 'Remembered your password? <button type="button" class="link-btn" data-back="auth">Sign in</button>',
+      signin: "Sign in", create: "Create account",
+      switchCreate: 'Don\u2019t have an account? <button type="button" class="link-btn" data-goto="create">Create one</button>',
+      switchSignin: 'Already have an account? <button type="button" class="link-btn" data-goto="signin">Sign in</button>',
+
+      nameLabel: "Full name", namePh: "Full name",
+      emailLabel: "Email address", emailPh: "Email address",
+      passLabel: "Password", passPhSignin: "Password", passPhCreate: "Password \u2014 6 characters or more",
+      confirmLabel: "Confirm password", confirmPh: "Confirm password",
+      show: "Show password", hide: "Hide password",
+
+      stay: "Remember me", forgot: "Forgot password?",
+      continueBtn: "Sign in", createBtn: "Create account",
+      signingIn: "Signing in\u2026", creatingAccount: "Creating account\u2026",
+
+      footer: "12+ years archived&nbsp;&nbsp;&middot;&nbsp;&nbsp;Daily downloads&nbsp;&nbsp;&middot;&nbsp;&nbsp;Free",
+
+      errName: "Enter your full name.",
+      errEmail: "Enter a valid email address.",
+      errPassword: "At least 6 characters.",
+      errConfirm: "Passwords don't match.",
+      verifiedBanner: "Email verified \u2014 sign in to continue.",
+      registeredBanner: "Account created \u2014 sign in to continue.",
+
+      forgotTitle: "Reset password",
+      forgotSubtitle: "Enter the email on your account and we'll send a code.",
+      sendCode: "Send code", sendingCode: "Sending code\u2026",
+      rememberLine: 'Remembered it? <button type="button" class="link-btn" data-back="auth">Sign in</button>',
       errForgotEmail: "Enter a valid email address.",
       forgotNotAvailable: "Password reset isn't available yet. Please contact support.",
 
       verifyTitle: "Check your email",
       verifySubtitle: "We sent a 6-digit code to",
-      verifyBtn: "Verify code", verifying: "Verifying…",
+      verifyBtn: "Verify email", verifying: "Verifying\u2026",
       errCode: "Enter the 6-digit code.",
-      resendPrefix: "Didn't get it?", resendLink: "Resend code",
+      resendPrefix: "Nothing arrived?", resendLink: "Resend code",
       resendWait: function (s) { return "Resend in " + s + "s"; },
-      resendSent: "New code sent — check your Gmail.",
+      resendSent: "New code sent \u2014 check your email.",
 
-      resetTitle: "Create new password",
-      resetSubtitle: "Choose a new password for your account.",
+      resetTitle: "New password",
+      resetSubtitle: "Enter the code we emailed you, then choose a password.",
       resetCodeLabel: "6-digit code", errResetCode: "Enter the 6-digit code from your email.",
+      resetCodePh: "6-digit code",
       newPasswordLabel: "New password", confirmNewLabel: "Confirm new password",
-      resetBtn: "Reset password", resetting: "Updating…",
+      newPasswordPh: "New password \u2014 6 characters or more",
+      resetBtn: "Reset password", resetting: "Updating\u2026",
       errNewPassword: "At least 6 characters.", errConfirmNew: "Passwords don't match.",
 
       successTitle: "Password updated",
       successSubtitle: "You can now sign in with your new password.",
       backToSignin: "Back to sign in",
 
-      offline: "Could not reach the server. Check your connection.",
-    },
+      offline: "Could not reach the server. Check your connection."
+    }
   };
 
   var mode = "signin";
@@ -73,188 +83,216 @@ var ZafarAuth = (function () {
 
   var el = function (id) { return document.getElementById(id); };
 
+  /* ---------------- icons ---------------- */
+  var ICONS = {
+    book: '<path d="M12 5C10.2 3.6 7.6 3 5 3v13c2.6 0 5.2.6 7 2 1.8-1.4 4.4-2 7-2V3c-2.6 0-5.2.6-7 2Z"/><path d="M12 5v13"/>',
+    user: '<circle cx="12" cy="8.2" r="3.6"/><path d="M4.6 20.4a7.4 7.4 0 0 1 14.8 0"/>',
+    mail: '<rect x="3" y="5.6" width="18" height="12.8" rx="2.6"/><path d="m3.6 7.6 8.4 5.9 8.4-5.9"/>',
+    lock: '<rect x="4.6" y="10.6" width="14.8" height="9.8" rx="2.6"/><path d="M8.1 10.6V8a3.9 3.9 0 0 1 7.8 0v2.6"/>',
+    back: '<path d="m14.6 18.4-6.4-6.4 6.4-6.4"/>',
+    check: '<path d="M20 6.5 9.2 17.3 4 12.1"/>',
+    eye: '<path d="M2.6 12S6.2 5.8 12 5.8 21.4 12 21.4 12 17.8 18.2 12 18.2 2.6 12 2.6 12Z"/><circle cx="12" cy="12" r="2.9"/>',
+    eyeoff: '<path d="M4 4l16 16"/><path d="M9.9 5.2A9.7 9.7 0 0 1 12 5c5.8 0 9.4 7 9.4 7a16 16 0 0 1-3 3.8"/><path d="M6.3 7.1A16 16 0 0 0 2.6 12S6.2 19 12 19a9.4 9.4 0 0 0 3.3-.6"/>'
+  };
+  function icon(name, size, stroke) {
+    return '<svg width="' + (size || 16) + '" height="' + (size || 16) + '" viewBox="0 0 24 24" ' +
+      'fill="none" stroke="currentColor" stroke-width="' + (stroke || 1.7) + '" ' +
+      'stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
+      (ICONS[name] || "") + "</svg>";
+  }
+
   /* ---------------- markup ---------------- */
+
+  // Floating past-paper cards over a shelf of books — the library, drawn.
+  function libraryHTML() {
+    var heights = [56, 76, 44, 88, 62, 94, 50, 72, 82, 42, 90, 60, 78, 48, 84, 66, 58, 74];
+    var spines = "";
+    for (var i = 0; i < heights.length; i++) {
+      var cls = i % 6 === 2 ? " a" : i % 3 === 0 ? " w" : "";
+      spines += '<i class="' + cls + '" style="height:' + heights[i] + '%"></i>';
+    }
+    return '<div class="lib" aria-hidden="true">' +
+      '<span class="doc d3"></span><span class="doc d1"></span><span class="doc d2"></span>' +
+      '<div class="shelf">' + spines + "</div>" +
+    "</div>";
+  }
+
+  function fieldMarkup(o) {
+    return '<div class="field" id="' + o.field + '">' +
+      '<label class="sr-only" for="' + o.input + '" id="' + o.label + '"></label>' +
+      '<div class="control">' +
+        '<span class="ic">' + icon(o.icon, 18) + "</span>" +
+        '<input class="input" id="' + o.input + '" type="' + (o.type || "text") + '"' +
+          (o.ac ? ' autocomplete="' + o.ac + '"' : "") +
+          (o.mode ? ' inputmode="' + o.mode + '"' : "") +
+          (o.max ? ' maxlength="' + o.max + '"' : "") +
+          (o.min ? ' minlength="' + o.min + '"' : "") +
+          (o.pattern ? ' pattern="' + o.pattern + '"' : "") +
+          (o.otp === 0 ? ' autocomplete="one-time-code"' : "") +
+          (o.otp !== undefined ? ' data-otp="' + o.otp + '" aria-label="Digit ' + (o.otp + 1) + '"' : "") +
+          ' aria-labelledby="' + o.label + '">' +
+        (o.reveal ? '<button type="button" class="toggle-show" data-target="' + o.input + '"></button>' : "") +
+      "</div>" +
+      (o.err ? '<div class="error-msg" id="' + o.err + '"></div>' : "") +
+      (o.strength
+        ? '<div class="strength-wrap" id="strengthWrap" hidden>' +
+            '<div class="strength" id="strengthMeter" data-score="0"><i></i><i></i><i></i></div>' +
+            '<div class="strength-label" id="strengthLabel"></div>' +
+          "</div>"
+        : "") +
+    "</div>";
+  }
+
   function screenHTML() {
     return (
-      '<div class="screen">' +
-        '<div class="auth-hero">' +
-          '<img id="heroImg" src="assets/img/hero.jpg" alt="A student reading in the school library">' +
-          '<a class="auth-brand" href="login.html">' +
-            '<span class="mark">' +
-              '<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round" aria-hidden="true">' +
-              '<path d="M12 5C10.2 3.6 7.6 3 5 3v13c2.6 0 5.2.6 7 2 1.8-1.4 4.4-2 7-2V3c-2.6 0-5.2.6-7 2Z"/><path d="M12 5v13"/></svg>' +
-            "</span>" +
-            '<span class="name">ZAFAR</span>' +
-          "</a>" +
-          '<div class="hero-copy"><h1 id="txt-headline"></h1><p id="txt-subtitle"></p>' +
-            '<div class="hero-stats">' +
-              '<span class="stat-item"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 7v5l3 2"/></svg><span>12+ years archived</span></span>' +
-              '<span class="stat-item"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v16"/><path d="M20.001 19A2 2 0 0022 17V5a2 2 0 00-1.999-2L16 3.002A5 5 0 0012 5a5 5 0 00-4-2H4a2 2 0 00-2 2v12a2 2 0 001.999 2H8a5 5 0 014 2 5 5 0 014-2z"/></svg><span>MSCE &amp; JCE</span></span>' +
-              '<span class="stat-item"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l2.4 7.2L22 12l-7.6 2.8L12 22l-2.4-7.2L2 12l7.6-2.8z"/></svg><span>Free to use</span></span>' +
-            '</div>' +
-          '</div>' +
-        "</div>" +
+      '<div class="auth">' +
 
-        '<div class="sheet">' +
+        '<header class="mast has-head" id="mast">' +
+          '<div class="mast-top">' +
+            '<a class="wordmark" href="login.html">' +
+              '<span class="glyph">' + icon("book", 16) + "</span>ZAFAR" +
+            "</a>" +
+            '<span class="mast-tag">Study library</span>' +
+          "</div>" +
+          '<p class="mast-head" id="txt-headline"></p>' +
+          '<p class="mast-lede" id="txt-subtitle"></p>' +
+          libraryHTML() +
+        "</header>" +
 
-          /* ---------- auth ---------- */
-          '<div class="panel" id="panel-auth">' +
-            '<div class="banner" id="authBanner"></div>' +
-            '<div class="segment" role="tablist">' +
-              '<span class="segment-thumb" data-segment-thumb></span>' +
-              '<button type="button" role="tab" aria-selected="true" class="tab active" data-tab="signin" id="tab-signin"></button>' +
-              '<button type="button" role="tab" aria-selected="false" class="tab" data-tab="create" id="tab-create"></button>' +
+        '<section class="sheet">' +
+          '<div class="sheet-body">' +
+
+            /* ---------- auth ---------- */
+            '<div class="panel" id="panel-auth">' +
+              '<div class="head">' +
+                '<h1 id="txt-pageTitle"></h1>' +
+                '<p id="switchLine"></p>' +
+              "</div>" +
+              '<div class="banner" id="authBanner" role="status"></div>' +
+              '<form class="form" id="authForm" novalidate>' +
+                fieldMarkup({ field: "field-name", input: "fullName", label: "lbl-name",
+                  icon: "user", ac: "name", err: "err-name" }) +
+                fieldMarkup({ field: "field-email", input: "email", label: "lbl-email",
+                  icon: "mail", type: "email", mode: "email", ac: "email", err: "err-email" }) +
+                fieldMarkup({ field: "field-password", input: "password", label: "lbl-password",
+                  icon: "lock", type: "password", ac: "current-password", min: 6,
+                  reveal: true, err: "err-password", strength: true }) +
+                fieldMarkup({ field: "field-confirm", input: "confirmPassword", label: "lbl-confirm",
+                  icon: "lock", type: "password", ac: "new-password", reveal: true, err: "err-confirm" }) +
+                '<div class="options-row">' +
+                  '<label class="stay-signed"><input type="checkbox" id="staySignedIn" checked>' +
+                    '<span id="txt-stay"></span></label>' +
+                  '<button type="button" class="link-btn" id="forgotLink"></button>' +
+                "</div>" +
+                '<button type="submit" class="submit" id="submitBtn">' +
+                  '<span class="spinner"></span><span class="submit-label"></span>' +
+                "</button>" +
+              "</form>" +
             "</div>" +
-            '<form class="auth-form" id="authForm" novalidate>' +
-              '<div class="field" id="field-name" hidden>' +
-                '<label for="fullName" id="lbl-name"></label>' +
-                '<input type="text" id="fullName" autocomplete="name">' +
-                '<div class="error-msg" id="err-name"></div>' +
-              "</div>" +
-              '<div class="field" id="field-email">' +
-                '<label for="email" id="lbl-email"></label>' +
-                '<input type="email" id="email" autocomplete="email" inputmode="email">' +
-                '<div class="error-msg" id="err-email"></div>' +
-              "</div>" +
-              '<div class="field" id="field-password">' +
-                '<label for="password" id="lbl-password"></label>' +
-                '<div class="input-wrap">' +
-                  '<input type="password" id="password" autocomplete="current-password" minlength="6">' +
-                  '<button type="button" class="toggle-show" data-target="password"></button>' +
-                "</div>" +
-                '<div class="strength-wrap" id="strengthWrap" hidden>' +
-                  '<div class="strength" id="strengthMeter" data-score="0"><i></i><i></i><i></i></div>' +
-                  '<div class="strength-label" id="strengthLabel"></div>' +
-                '</div>' +
-                '<div class="error-msg" id="err-password"></div>' +
-              "</div>" +
-              '<div class="field" id="field-confirm" hidden>' +
-                '<label for="confirmPassword" id="lbl-confirm"></label>' +
-                '<div class="input-wrap">' +
-                  '<input type="password" id="confirmPassword" autocomplete="new-password">' +
-                  '<button type="button" class="toggle-show" data-target="confirmPassword"></button>' +
-                "</div>" +
-                '<div class="error-msg" id="err-confirm"></div>' +
-              "</div>" +
-              '<div class="options-row">' +
-                '<label class="stay-signed"><input type="checkbox" id="staySignedIn" checked>' +
-                '<span id="txt-stay"></span></label>' +
-                '<button type="button" class="link-btn" id="forgotLink"></button>' +
-              "</div>" +
-              '<button type="submit" class="submit" id="submitBtn">' +
-                '<span class="spinner"></span><span class="submit-label"></span>' +
-              "</button>" +
-              '<div class="switch-line" id="switchLine"></div>' +
-            "</form>" +
-          "</div>" +
 
-          /* ---------- forgot ---------- */
-          '<div class="panel" id="panel-forgot" hidden>' +
-            panelHead("auth", "txt-forgotTitle", "txt-forgotSubtitle") +
-            '<form class="auth-form" id="forgotForm" novalidate>' +
-              '<div class="field" id="field-forgot-email">' +
-                '<label for="forgotEmail" id="lbl-forgot-email"></label>' +
-                '<input type="email" id="forgotEmail" autocomplete="email" inputmode="email">' +
-                '<div class="error-msg" id="err-forgot-email"></div>' +
-              "</div>" +
-              '<div class="banner error" id="forgotBanner"></div>' +
-              '<button type="submit" class="submit" id="forgotBtn">' +
-                '<span class="spinner"></span><span class="submit-label" id="txt-sendCode"></span>' +
-              "</button>" +
-              '<div class="switch-line" id="rememberLine"></div>' +
-            "</form>" +
-          "</div>" +
+            /* ---------- forgot ---------- */
+            '<div class="panel" id="panel-forgot" hidden>' +
+              backBtn("auth") +
+              '<div class="head"><h1 id="txt-forgotTitle"></h1><p id="txt-forgotSubtitle"></p></div>' +
+              '<form class="form" id="forgotForm" novalidate>' +
+                fieldMarkup({ field: "field-forgot-email", input: "forgotEmail",
+                  label: "lbl-forgot-email", icon: "mail", type: "email", mode: "email",
+                  ac: "email", err: "err-forgot-email" }) +
+                '<div class="banner" id="forgotBanner" role="status"></div>' +
+                '<button type="submit" class="submit" id="forgotBtn">' +
+                  '<span class="spinner"></span><span class="submit-label" id="txt-sendCode"></span>' +
+                "</button>" +
+              "</form>" +
+              '<p class="alt" id="rememberLine"></p>' +
+            "</div>" +
 
-          /* ---------- verify ---------- */
-          '<div class="panel" id="panel-verify" hidden>' +
-            '<div class="panel-head">' +
+            /* ---------- verify ---------- */
+            '<div class="panel" id="panel-verify" hidden>' +
               backBtn("register") +
-              '<div class="panel-head-text"><h2 id="txt-verifyTitle"></h2>' +
-              '<p><span id="txt-verifySubtitle"></span> <strong id="verify-email-target"></strong></p></div>' +
+              '<div class="head"><h1 id="txt-verifyTitle"></h1>' +
+                '<p><span id="txt-verifySubtitle"></span><br>' +
+                '<strong id="verify-email-target"></strong></p></div>' +
+              '<form class="form" id="verifyForm" novalidate>' +
+                '<div class="otp-row" id="otpRow">' +
+                  [0, 1, 2, 3, 4, 5].map(function (i) {
+                    return '<input type="text" inputmode="numeric" pattern="[0-9]*" maxlength="1"' +
+                      (i === 0 ? ' autocomplete="one-time-code"' : "") +
+                      ' aria-label="Digit ' + (i + 1) + '" data-otp="' + i + '">';
+                  }).join("") +
+                "</div>" +
+                '<div class="error-msg" id="err-code"></div>' +
+                '<div class="banner" id="verifyBanner" role="status"></div>' +
+                '<button type="submit" class="submit" id="verifyBtn">' +
+                  '<span class="spinner"></span><span class="submit-label" id="txt-verifyBtn"></span>' +
+                "</button>" +
+                '<div class="resend-row"><span id="txt-resendPrefix"></span> ' +
+                  '<button type="button" class="link-btn" id="resendLink"></button></div>' +
+              "</form>" +
             "</div>" +
-            '<form class="auth-form" id="verifyForm" novalidate>' +
-              '<div class="otp-row" id="otpRow">' +
-                [0, 1, 2, 3, 4, 5].map(function (i) {
-                  return '<input type="text" inputmode="numeric" pattern="[0-9]*" maxlength="1"' +
-                    (i === 0 ? ' autocomplete="one-time-code"' : "") +
-                    ' aria-label="Digit ' + (i + 1) + '" data-otp="' + i + '">';
-                }).join("") +
-              "</div>" +
-              '<div class="error-msg" id="err-code" style="text-align:center"></div>' +
-              '<div class="banner error" id="verifyBanner"></div>' +
-              '<button type="submit" class="submit" id="verifyBtn" style="margin-top:6px">' +
-                '<span class="spinner"></span><span class="submit-label" id="txt-verifyBtn"></span>' +
-              "</button>" +
-              '<div class="resend-row"><span id="txt-resendPrefix"></span> ' +
-              '<button type="button" class="link-btn" id="resendLink"></button></div>' +
-            "</form>" +
-          "</div>" +
 
-          /* ---------- reset ---------- */
-          '<div class="panel" id="panel-reset" hidden>' +
-            panelHead("forgot", "txt-resetTitle", "txt-resetSubtitle") +
-            '<form class="auth-form" id="resetForm" novalidate>' +
-              '<div class="field" id="field-reset-code">' +
-                '<label for="resetCode" id="lbl-resetCode"></label>' +
-                '<input type="text" id="resetCode" inputmode="numeric" maxlength="6" autocomplete="one-time-code">' +
-                '<div class="error-msg" id="err-resetCode"></div>' +
-              "</div>" +
-              '<div class="field" id="field-new-password">' +
-                '<label for="newPassword" id="lbl-newPassword"></label>' +
-                '<div class="input-wrap"><input type="password" id="newPassword">' +
-                '<button type="button" class="toggle-show" data-target="newPassword"></button></div>' +
-                '<div class="error-msg" id="err-newPassword"></div>' +
-              "</div>" +
-              '<div class="field" id="field-confirm-new">' +
-                '<label for="confirmNewPassword" id="lbl-confirmNew"></label>' +
-                '<div class="input-wrap"><input type="password" id="confirmNewPassword">' +
-                '<button type="button" class="toggle-show" data-target="confirmNewPassword"></button></div>' +
-                '<div class="error-msg" id="err-confirmNew"></div>' +
-              "</div>" +
-              '<div class="banner error" id="resetBanner"></div>' +
-              '<button type="submit" class="submit" id="resetBtn">' +
-                '<span class="spinner"></span><span class="submit-label" id="txt-resetBtn"></span>' +
-              "</button>" +
-            "</form>" +
-          "</div>" +
-
-          /* ---------- success ---------- */
-          '<div class="panel" id="panel-success" hidden>' +
-            '<div class="success-wrap">' +
-              '<div class="success-icon">' +
-                '<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 13l4 4L19 7"/></svg>' +
-              "</div>" +
-              '<h2 id="txt-successTitle"></h2><p id="txt-successSubtitle"></p>' +
-              '<button type="button" class="submit" id="backToSigninBtn">' +
-              '<span class="submit-label" id="txt-backToSignin"></span></button>' +
+            /* ---------- reset ---------- */
+            '<div class="panel" id="panel-reset" hidden>' +
+              backBtn("forgot") +
+              '<div class="head"><h1 id="txt-resetTitle"></h1><p id="txt-resetSubtitle"></p></div>' +
+              '<form class="form" id="resetForm" novalidate>' +
+                fieldMarkup({ field: "field-reset-code", input: "resetCode",
+                  label: "lbl-resetCode", icon: "mail", mode: "numeric", max: 6,
+                  ac: "one-time-code", err: "err-resetCode" }) +
+                fieldMarkup({ field: "field-new-password", input: "newPassword",
+                  label: "lbl-newPassword", icon: "lock", type: "password", reveal: true,
+                  err: "err-newPassword" }) +
+                fieldMarkup({ field: "field-confirm-new", input: "confirmNewPassword",
+                  label: "lbl-confirmNew", icon: "lock", type: "password", reveal: true,
+                  err: "err-confirmNew" }) +
+                '<div class="banner" id="resetBanner" role="status"></div>' +
+                '<button type="submit" class="submit" id="resetBtn">' +
+                  '<span class="spinner"></span><span class="submit-label" id="txt-resetBtn"></span>' +
+                "</button>" +
+              "</form>" +
             "</div>" +
-          "</div>" +
 
-          '<div class="sheet-footer"><span id="txt-footer"></span></div>' +
-        "</div>" +
+            /* ---------- success ---------- */
+            '<div class="panel" id="panel-success" hidden>' +
+              '<div class="done">' +
+                '<div class="tick">' + icon("check", 28, 2.3) + "</div>" +
+                '<h1 id="txt-successTitle"></h1><p id="txt-successSubtitle"></p>' +
+                '<button type="button" class="submit" id="backToSigninBtn">' +
+                  '<span class="submit-label" id="txt-backToSignin"></span>' +
+                "</button>" +
+              "</div>" +
+            "</div>" +
+
+          "</div>" +
+          '<footer class="sheet-footer"><span id="txt-footer"></span></footer>' +
+        "</section>" +
       "</div>"
     );
   }
 
   function backBtn(dest) {
-    return (
-      '<button type="button" class="back-btn" data-back="' + dest + '" aria-label="Back">' +
-      '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 6l-6 6 6 6"/></svg>' +
-      "</button>"
-    );
-  }
-  function panelHead(dest, titleId, subId) {
-    return (
-      '<div class="panel-head">' + backBtn(dest) +
-      '<div class="panel-head-text"><h2 id="' + titleId + '"></h2><p id="' + subId + '"></p></div></div>'
-    );
+    return '<button type="button" class="back" data-back="' + dest + '" aria-label="Back">' +
+      icon("back", 18) + "</button>";
   }
 
   /* ---------------- state helpers ---------------- */
   var panels = ["auth", "forgot", "verify", "reset", "success"];
+
   function showPanel(name) {
     panels.forEach(function (p) { el("panel-" + p).hidden = p !== name; });
+    syncGreeting();
   }
+
+  // The welcome exists only on the screen people land on — never on a
+  // screen they reached mid-flow, and never on the create-account form.
+  function syncGreeting() {
+    var mast = el("mast");
+    var head = el("txt-headline");
+    if (!mast || !head) return;
+    var show = !el("panel-auth").hidden && mode === "signin";
+    mast.classList.toggle("has-head", show);
+    head.hidden = !show;
+  }
+
   function showBanner(id, message, isError) {
     var b = el(id);
     b.textContent = message || "";
@@ -273,25 +311,23 @@ var ZafarAuth = (function () {
   function isValidEmail(v) { return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v); }
 
   /* ---------------- render ---------------- */
-  // Slide the pill behind whichever tab is active.
-  function moveThumb() {
-    var active = document.querySelector(".segment button.active");
-    var thumb = document.querySelector("[data-segment-thumb]");
-    if (!active || !thumb) return;
-    thumb.style.left = active.offsetLeft + "px";
-    thumb.style.width = active.offsetWidth + "px";
+  function refreshReveal(btn) {
+    var input = el(btn.dataset.target);
+    var showing = !!input && input.type === "text";
+    btn.classList.toggle("shown", showing);
+    btn.setAttribute("aria-label", showing ? T[lang].hide : T[lang].show);
+    btn.innerHTML = icon(showing ? "eyeoff" : "eye", 18);
   }
 
   function render() {
     var t = T[lang];
     var isCreate = mode === "create";
 
-    document.documentElement.setAttribute("lang", lang === "ny" ? "ny" : "en");
-
     el("txt-headline").innerHTML = t.headline;
     el("txt-subtitle").innerHTML = t.subtitle;
-    el("tab-signin").textContent = t.signin;
-    el("tab-create").textContent = t.create;
+
+    el("txt-pageTitle").textContent = isCreate ? t.create : t.signin;
+    el("switchLine").innerHTML = isCreate ? t.switchSignin : t.switchCreate;
 
     el("lbl-name").textContent = t.nameLabel;
     el("fullName").placeholder = t.namePh;
@@ -302,17 +338,13 @@ var ZafarAuth = (function () {
     el("lbl-confirm").textContent = t.confirmLabel;
     el("confirmPassword").placeholder = t.confirmPh;
 
-    document.querySelectorAll(".toggle-show").forEach(function (btn) {
-      var input = el(btn.dataset.target);
-      btn.textContent = input && input.type === "text" ? t.hide : t.show;
-    });
+    document.querySelectorAll(".toggle-show").forEach(refreshReveal);
 
     el("txt-stay").textContent = t.stay;
     el("forgotLink").textContent = t.forgot;
     el("forgotLink").style.visibility = isCreate ? "hidden" : "visible";
 
     el("submitBtn").querySelector(".submit-label").textContent = isCreate ? t.createBtn : t.continueBtn;
-    el("switchLine").innerHTML = isCreate ? t.switchSignin : t.switchCreate;
     el("txt-footer").innerHTML = t.footer;
 
     el("err-name").textContent = t.errName;
@@ -323,7 +355,10 @@ var ZafarAuth = (function () {
     el("field-name").hidden = !isCreate;
     el("field-confirm").hidden = !isCreate;
     el("strengthWrap").hidden = !isCreate;
-    if (!isCreate) { el("strengthMeter").setAttribute("data-score", "0"); el("strengthLabel").textContent = ""; }
+    if (!isCreate) {
+      el("strengthMeter").setAttribute("data-score", "0");
+      el("strengthLabel").textContent = "";
+    }
     el("password").setAttribute("autocomplete", isCreate ? "new-password" : "current-password");
 
     el("txt-forgotTitle").textContent = t.forgotTitle;
@@ -345,9 +380,10 @@ var ZafarAuth = (function () {
     el("txt-resetTitle").textContent = t.resetTitle;
     el("txt-resetSubtitle").textContent = t.resetSubtitle;
     el("lbl-resetCode").textContent = t.resetCodeLabel;
+    el("resetCode").placeholder = t.resetCodePh;
     el("err-resetCode").textContent = t.errResetCode;
     el("lbl-newPassword").textContent = t.newPasswordLabel;
-    el("newPassword").placeholder = t.passPhCreate;
+    el("newPassword").placeholder = t.newPasswordPh;
     el("lbl-confirmNew").textContent = t.confirmNewLabel;
     el("confirmNewPassword").placeholder = t.confirmPh;
     el("err-newPassword").textContent = t.errNewPassword;
@@ -357,19 +393,16 @@ var ZafarAuth = (function () {
     el("txt-successTitle").textContent = t.successTitle;
     el("txt-successSubtitle").textContent = t.successSubtitle;
     el("txt-backToSignin").textContent = t.backToSignin;
-    moveThumb();
+
+    syncGreeting();
   }
 
   function setMode(next) {
     mode = next;
-    document.querySelectorAll(".tab").forEach(function (tab) {
-      var on = tab.dataset.tab === mode;
-      tab.classList.toggle("active", on);
-      tab.setAttribute("aria-selected", String(on));
-    });
     clearErrors(el("authForm"));
     render();
   }
+
   /* ---------------- OTP ---------------- */
   function otpInputs() { return Array.prototype.slice.call(document.querySelectorAll("[data-otp]")); }
   function clearOtp() {
@@ -399,7 +432,7 @@ var ZafarAuth = (function () {
         if (!text) return;
         e.preventDefault();
         text.slice(0, 6).split("").forEach(function (digit, idx) {
-          if (inputs[idx]) inputs[idx].value = digit;
+          if (inputs[idx]) { inputs[idx].value = digit; inputs[idx].classList.add("filled"); }
         });
         (inputs[Math.min(text.length, 5)] || inputs[5]).focus();
       });
@@ -511,7 +544,7 @@ var ZafarAuth = (function () {
         Zafar.postJSON("/auth/register", {
           email: email,
           password: password,
-          name: el("fullName").value.trim(),
+          name: el("fullName").value.trim()
         })
           .then(function () {
             busy(false, t.createBtn);
@@ -577,7 +610,6 @@ var ZafarAuth = (function () {
       Zafar.postJSON("/auth/resend", { email: currentEmail })
         .then(function () {
           showBanner("verifyBanner", T[lang].resendSent, false);
-          el("verifyBanner").classList.remove("error");
           startResendCountdown();
         })
         .catch(function (err) { showBanner("verifyBanner", friendlyError(err), true); });
@@ -638,7 +670,7 @@ var ZafarAuth = (function () {
       Zafar.postJSON("/auth/reset-password", {
         email: currentEmail,
         code: code,
-        new_password: el("newPassword").value,
+        new_password: el("newPassword").value
       })
         .then(function () {
           showPanel("success");
@@ -662,9 +694,8 @@ var ZafarAuth = (function () {
   }
 
   function wireChrome() {
-    document.querySelectorAll(".tab").forEach(function (tab) {
-      tab.addEventListener("click", function () { setMode(tab.dataset.tab); });
-    });
+    // Mode switch, panel back buttons — one delegated listener covers the
+    // links the renderer rewrites on every mode change.
     document.body.addEventListener("click", function (e) {
       var goto = e.target.closest("[data-goto]");
       if (goto) return setMode(goto.dataset.goto);
@@ -678,40 +709,14 @@ var ZafarAuth = (function () {
         showPanel(dest);
       }
     });
+
     document.querySelectorAll(".toggle-show").forEach(function (btn) {
       btn.addEventListener("click", function () {
         var input = el(btn.dataset.target);
-        var showing = input.type === "text";
-        input.type = showing ? "password" : "text";
-        btn.textContent = showing ? T[lang].show : T[lang].hide;
+        input.type = input.type === "password" ? "text" : "password";
+        refreshReveal(btn);
       });
     });
-  }
-
-  /* ---------------- accent from the hero photo ---------------- */
-  // The hero photo's average tone is blended heavily toward brand green and
-  // used for focus rings, so the page feels tied to whatever image is set.
-  function applyAccentFromImage(img) {
-    try {
-      var size = 24;
-      var canvas = document.createElement("canvas");
-      canvas.width = size;
-      canvas.height = size;
-      var ctx = canvas.getContext("2d");
-      ctx.drawImage(img, 0, 0, size, size);
-      var data = ctx.getImageData(0, 0, size, size).data;
-      var r = 0, g = 0, b = 0, n = 0;
-      for (var i = 0; i < data.length; i += 4) { r += data[i]; g += data[i + 1]; b += data[i + 2]; n++; }
-      function mix(sample, brand) {
-        return Math.max(0, Math.min(255, Math.round((sample / n) * 0.25 + brand * 0.75)));
-      }
-      document.documentElement.style.setProperty(
-        "--ring",
-        "rgba(" + mix(r, 12) + "," + mix(g, 58) + "," + mix(b, 45) + ",0.28)"
-      );
-    } catch (e) {
-      /* canvas is tainted or unavailable — the token default stays */
-    }
   }
 
   /* ---------------- init ---------------- */
@@ -721,7 +726,6 @@ var ZafarAuth = (function () {
 
     var root = document.getElementById("auth");
     root.innerHTML = screenHTML();
-    document.body.classList.add("auth-body");
 
     wireChrome();
     wireAuthForm();
@@ -729,7 +733,6 @@ var ZafarAuth = (function () {
     wireVerify();
     wireReset();
     wireStrength();
-    window.addEventListener("resize", moveThumb);
 
     var page = (location.pathname.split("/").pop() || "login.html").replace(/^$/, "login.html");
     var params = new URLSearchParams(location.search);
@@ -754,10 +757,6 @@ var ZafarAuth = (function () {
         location.replace("dashboard.html");
       }
     }
-
-    var hero = el("heroImg");
-    if (hero.complete && hero.naturalWidth) applyAccentFromImage(hero);
-    else hero.addEventListener("load", function () { applyAccentFromImage(hero); });
   }
 
   return { init: init, T: T };

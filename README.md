@@ -16,9 +16,11 @@ web/                     static frontend (no build step, no framework)
   marking-keys.html      marking keys
   favorites.html         saved documents, across every section
   help.html              FAQ
-  assets/css/app.css     the whole design system, token driven, light theme
-  assets/css/auth.css    the authentication screen
-  assets/img/hero.jpg    brand photograph (auth hero)
+  assets/css/app.css     design system for the signed-in app, token driven
+  assets/css/auth.css    the authentication screen — self-contained, so the
+                         app stylesheet can be re-skinned without touching it
+  assets/fonts/…         Instrument Sans, 29 KB variable (the only webfont)
+  assets/img/hero.jpg    brand photograph — no longer used by the auth screen
   assets/js/config.js    API client, token storage, favorites, formatting
   assets/js/i18n.js      the English string table for the signed-in app
   assets/js/shell.js     sidebar + topbar + drawer + toasts
@@ -37,11 +39,27 @@ panel opens first.
 
 ## Design
 
-Colours live in `web/assets/css/app.css` as tokens and derive from the
-authentication screen: deep forest green `#0c3a2d` on warm cream `#f7f2e8`,
-with white as the single bright accent on the green surfaces. The app is
-light-only and English-only. Nothing in the app hard-codes a colour outside
-those tokens.
+**The authentication screen** (`auth.css`) is the current reference design.
+A teal panel carries the brand and a white sheet carries the form: centred
+title, pill fields with leading icons, one pill CTA. Two colours do the work —
+teal `#006D7C` for every piece of text, border and the CTA, mint `#CFEBE1` for
+highlights on the teal panel only (mint on cream is invisible, so it never
+appears there). Amber `#B26A14` is reserved for errors and notices. Contrast:
+teal on the sheet 5.9:1, cream on the teal CTA 5.9:1, mint on teal 4.8:1.
+
+One webfont, self-hosted: Instrument Sans, 29 KB, variable 100–900. No shadows
+anywhere — depth comes from the teal block against the sheet and one hairline.
+Mobile is the design: the sheet fills whatever height is left, the form is
+centred with `margin-block: auto` and the footer is pinned, so no screen ends
+in a dead band. Desktop is the same system at width.
+
+The mobile header carries a CSS-drawn library — floating past-paper cards over
+a shelf of book spines — which costs zero bytes. Phones therefore never
+download a hero image.
+
+**The signed-in app** (past papers, books, notes, marking keys, favourites,
+help) still runs on the previous forest-green/cream tokens in `app.css`. It has
+not been re-skinned to the new system yet.
 
 ## Running locally
 
@@ -49,11 +67,7 @@ those tokens.
 node server.js            # http://localhost:4173
 ```
 
-Or with the Alloy dev stack:
-
-```bash
-docker compose -f docker-compose.alloy.yaml up
-```
+Zero dependencies — `server.js` only serves `web/` and refuses paths outside it.
 
 ## Backend
 
@@ -87,6 +101,13 @@ from Drive with a correct `Content-Disposition`; the page then hands the browser
 a same-origin blob so the filename survives.
 
 ## Known gaps
+
+- **The app still uses the old palette.** The auth screen is on teal/mint;
+  past papers, books, notes, marking keys, favourites and help are still on
+  forest green over cream in `app.css`. Signing in therefore changes colour
+  scheme. Porting the tokens across is the next piece of work.
+- `assets/img/hero.jpg` (1.5 MB) is no longer used by any page. It is kept for
+  a future landing page; nothing loads it today.
 
 - `/auth/forgot-password` and `/auth/reset-password` don't exist server-side
   yet. The sign-in screen has both panels built and wired to validation, but
