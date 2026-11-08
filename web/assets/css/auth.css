@@ -98,6 +98,11 @@ img { display: block; }
   flex-direction: column;
   min-height: 100vh;
   min-height: 100dvh;
+  /* Phone-only design: the column keeps its phone width on any screen
+     instead of rearranging into a desktop layout. */
+  width: 100%;
+  max-width: 470px;
+  margin-inline: auto;
   background: var(--brand); /* shows through the sheet's rounded corners */
 }
 
@@ -135,16 +140,6 @@ img { display: block; }
   place-items: center;
   background: var(--mint);
   color: var(--brand);
-}
-
-.mast-tag {
-  display: none;
-  font-size: 9.5px;
-  font-weight: 600;
-  letter-spacing: .14em;
-  text-transform: uppercase;
-  color: var(--on-72);
-  white-space: nowrap;
 }
 
 /* The greeting exists only on the screen people land on. */
@@ -598,77 +593,6 @@ img { display: block; }
   text-transform: uppercase;
   color: var(--t-45);
   text-align: center;
-}
-
-/* ============================================================
-   Wide screens
-   ============================================================ */
-
-@media (min-width: 900px) {
-  .auth { display: grid; grid-template-columns: 46fr 54fr; background: var(--sheet); }
-
-  .mast {
-    display: flex;
-    flex-direction: column;
-    padding: 34px 44px 0;
-    overflow: hidden;
-  }
-
-  .mast-tag {
-    display: inline-block;
-    padding: 5px 11px;
-    border: 1px solid var(--on-16);
-    border-radius: 999px;
-    color: var(--on-72);
-  }
-
-  .mast-head {
-    margin: 0;
-    font-size: clamp(34px, 3.2vw, 50px);
-    line-height: 1;
-    letter-spacing: -.04em;
-  }
-
-  .mast-lede {
-    margin-top: 18px;
-    max-width: 21ch;
-    font-size: clamp(21px, 2vw, 31px);
-    line-height: 1.2;
-    letter-spacing: -.028em;
-    color: var(--on);
-  }
-  .mast.has-head .mast-lede {
-    margin-top: 16px;
-    max-width: 30ch;
-    font-size: 14.5px;
-    line-height: 1.5;
-    letter-spacing: 0;
-    color: var(--on-72);
-  }
-
-  .lib {
-    height: 190px;
-    margin: auto -44px 0; /* pinned to the bottom of the panel */
-    padding: 18px 44px 32px;
-  }
-  .shelf { height: 64px; gap: 5px; bottom: 32px; border-bottom-width: 3px; }
-  .shelf i { border-radius: 2px 2px 0 0; }
-
-  .doc { border-radius: 10px; }
-  .doc::before, .doc::after { left: 11px; right: 13px; height: 3px; }
-  .doc::before { top: 15px; }
-  .doc::after { top: 24px; right: 24px; }
-  .doc.d1 { right: 88px; top: 0; width: 64px; height: 82px; }
-  .doc.d2 { right: 10px; top: 18px; width: 54px; height: 68px; }
-  .doc.d3 { right: 178px; top: 40px; width: 40px; height: 50px; }
-
-  .sheet {
-    border-radius: 0;
-    padding: 44px clamp(34px, 5vw, 76px) 26px;
-  }
-  .sheet-body { margin-block: auto; margin-inline: 0; max-width: 384px; }
-  .head { padding-top: 0; }
-  .sheet-footer { margin-top: 20px; }
 }
 
 @media (max-width: 380px) {

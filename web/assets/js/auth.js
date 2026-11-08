@@ -152,7 +152,6 @@ var ZafarAuth = (function () {
             '<a class="wordmark" href="login.html">' +
               '<span class="glyph">' + icon("book", 16) + "</span>ZAFAR" +
             "</a>" +
-            '<span class="mast-tag">Study library</span>' +
           "</div>" +
           '<p class="mast-head" id="txt-headline"></p>' +
           '<p class="mast-lede" id="txt-subtitle"></p>' +
