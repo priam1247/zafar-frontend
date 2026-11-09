@@ -173,11 +173,20 @@ const DEMO_SCRIPT = `<script>
     if (url.indexOf("/auth/quota") !== -1) return reply(200, readQuota());
 
     if (url.indexOf("/drive/download/") !== -1) {
-      var section = new URL(url, location.href).searchParams.get("section") || "papers";
-      // An unknown section is a client bug on the real server (400), so the
-      // demo refuses it the same way instead of quietly charging papers.
-      if (!BUCKET[section]) return reply(400, { detail: "Unknown section" });
-      var field = BUCKET[section];
+      // The section is required, exactly as on the server: no default, because a
+      // default is what a broken caller never notices. Missing answers 422 in
+      // FastAPI's own validation shape, unknown answers 400 with its message,
+      // and neither charges anything.
+      var asked = new URL(url, location.href).searchParams.get("section");
+      if (asked === null) {
+        return reply(422, {
+          detail: [
+            { type: "missing", loc: ["query", "section"], msg: "Field required", input: null }
+          ]
+        });
+      }
+      if (!BUCKET[asked]) return reply(400, { detail: "Unknown section '" + asked + "'" });
+      var field = BUCKET[asked];
       var key = field + "_left";
       var usedKey = field + "_downloaded_today";
       var quota = readQuota();
