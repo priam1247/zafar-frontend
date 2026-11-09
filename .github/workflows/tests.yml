@@ -1,0 +1,20 @@
+name: tests
+
+# The app has no build step, so the only thing a push can break silently is
+# behaviour — and it has. These tests are the checks that were run by hand
+# after every round; now they run on their own.
+on:
+  push:
+  pull_request:
+
+jobs:
+  app:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npm test

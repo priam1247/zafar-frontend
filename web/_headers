@@ -2,3 +2,12 @@
 # current app on the next visit, not one from last week.
 /*.html
   Cache-Control: no-cache
+
+# The app is never framed, never runs anything it did not ship, and never lets
+# a browser guess a file's type. (No script-src: every page carries a small
+# inline script, so a strict policy would need nonces served per request.)
+/*
+  X-Content-Type-Options: nosniff
+  X-Frame-Options: DENY
+  Referrer-Policy: strict-origin-when-cross-origin
+  Content-Security-Policy: frame-ancestors 'none'; object-src 'none'; base-uri 'self'

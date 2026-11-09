@@ -28,7 +28,7 @@
   <script>
     document.addEventListener("DOMContentLoaded", function () {
       var p = ZafarI18n.t("pages.keys");
-      var shell = ZafarShell.init({ active: "keys", title: p.title, crumb: p.crumb, desc: p.desc });
+      var shell = ZafarShell.init({ active: "keys", title: p.title, crumb: p.crumb });
       if (!shell) return;
       ZafarList.init({
         section: "marking-keys",

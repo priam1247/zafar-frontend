@@ -3,7 +3,11 @@
    ============================================================ */
 
 // Base URL of the deployed Zafar backend (zafar-backend FastAPI app).
-// Can be overridden at runtime with ?api=https://... for testing.
+// A local page may point at another backend with ?api=http://..., which is
+// how the app is developed against a laptop server. Anywhere else the
+// parameter is ignored: honouring it on the live site would let a link such
+// as notes.html?api=https://elsewhere send the student's login token to a
+// host we do not control.
 var API_BASE_URL = "https://bloody-brigitta-ahzafar-de9b1709.koyeb.app";
 
 // Daily allowances: one bucket per section, counted separately.
@@ -46,7 +50,16 @@ var SUPPORT_WHATSAPP = "";
 
 (function () {
   var override = new URLSearchParams(location.search).get("api");
-  if (override) API_BASE_URL = override.replace(/\/+$/, "");
+  if (!override) return;
+  var host = location.hostname;
+  var local = host === "localhost" || host === "127.0.0.1" || host === "[::1]" || host === "::1";
+  var target = null;
+  try { target = new URL(override); } catch (e) { target = null; }
+  if (!local || !target || (target.protocol !== "http:" && target.protocol !== "https:")) {
+    console.warn("Zafar: ?api= is only honoured on a local page — ignoring it.");
+    return;
+  }
+  API_BASE_URL = target.origin + target.pathname.replace(/\/+$/, "");
 })();
 
 var Zafar = {
@@ -76,8 +89,9 @@ var Zafar = {
 
   // Bookmarks / recent downloads are per-account, not per-device: two
   // accounts sharing a browser must never see each other's data. The JWT's
-  // "sub" claim (the account's email address) is decoded client-side and
-  // used purely as a storage key namespace — never as an auth decision.
+  // "sub" claim (the account's generated username, e.g. "john2") is decoded
+  // client-side and used purely as a storage key namespace — never as an
+  // auth decision, and never shown to anyone.
   _currentUserSuffix: function () {
     var token = this.getToken();
     if (!token) return "anon";
@@ -89,17 +103,13 @@ var Zafar = {
       return "anon";
     }
   },
-  // Friendly display name. The JWT subject is an email address, so greet
-  // people with the local part rather than the whole address.
-  username: function () {
-    var sub = this._currentUserSuffix();
-    if (sub === "anon") return "there";
-    var local = sub.split("@")[0].replace(/[._-]+/g, " ").trim();
-    return local.charAt(0).toUpperCase() + local.slice(1);
-  },
   // One-time migration: the first version of this app stored bookmarks and
-  // downloads under one shared key for every account on the device.
+  // downloads under one shared key for every account on the device. Each key
+  // is looked at once per page, not on every read.
+  _migrated: {},
   _migrateLegacyKey: function (legacyKey, scopedKey) {
+    if (this._migrated[legacyKey]) return;
+    this._migrated[legacyKey] = true;
     var legacy = localStorage.getItem(legacyKey);
     if (legacy !== null && localStorage.getItem(scopedKey) === null) {
       localStorage.setItem(scopedKey, legacy);
@@ -156,13 +166,6 @@ var Zafar = {
     }
     return limit ? list.slice(0, limit) : list;
   },
-  getDownloadsToday: function () {
-    var today = new Date().toDateString();
-    return this.getRecentDownloads().filter(function (d) {
-      return new Date(d.at).toDateString() === today;
-    }).length;
-  },
-
   /* ---------- Formatting -------------------------------------------- */
   escapeHTML: function (str) {
     var div = document.createElement("div");
@@ -174,21 +177,24 @@ var Zafar = {
     var mb = bytes / (1024 * 1024);
     return mb < 0.1 ? Math.ceil(bytes / 1024) + " KB" : mb.toFixed(1) + " MB";
   },
-  timeAgo: function (iso) {
-    var secs = (Date.now() - new Date(iso).getTime()) / 1000;
-    if (!isFinite(secs)) return "";
-    if (secs < 60) return "just now";
-    var mins = Math.floor(secs / 60);
-    if (mins < 60) return mins + "m ago";
-    var hrs = Math.floor(mins / 60);
-    if (hrs < 24) return hrs + "h ago";
-    var days = Math.floor(hrs / 24);
-    return days === 1 ? "yesterday" : days + "d ago";
-  },
 
   // FastAPI error bodies come in two shapes:
   //   {"detail": "some string"}                       (HTTPException)
   //   {"detail": [{"loc": [...], "msg": "..."}]}      (pydantic 422)
+  // What may be shown to a student. The backend's own wording is used only
+  // when it is a 4xx explaining a mistake the person can fix (a wrong code, a
+  // section that does not match). Anything from a 5xx, a gateway, or a network
+  // failure can carry internal detail — server names, project ids, folder ids
+  // — so it never reaches the screen; `fallback` does.
+  safeMessage: function (err, fallback) {
+    if (!err) return fallback;
+    if (err.timeout) return err.message;
+    if (err instanceof TypeError) return fallback;
+    if (!err.status) return fallback;
+    if (err.status >= 500) return fallback;
+    return err.message || fallback;
+  },
+
   extractErrorMessage: function (data) {
     if (!data || !data.detail) return "Request failed";
     if (typeof data.detail === "string") return data.detail;
@@ -204,6 +210,38 @@ var Zafar = {
   },
 
   /* ---------- HTTP --------------------------------------------------- */
+  // A request that never comes back is the worst state this app can be in:
+  // the spinner stays up and the only way out is to close the tab. Every
+  // request therefore has a deadline — 15 s for an answer, 90 s for a file.
+  REQUEST_TIMEOUT_MS: 15000,
+  FILE_TIMEOUT_MS: 90000,
+
+  _fetch: function (url, options, timeoutMs) {
+    if (typeof AbortController === "undefined") return fetch(url, options);
+    var controller = new AbortController();
+    var ms = timeoutMs || this.REQUEST_TIMEOUT_MS;
+    var timer = setTimeout(function () { controller.abort(); }, ms);
+    var opts = {};
+    Object.keys(options || {}).forEach(function (k) { opts[k] = options[k]; });
+    opts.signal = controller.signal;
+    return fetch(url, opts).then(
+      function (res) {
+        clearTimeout(timer);
+        return res;
+      },
+      function (err) {
+        clearTimeout(timer);
+        if (err && err.name === "AbortError") {
+          var timeout = new Error("This is taking too long. Check your connection and try again.");
+          timeout.status = 0;
+          timeout.timeout = true;
+          throw timeout;
+        }
+        throw err;
+      }
+    );
+  },
+
   _json: function (res) {
     var self = this;
     return res
@@ -215,6 +253,12 @@ var Zafar = {
         if (!res.ok) {
           var err = new Error(self.extractErrorMessage(data));
           err.status = res.status;
+          // Headers the backend already sends: how long to wait before the
+          // next try, and a stable machine code for the refusal.
+          var retry = res.headers && res.headers.get ? Number(res.headers.get("Retry-After")) : NaN;
+          if (isFinite(retry) && retry > 0) err.retryAfter = retry;
+          var code = res.headers && res.headers.get ? res.headers.get("X-Error-Code") : null;
+          if (code) err.code = code;
           throw err;
         }
         return data;
@@ -224,7 +268,7 @@ var Zafar = {
   // JSON request (/auth/register, /auth/verify, /auth/resend).
   postJSON: function (path, body) {
     var self = this;
-    return fetch(API_BASE_URL + path, {
+    return this._fetch(API_BASE_URL + path, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
@@ -242,13 +286,25 @@ var Zafar = {
     Object.keys(fields).forEach(function (k) {
       params.append(k, fields[k]);
     });
-    return fetch(API_BASE_URL + path, {
+    return this._fetch(API_BASE_URL + path, {
       method: "POST",
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
       body: params.toString(),
     }).then(function (res) {
       return self._json(res);
     });
+  },
+
+  // Koyeb's free instance sleeps. One ping per page, sent before the person
+  // has finished typing, so the instance is awake by the time they press a
+  // button. Harmless if it was already awake.
+  _warmed: false,
+  warmUp: function () {
+    if (this._warmed) return;
+    this._warmed = true;
+    try {
+      this._fetch(API_BASE_URL + "/health", { mode: "cors" }).catch(function () {});
+    } catch (e) {}
   },
 
   _unauthorized: function () {
@@ -261,7 +317,7 @@ var Zafar = {
 
   authGet: function (path) {
     var self = this;
-    return fetch(API_BASE_URL + path, {
+    return this._fetch(API_BASE_URL + path, {
       headers: { Authorization: "Bearer " + this.getToken() },
     })
       .then(function (res) {
@@ -272,7 +328,7 @@ var Zafar = {
 
   authPostJSON: function (path, body) {
     var self = this;
-    return fetch(API_BASE_URL + path, {
+    return this._fetch(API_BASE_URL + path, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",

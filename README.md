@@ -193,7 +193,11 @@ What is left, and why:
 - **The browser retires it too.** `sw.js` no longer exists, so an update check
   finds a 404 and drops the registration on its own. Two independent paths, so
   no phone keeps a stored copy.
-- **`web/_headers` serves every page with `Cache-Control: no-cache`.**
+- **`web/_headers` serves every page with `Cache-Control: no-cache`**, and adds
+  the headers that cost nothing and close the obvious doors: no framing
+  (`frame-ancestors 'none'`, `X-Frame-Options: DENY`), no MIME guessing
+  (`nosniff`), no plugins (`object-src 'none'`), and no referrer leakage to
+  other sites.
 
 If a phone is stuck on an old copy and will not open the app at all, only the
 browser can clear it: Chrome on Android → Settings → Site settings → All sites →
@@ -217,12 +221,19 @@ backend. Endpoints used:
 | POST | `/auth/login` | issue a JWT (form-encoded: `email`, `password`) |
 | POST | `/auth/verify` | confirm the 6-digit email code — `{email, code}` |
 | POST | `/auth/resend` | send a fresh verification code — `{email}` |
+| POST | `/auth/forgot-password` | email a reset code — `{email}` |
+| POST | `/auth/reset-password` | set a new password — `{email, code, new_password}` |
 | GET | `/auth/quota` | today's remaining downloads, per section |
 | GET | `/drive/papers` | catalogue, filtered by `section`, `category`, `q` |
+| GET | `/drive/categories` | the folder names inside a `section` |
 | POST | `/drive/download/{id}` | spend quota, return a short-lived signed URL |
 | POST | `/drive/confirm/{download_id}` | confirm the bytes actually arrived |
+| GET | `/health` | warm-up ping, used by `Zafar.warmUp()` |
 
-Override the backend per-session with `?api=https://…` on any page.
+A **local** page may point at another backend with `?api=http://localhost:8000`.
+On the live site the parameter is ignored: honouring it there would let a link
+such as `notes.html?api=https://elsewhere` hand a student's login token to a
+host we do not control.
 
 The deployed app has no demo mode — it always talks to the real backend, and
 `server.js` is the only thing that ever fakes an answer. When the backend can't

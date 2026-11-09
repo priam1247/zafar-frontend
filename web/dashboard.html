@@ -28,7 +28,7 @@
   <script>
     document.addEventListener("DOMContentLoaded", function () {
       var p = ZafarI18n.t("pages.papers");
-      var shell = ZafarShell.init({ active: "papers", title: p.title, crumb: p.crumb, desc: p.desc });
+      var shell = ZafarShell.init({ active: "papers", title: p.title, crumb: p.crumb });
       if (!shell) return; // not signed in — already navigating to login
       ZafarList.init({
         section: "papers",

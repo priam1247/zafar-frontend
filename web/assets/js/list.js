@@ -386,6 +386,27 @@ var ZafarList = (function () {
     }
 
     /* ---------- Favorites ---------- */
+    // Take one card out of the grid and keep the rest of the page honest: the
+    // count, the group heading if that group is now empty, and the empty state
+    // if nothing is left.
+    function dropCard(card) {
+      if (!card) return;
+      var group = card.closest(".grid");
+      card.remove();
+      renderedCount = Math.max(0, renderedCount - 1);
+      shell.count.textContent = t("list.savedCount", renderedCount);
+      if (group && !group.querySelector(".item")) {
+        var heading = group.previousElementSibling;
+        if (heading && heading.classList.contains("group-title")) heading.remove();
+        group.remove();
+      }
+      if (!renderedCount) {
+        el.empty.querySelector("h3").textContent = t("list.noFavoritesTitle");
+        el.empty.querySelector("p").innerHTML = t("list.noFavoritesBody");
+        show("empty");
+      }
+    }
+
     el.grid.addEventListener("click", function (e) {
       var btn = e.target.closest("[data-fav]");
       if (!btn) return;
@@ -402,8 +423,10 @@ var ZafarList = (function () {
       btn.classList.add("bounce");
       setTimeout(function () { btn.classList.remove("bounce"); }, 320);
       shell.showToast(on ? t("list.savedToFavorites") : t("list.removedFromFavorites"), "heart");
-      // On the Favorites page, un-saving should drop the card from view.
-      if (cfg.favoritesOnly && !on) setTimeout(load, 300);
+      // On the Favorites page, un-saving drops the card from view here rather
+      // than reloading: the answer is already on screen, and a reload would
+      // ask the server for all four sections again just to hide one card.
+      if (cfg.favoritesOnly && !on) dropCard(btn.closest(".item"));
     });
 
     /* ---------- Downloads ---------- */
@@ -456,8 +479,15 @@ var ZafarList = (function () {
       startDownload(btn);
     });
 
+    // One file at a time. Two taps in quick succession are two reservations,
+    // and the quota is checked between them on the server — a check the phone
+    // can make cheaply by simply not sending the second one yet.
+    var downloadBusy = false;
+
     // One download, from the request to the file landing in the phone.
     function startDownload(btn) {
+      if (downloadBusy) return shell.showToast(t("list.oneAtATime"), "download");
+      downloadBusy = true;
       var id = btn.dataset.download;
       var original = btn.innerHTML;
       btn.dataset.pending = "true";
@@ -469,6 +499,7 @@ var ZafarList = (function () {
         '<span class="btn-label">' + t("list.preparing") + "</span>";
 
       function restore() {
+        downloadBusy = false;
         btn.dataset.pending = "false";
         btn.removeAttribute("aria-disabled");
         btn.disabled = false;
@@ -477,6 +508,9 @@ var ZafarList = (function () {
       }
 
       function markSaved() {
+        // The file is on the phone: the next one may start even while this
+        // button is still showing "Saved".
+        downloadBusy = false;
         btn.classList.remove("is-loading");
         btn.classList.add("is-done");
         btn.innerHTML =
@@ -488,6 +522,14 @@ var ZafarList = (function () {
       // section of its own, so without it a saved note would be charged to
       // papers.
       var section = btn.dataset.section || cfg.section;
+      var card = btn.closest(".item");
+      // Remembered only once the file is actually on the phone — a reservation
+      // that never delivered anything is not a download.
+      var file = {
+        id: id,
+        name: card ? card.querySelector(".item-title").textContent : btn.dataset.filename,
+        category: card ? card.querySelector(".item-cat").textContent : "",
+      };
       Zafar.authPostJSON(
         "/drive/download/" + encodeURIComponent(id) + "?section=" + encodeURIComponent(section)
       )
@@ -497,13 +539,6 @@ var ZafarList = (function () {
           if (cfg.quotaKey && data.quota) {
             applyQuota(data.quota, true);
           }
-          var card = btn.closest(".item");
-          Zafar.recordDownload({
-            id: id,
-            name: card ? card.querySelector(".item-title").textContent : btn.dataset.filename,
-            category: card ? card.querySelector(".item-cat").textContent : "",
-          });
-
           if (!data.url) {
             restore();
             shell.showToast(t("list.downloadFailed"), "alert");
@@ -511,7 +546,7 @@ var ZafarList = (function () {
           }
 
           shell.showToast(t("list.downloadStarted"), "download");
-          return fetch(data.url)
+          return Zafar._fetch(data.url, {}, Zafar.FILE_TIMEOUT_MS)
             .then(function (resp) {
               if (!resp.ok) throw new Error("Download failed (" + resp.status + ")");
               return resp.blob();
@@ -524,7 +559,10 @@ var ZafarList = (function () {
               document.body.appendChild(a);
               a.click();
               a.remove();
-              URL.revokeObjectURL(url);
+              // Safari cancels a save whose blob is revoked in the same tick as
+              // the click. A minute is long enough for the browser to take it.
+              setTimeout(function () { URL.revokeObjectURL(url); }, 60000);
+              Zafar.recordDownload(file);
               markSaved();
               // Tell the backend the bytes actually arrived, so this counts
               // permanently against today's quota. A reservation that never
@@ -557,15 +595,38 @@ var ZafarList = (function () {
             }
             shell.showToast(t("list.notice.title", section), "alert");
           } else {
-            shell.showToast((err && err.message) || t("list.downloadStartFailed"), "alert");
+            // safeMessage keeps internal 5xx text (folder ids, project names)
+            // off the screen and shows it only for a 4xx the person can fix.
+            shell.showToast(Zafar.safeMessage(err, t("list.downloadFailed")), "alert");
           }
         });
     }
 
     /* ---------- Category chips ---------- */
+    // The folders belong to the library, not to this file: ask the server once
+    // and keep the page's static list only until (or unless) it answers. A chip
+    // whose folder has been renamed or removed would otherwise filter to nothing
+    // and look like broken search.
+    var catList = (cfg.categories || []).slice();
     function renderCatChips() {
       if (!el.catChips) return;
-      el.catChips.innerHTML = catChipsHTML(cfg.categories || [], state.category);
+      el.catChips.innerHTML = catChipsHTML(catList, state.category);
+    }
+    if (el.catChips && cfg.section) {
+      Zafar.authGet("/drive/categories?section=" + encodeURIComponent(cfg.section))
+        .then(function (names) {
+          if (!Array.isArray(names) || !names.length) return;
+          catList = names.slice();
+          // A category that arrived in the URL but is no longer a folder keeps
+          // its chip, so the page never claims a filter it is not applying.
+          if (state.category && catList.indexOf(state.category) === -1) {
+            catList = [state.category].concat(catList);
+          }
+          renderCatChips();
+        })
+        .catch(function () {
+          // The static list stays. Chips are a convenience, not an answer.
+        });
     }
     if (el.catChips) {
       el.catChips.addEventListener("click", function (e) {
@@ -624,7 +685,56 @@ var ZafarList = (function () {
     }
 
     /* ---------- Load ---------- */
-    function load() {
+    // The server says how long to wait in Retry-After; say the same thing in
+    // words instead of guessing at "a moment".
+    function waitPhrase(seconds) {
+      if (!(seconds > 0)) return "";
+      if (seconds <= 1) return "a second";
+      if (seconds < 60) return seconds + " seconds";
+      var mins = Math.ceil(seconds / 60);
+      return mins === 1 ? "a minute" : mins + " minutes";
+    }
+
+    // Two rules keep this page cheap and honest.
+    //
+    // Cheap: an answer is reused for a minute, keyed by the exact query that
+    // produced it. Favorites asks four sections at once, so starring a document,
+    // re-typing the same search or coming back to the same category would
+    // otherwise cost four more requests each — out of one 120-a-minute budget
+    // shared by everyone behind a school's connection.
+    //
+    // Honest: every load takes a ticket, and a slow answer that arrives after a
+    // newer one is dropped. The grid can then never show results for a search
+    // the box no longer holds.
+    var CACHE_TTL_MS = 60000;
+    var cache = {};
+    var loadSeq = 0;
+
+    function fetchSection(section, force) {
+      var query = new URLSearchParams();
+      query.set("section", section);
+      if (state.category) query.set("category", state.category);
+      if (state.q) query.set("q", state.q);
+      var key = query.toString();
+      var hit = cache[key];
+      if (!force && hit && Date.now() - hit.at < CACHE_TTL_MS) {
+        return Promise.resolve(hit.result);
+      }
+      return Zafar.authGet("/drive/papers?" + key).then(
+        function (rows) {
+          var result = { rows: rows || [] };
+          cache[key] = { at: Date.now(), result: result };
+          return result;
+        },
+        function (error) {
+          // A failure is never cached: the next attempt really tries.
+          return { error: error };
+        }
+      );
+    }
+
+    function load(force) {
+      var mine = ++loadSeq;
       renderChips();
       renderCatChips();
       syncURL();
@@ -640,19 +750,13 @@ var ZafarList = (function () {
       // documents the others can still show.
       var sections = cfg.sections || [cfg.section];
       var requests = sections.map(function (section) {
-        var query = new URLSearchParams();
-        query.set("section", section);
-        if (state.category) query.set("category", state.category);
-        if (state.q) query.set("q", state.q);
-        var path = "/drive/papers?" + query.toString();
-        return Zafar.authGet(path).then(
-          function (rows) { return { rows: rows || [] }; },
-          function (error) { return { error: error }; }
-        );
+        return fetchSection(section, !!force);
       });
 
       Promise.all(requests)
         .then(function (results) {
+          // A newer search already answered; this one is history.
+          if (mine !== loadSeq) return;
           var failures = results.filter(function (result) { return result.error; });
 
           // Tag each doc with the section it came from, so the
@@ -674,8 +778,11 @@ var ZafarList = (function () {
             } else {
               shell.count.textContent = "—";
               show("error");
+              var first = failures[0].error;
               shell.showToast(
-                (failures[0].error && failures[0].error.message) || t("list.couldntLoad", cfg.itemLabel),
+                first && first.status === 429
+                  ? t("list.tooManyRequests", waitPhrase(first.retryAfter))
+                  : Zafar.safeMessage(first, t("list.loadError")),
                 "alert"
               );
             }
@@ -738,7 +845,7 @@ var ZafarList = (function () {
         });
     }
 
-    root.querySelector("[data-retry]").addEventListener("click", load);
+    root.querySelector("[data-retry]").addEventListener("click", function () { load(true); });
     el.search.addEventListener("input", debounce(function () {
       state.q = (el.search.value || "").trim();
       load();
