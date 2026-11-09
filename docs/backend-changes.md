@@ -295,7 +295,11 @@ limiter finally sees each student instead of the whole site behind one IP.
 
 Two small things left, both narrow:
 
-### 15.1 Make `section` required on `POST /drive/download` (P2)
+### 15.1 Make `section` required on `POST /drive/download` — **landed** (`916db86`)
+
+The route now declares `section: str`, so a missing parameter is a `422` with
+FastAPI's validation body and an unknown one a `400 Unknown section '…'`. The
+demo mock in `server.js` mirrors both, including the exact bodies.
 
 `routers/drive.py` declares `section: str = "papers"`. A client that forgets
 the parameter is therefore charged to papers rather than told it made a

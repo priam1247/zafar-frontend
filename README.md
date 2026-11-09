@@ -145,7 +145,10 @@ that bucket's remaining count and its used-today total together, and every
 bucket refilling at midnight UTC; the allowance persists in `localStorage` across page loads and
 carries a schema version, so a record left by an older demo starts the day
 over rather than half-initialising; a spent allowance answers `429`, so the
-client's limit path is exercised for real.
+client's limit path is exercised for real. A download that names no section
+gets FastAPI's own `422` body and an unknown one gets the server's `400`
+(`Unknown section 'bogus'`) — the section is required on the real route now, and
+a mock that defaulted it would hide exactly the bug that defaults cause.
 
 It also stands down the moment a real session exists. **Logging out ends the
 demo** (cookie and demo token both cleared), and `login.html?switch=1` hands the
