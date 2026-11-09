@@ -222,20 +222,22 @@ var ZafarList = (function () {
       }).join("");
     }
 
-    /* ---------- Daily allowance — shown in the header, not the sheet ----------
-       The server keeps two buckets today: papers (which notes and marking keys
-       are charged against as well) and books. QUOTA_SECTION maps this page to
-       the bucket it is really spending, so Notes and Marking Keys show the
-       paper count instead of advertising an allowance of their own. */
-    var bucket = QUOTA_SECTION[cfg.quotaKey] || cfg.quotaKey;
-    // The two allowances are independent, so this page also tracks the other
-    // one: "you've run out of papers" is only half the story when there are
-    // still books to download.
-    var otherBucket = bucket === "books" ? "papers" : "books";
-    var cap = DAILY_LIMITS[bucket] || null;
-    var otherCap = DAILY_LIMITS[otherBucket] || null;
+    /* ---------- Daily allowances — one per section ----------------------------
+       The server keeps four buckets, each on its own UTC day: papers 10, books
+       3, notes 3, marking keys 10 by default. QUOTA_FIELD maps this page's
+       section to the field prefix its numbers live under in /auth/quota —
+       "marking-keys" the section, "marking_keys" the fields. */
+    var bucket = QUOTA_FIELD[cfg.quotaKey] || cfg.quotaKey;
+    // The limit is a server setting (DAILY_*_LIMIT), so it is never guessed
+    // from the copy in config.js: no reported limit means no chip, exactly
+    // like no reported count.
+    var cap = null;
     var left = null;        // this page's allowance, as the server last said
-    var otherLeft = null;   // the other one, when the server said
+    // The others, from the same answer: "you're out of notes" is only half the
+    // story when there are still papers to download. null means "not known",
+    // and the notice then quotes no number at all.
+    var others = null;
+
     // A download can land while the initial GET is still in flight. Its
     // numbers are the newer ones, so the GET must not overwrite them.
     var quotaDirty = false;
@@ -247,24 +249,34 @@ var ZafarList = (function () {
     // zero is to ask the server again — one GET, only when the page is spent.
     var quotaChecking = false;
 
-    function pick(q, key, suffix) {
-      var field = key + "_" + suffix;
-      return q && typeof q[field] === "number" ? q[field] : null;
+    function pick(q, field, suffix) {
+      var name = field + "_" + suffix;
+      return q && typeof q[name] === "number" ? q[name] : null;
     }
 
-    // One bucket spent is not "today's downloads" spent: say which allowance
-    // ran out, and what is still available.
+    // Which other sections still have downloads today, as one short phrase.
+    function spareLine() {
+      if (!others) return "";
+      var spare = [];
+      QUOTA_SECTIONS.forEach(function (section) {
+        if (section === cfg.quotaKey) return;
+        var field = QUOTA_FIELD[section];
+        var count = others[field] ? others[field].left : null;
+        if (count > 0) spare.push(t("list.sectionName." + section) + " " + count);
+      });
+      if (!spare.length) return t("list.notice.spareNone");
+      return t("list.notice.spare", spare.join(" · "));
+    }
+
+    // One bucket spent is not "today's downloads" spent: name the allowance
+    // that ran out, and say what is still available in the others.
     function noticeCopy() {
-      var isBooks = bucket === "books";
-      var lines = [
-        isBooks ? t("list.notice.booksWhy") : t("list.notice.papersWhy"),
-      ];
-      if (otherLeft > 0) {
-        lines.push(isBooks ? t("list.notice.sparePapers", otherLeft) : t("list.notice.spareBooks", otherLeft));
-      }
+      var lines = [t("list.notice.why." + cfg.quotaKey)];
+      var spare = spareLine();
+      if (spare) lines.push(spare);
       lines.push(t("list.notice.recovery"));
       return {
-        title: isBooks ? t("list.notice.booksTitle") : t("list.notice.papersTitle"),
+        title: t("list.notice.title." + cfg.quotaKey),
         body: lines.join(" "),
       };
     }
@@ -284,7 +296,7 @@ var ZafarList = (function () {
 
       // Nothing reported for this bucket: say nothing rather than imply an
       // allowance we cannot measure.
-      if (left === null) {
+      if (left === null || !(cap > 0)) {
         el.limit.hidden = true;
         return;
       }
@@ -295,13 +307,9 @@ var ZafarList = (function () {
       el.limitText.textContent = allowed
         ? t("list.downloadsLeft", left, cap)
         : t("list.limitReached");
-
-      var shared = bucket === "papers" && cfg.quotaKey !== "papers"
-        ? t("list.sharedBucket")
-        : "";
       el.limit.setAttribute(
         "aria-label",
-        (allowed ? t("list.downloadsLeftLabel", left, cap) : t("list.limitReached")) + shared
+        (allowed ? t("list.downloadsLeftLabel", left, cap) : t("list.limitReached"))
       );
     }
 
@@ -317,11 +325,14 @@ var ZafarList = (function () {
     function applyQuota(q, fromTap) {
       var reported = pick(q, bucket, "limit");
       if (reported > 0) cap = reported;
-      var otherReported = pick(q, otherBucket, "limit");
-      if (otherReported > 0) otherCap = otherReported;
 
       left = pick(q, bucket, "left");
-      otherLeft = pick(q, otherBucket, "left");
+      others = {};
+      QUOTA_SECTIONS.forEach(function (section) {
+        var field = QUOTA_FIELD[section];
+        others[field] = { left: pick(q, field, "left"), limit: pick(q, field, "limit") };
+      });
+
       if (fromTap) quotaDirty = true;
       renderLimit();
       return left;
@@ -331,21 +342,9 @@ var ZafarList = (function () {
     // not. The caller must keep those apart: "I could not check" is not "you
     // have none", and a student should never be told the second when the first
     // is what happened.
-    function refreshQuota(onlyOther) {
+    function refreshQuota() {
       return Zafar.authGet("/auth/quota")
         .then(function (q) {
-          if (onlyOther) {
-            // After a 429 we only know about the bucket that refused. The
-            // notice quotes an exact number for the other one, and another tab
-            // may have spent it since — so refresh that, and leave the refusal
-            // standing.
-            var spareLimit = pick(q, otherBucket, "limit");
-            if (spareLimit > 0) otherCap = spareLimit;
-            var spare = pick(q, otherBucket, "left");
-            if (spare !== null) otherLeft = spare;
-            renderLimit();
-            return "ok";
-          }
           applyQuota(q, true);
           return "ok";
         })
@@ -472,15 +471,10 @@ var ZafarList = (function () {
         "/drive/download/" + encodeURIComponent(id) + "?section=" + encodeURIComponent(cfg.section)
       )
         .then(function (data) {
+          // The download answer carries all four buckets, so it can replace
+          // every number the page holds, not just this section's.
           if (cfg.quotaKey && data.quota) {
-            var fresh = pick(data.quota, bucket, "left");
-            var freshOther = pick(data.quota, otherBucket, "left");
-            if (freshOther !== null) otherLeft = freshOther;
-            if (fresh !== null) {
-              quotaDirty = true;
-              left = fresh;
-              renderLimit();
-            }
+            applyQuota(data.quota, true);
           }
           var card = btn.closest(".item");
           Zafar.recordDownload({
@@ -531,14 +525,14 @@ var ZafarList = (function () {
             if (cfg.quotaKey) {
               quotaDirty = true;
               left = 0;
-              // The refusal says nothing about the other allowance, and the
-              // notice quotes an exact number for it — so quote nothing until
-              // a fresh answer arrives, and keep quoting nothing if the
-              // refresh cannot complete.
-              otherLeft = null;
+              // The refusal names this section's bucket; the notice quotes
+              // exact numbers for the others, so quote none until a fresh
+              // answer arrives — and keep quoting none if the refresh cannot
+              // complete.
+              others = null;
               renderLimit();
               revealNotice();
-              refreshQuota(true);
+              refreshQuota();
             }
             shell.showToast(t("list.limitReached"), "alert");
           } else {

@@ -6,32 +6,38 @@
 // Can be overridden at runtime with ?api=https://... for testing.
 var API_BASE_URL = "https://bloody-brigitta-ahzafar-de9b1709.koyeb.app";
 
-// Daily allowances, as the backend enforces them today:
-//   papers  10 a day — notes AND marking keys are charged against this one
-//   books    3 a day
-// The window is a UTC calendar day: everything refills at 00:00 UTC, not 24
+// Daily allowances: one bucket per section, counted separately.
+//   papers        10 a day
+//   books          3 a day
+//   notes          3 a day
+//   marking keys  10 a day
+// The window is a UTC calendar day: every bucket refills at 00:00 UTC, not 24
 // hours after a first download. The chips, the help page and the FAQ all say
-// so; nothing in the UI should promise a per-section counter until the
-// backend actually keeps one.
+// so.
 //
-// QUOTA_SECTION maps a page's section to the bucket the server charges. When
-// the backend grows real per-section counters and a rolling window, change
-// this table and the copy in i18n.js — the list page needs nothing else.
+// These numbers are the published policy the Help page lists. The app never
+// quotes them as if it had measured anything: /auth/quota reports each
+// section's real limit (they are env settings on the server, DAILY_*_LIMIT),
+// and a chip with no reported ceiling stays hidden rather than borrowing the
+// number below.
 var DAILY_LIMITS = {
   papers: 10,
   books: 3,
+  notes: 3,
+  "marking-keys": 10,
 };
 
-var QUOTA_SECTION = {
+// The section key in the API is not always the field prefix in /auth/quota:
+// the section is "marking-keys", the four numbers are "marking_keys_*".
+var QUOTA_FIELD = {
   papers: "papers",
-  notes: "papers",
-  "marking-keys": "papers",
   books: "books",
+  notes: "notes",
+  "marking-keys": "marking_keys",
 };
 
-// Kept as named aliases for the pages that show a single number.
-var DAILY_PAPER_LIMIT = DAILY_LIMITS.papers;
-var DAILY_BOOK_LIMIT = DAILY_LIMITS.books;
+// Display order for "what is still available" in the spent-allowance notice.
+var QUOTA_SECTIONS = ["papers", "books", "notes", "marking-keys"];
 
 // The admin's WhatsApp number in international format — digits only,
 // country code included, no "+" (e.g. "265991234567"). Leave empty to

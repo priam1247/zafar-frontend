@@ -50,9 +50,11 @@ const DEMO_SCRIPT = `<script>
   // one book allowance of 3, and both refill at midnight UTC. The demo has to
   // mirror this: a demo that is more generous than production teaches the
   // wrong thing.
-  var LIMITS = { papers: 10, books: 3 };
-  var BUCKET = { papers: "papers", notes: "papers", "marking-keys": "papers", books: "books" };
-  var QUOTA_VERSION = 2;
+  var LIMITS = { papers: 10, books: 3, notes: 3, "marking-keys": 10 };
+  // Section key -> the field prefix its numbers live under, exactly as the
+  // server does it: "marking-keys" the section, "marking_keys" the fields.
+  var BUCKET = { papers: "papers", books: "books", notes: "notes", "marking-keys": "marking_keys" };
+  var QUOTA_VERSION = 3;
 
   var TOKEN_KEY = "zafar_token";
   var QUOTA_KEY = "zafar_demo_quota";
@@ -68,14 +70,14 @@ const DEMO_SCRIPT = `<script>
 
   // ---- allowance lives in localStorage, so it survives navigation ---------
   function freshQuota() {
-    return {
-      v: QUOTA_VERSION,
-      day: utcDay(),
-      papers_left: LIMITS.papers,
-      papers_limit: LIMITS.papers,
-      books_left: LIMITS.books,
-      books_limit: LIMITS.books,
-    };
+    var q = { v: QUOTA_VERSION, day: utcDay() };
+    Object.keys(BUCKET).forEach(function (section) {
+      var field = BUCKET[section];
+      q[field + "_left"] = LIMITS[section];
+      q[field + "_limit"] = LIMITS[section];
+      q[field + "_downloaded_today"] = 0;
+    });
+    return q;
   }
 
   function readQuota() {
@@ -84,7 +86,8 @@ const DEMO_SCRIPT = `<script>
     // A record from an older demo (no version, or per-section fields) and a
     // record from an earlier UTC day are both stale: start the day over.
     var usable = q && q.v === QUOTA_VERSION && q.day === utcDay() &&
-      typeof q.papers_left === "number" && typeof q.books_left === "number";
+      typeof q.papers_left === "number" && typeof q.books_left === "number" &&
+      typeof q.notes_left === "number" && typeof q.marking_keys_left === "number";
     if (!usable) {
       q = freshQuota();
       writeQuota(q);

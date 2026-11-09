@@ -76,20 +76,22 @@ search, tabs — while teal is kept for text, headers and the filled download
 button. Each page carries a one-line description under its title.
 
 The allowance chip sits beside the title so it stays visible while the
-catalogue scrolls. It reports what the server actually enforces: **10 paper
-downloads and 3 book downloads a day**, refilling **at midnight UTC**. Notes
-and marking keys are charged against the paper allowance, so those pages show
-the *same* number as Past Papers rather than advertising an allowance of their
-own — the chip's accessible label says so, and the page description reads
-"counted against your papers". Where the server reports no count, the chip
-stays hidden instead of quoting a policy the backend does not keep.
+catalogue scrolls. Each section has its **own** allowance, and the chip reports
+the one for the page you are on: **10 papers, 3 books, 3 notes, 10 marking
+keys** a day, each on its own UTC day. `QUOTA_FIELD` in `config.js` maps a page
+to the field prefix its numbers live under — the `marking-keys` section reads
+`marking_keys_left` / `marking_keys_limit`, with the underscore the API uses.
+Both the count and the ceiling come from that answer, because both are server
+settings (`DAILY_*_LIMIT`); `DAILY_LIMITS` is only the policy table the Help
+page prints. Where the server reports no count — or no ceiling — the chip stays
+hidden instead of quoting a policy the backend does not keep.
 
-When the allowance runs out, a plain-English notice appears above the
+When an allowance runs out, a plain-English notice appears above the
 catalogue — and again if a download is refused — naming **which** allowance ran
-out (papers, or books), saying how many of the other one are still available,
-and when it refills: **02:00 in Malawi, which is midnight UTC**. It never says
-"tomorrow", because the refill is not a day away — a student who hits the limit
-at 01:00 has it back within the hour.
+out, listing **how much the others still have** from that same answer, so the
+numbers are never stale, and when it refills: **02:00 in Malawi, which is
+midnight UTC**. It never says "tomorrow", because the refill is not a day
+away — a student who hits the limit at 01:00 has it back within the hour.
 
 A refusal is a statement about a moment, not a permanent fact. The backend
 expires an unconfirmed reservation five minutes after the *download request*,
@@ -126,9 +128,9 @@ sample catalogue — so every screen can be walked without credentials or a
 network. It lives entirely inside `server.js`: nothing is added to `web/`, and
 the deployed site never sees it.
 
-The stand-in mirrors the real rules rather than simplifying them: the same two
-buckets (10 papers shared by notes and marking keys, 3 books), refilling at
-midnight UTC; the allowance persists in `localStorage` across page loads and
+The stand-in mirrors the real rules rather than simplifying them: the same four
+buckets (10 papers, 3 books, 3 notes, 10 marking keys), refilling at midnight
+UTC; the allowance persists in `localStorage` across page loads and
 carries a schema version, so a record left by an older demo starts the day
 over rather than half-initialising; a spent allowance answers `429`, so the
 client's limit path is exercised for real.
@@ -200,7 +202,7 @@ backend. Endpoints used:
 | POST | `/auth/login` | issue a JWT (form-encoded: `email`, `password`) |
 | POST | `/auth/verify` | confirm the 6-digit email code — `{email, code}` |
 | POST | `/auth/resend` | send a fresh verification code — `{email}` |
-| GET | `/auth/quota` | today's remaining paper/book downloads |
+| GET | `/auth/quota` | today's remaining downloads, per section |
 | GET | `/drive/papers` | catalogue, filtered by `section`, `category`, `q` |
 | POST | `/drive/download/{id}` | spend quota, return a short-lived signed URL |
 | POST | `/drive/confirm/{download_id}` | confirm the bytes actually arrived |
@@ -223,13 +225,19 @@ a same-origin blob so the filename survives.
 
 ## Known gaps
 
-- **Per-section allowances are a backend change.** The aiming point is four
-  independent counters — 10 papers, 10 marking keys, 3 notes, 3 books — each
-  refilling 24 hours after its first download. Until `/auth/quota` reports
-  `notes_left` / `marking_keys_left` and the server stops charging notes and
-  marking keys to the paper bucket, the UI deliberately describes today's
-  shared bucket instead of promising the new one. Flipping it over is
-  `QUOTA_SECTION` in `config.js` plus three strings in `i18n.js`.
+- **Per-section quotas landed in the backend** (`f30f39a`): four independent
+  counters — 10 papers, 3 books, 3 notes, 10 marking keys — each on its own UTC
+  day, reported as `papers_*`, `books_*`, `notes_*` and `marking_keys_*` in
+  every `/auth/quota` and download response. The section key and the field
+  prefix differ for one page (`marking-keys` → `marking_keys`), which is what
+  `QUOTA_FIELD` in `config.js` is for; `DAILY_LIMITS` is only the fallback
+  shown before the first answer, because the real numbers are server settings.
+
+- **Legacy download rows cannot be split.** Rows created before this change
+  carry `category` of `paper` for anything charged to the old shared bucket, so
+  a notes or marking-keys download made earlier today still counts as a paper
+  until the UTC day rolls over. Nothing in the UI needs to say so — the numbers
+  correct themselves at 00:00 UTC — but it explains a chip that looks one out.
 
 - **Offline covers what you have already seen, on the credential that saw it.**
   The worker stores one catalogue answer per exact view (section plus filters)
