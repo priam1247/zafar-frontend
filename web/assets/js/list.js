@@ -734,7 +734,10 @@ var ZafarList = (function () {
     }
 
     // The worker tells the page when it answered a catalogue request from its
-    // stored copy, so the count can say so even with the radio on.
+    // stored copy, so the count can say so even with the radio on. ZAFAR no
+    // longer installs a worker — this stays for the transition, while a phone
+    // may still hold one that answers from its copy until it updates and
+    // retires itself.
     if (navigator.serviceWorker && navigator.serviceWorker.addEventListener) {
       navigator.serviceWorker.addEventListener("message", function (event) {
         var data = event.data;

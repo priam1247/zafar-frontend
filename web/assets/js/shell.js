@@ -125,16 +125,19 @@ var ZafarShell = (function () {
     }
   }
 
-  // Unregister and drop this worker's caches. Shared by ?sw=0 and by the demo,
-  // which must not be served by a worker left over from a real session: the
-  // dev server rewrites each page as it serves it, and a stored copy would be
-  // the wrong copy — a cached demo page can re-seed a demo session after a
-  // logout, and a cached real page cannot carry the demo stand-in at all.
+  // Unregister this app's worker and drop its caches.
+  //
+  // The app no longer registers one — ZAFAR keeps nothing on the phone, and
+  // works only while it can reach the network. What remains here is the
+  // clean-up: a phone that installed an older version still has its worker and
+  // its stored pages, and this takes them away on the next load. The worker
+  // file itself (web/sw.js) does the same from the other side, for browsers
+  // that never run this script.
   function clearWorker() {
     if (!("serviceWorker" in navigator)) return;
 
     // Only this app's registration. Other apps can share the origin, and their
-    // workers are not ours to remove just because a demo was opened.
+    // workers are not ours to remove.
     var mine = new URL("sw.js", location.href).href;
     navigator.serviceWorker.getRegistrations().then(function (regs) {
       regs.forEach(function (reg) {
@@ -146,7 +149,7 @@ var ZafarShell = (function () {
       });
     });
 
-    // Prefix-scoped, like the worker's own activation: zafar-* only.
+    // Prefix-scoped, like the worker's own cleanup: zafar-* only.
     if (window.caches) {
       caches.keys().then(function (names) {
         names.forEach(function (name) {
@@ -159,34 +162,8 @@ var ZafarShell = (function () {
   function registerWorkerNow() {
     if (!("serviceWorker" in navigator)) return;
 
-    var flag = new URLSearchParams(location.search).get("sw");
-
-    if (flag === "0") {
-      clearWorker();
-      return;
-    }
-
-    var demo = new URLSearchParams(location.search).get("demo") ||
-      /^demo\./.test(Zafar.getToken() || "");
-    if (demo && flag !== "1") {
-      // Not merely "do not register": take away anything already there.
-      clearWorker();
-      return;
-    }
-
-    // Service workers need a secure origin; localhost counts as one.
-    var secure = location.protocol === "https:" ||
-      location.hostname === "localhost" || location.hostname === "127.0.0.1";
-    if (!secure) return;
-
-    // After load: registration is off the path to the first painting, and a
-    // slow install can never hold the page up.
-    var start = function () {
-      // updateViaCache: never answer the registration's own script from the
-      // HTTP cache. A fix to the worker must reach the phone on the next visit,
-      // not whenever the old script happens to expire.
-      navigator.serviceWorker.register("sw.js", { updateViaCache: "none" }).catch(function () {});
-    };
+    // After load, and never on the path to the first painting.
+    var start = function () { clearWorker(); };
     if (document.readyState === "complete") start();
     else window.addEventListener("load", start, { once: true });
   }
