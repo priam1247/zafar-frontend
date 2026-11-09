@@ -41,22 +41,18 @@
           '<a class="btn btn-on-teal btn-sm" href="dashboard.html">' + t("help.backToPapers") + "</a>" +
         "</section>" +
 
-        '<div class="stats">' +
-          '<div class="stat"><div class="stat-head"><span class="stat-glyph">' + icon("file", 14) +
-          '</span><span class="stat-label">' + t("help.paperLimitLabel") + '</span></div>' +
-          '<div class="stat-value">' + DAILY_LIMITS.papers + "</div>" +
-          '<div class="stat-foot">' + t("help.paperLimitFoot") + "</div></div>" +
-
-          '<div class="stat"><div class="stat-head"><span class="stat-glyph">' + icon("book", 14) +
-          '</span><span class="stat-label">' + t("help.bookLimitLabel") + '</span></div>' +
-          '<div class="stat-value">' + DAILY_LIMITS.books + "</div>" +
-          '<div class="stat-foot">' + t("help.bookLimitFoot") + "</div></div>" +
-
-          '<div class="stat"><div class="stat-head"><span class="stat-glyph">' + icon("clock", 14) +
-          '</span><span class="stat-label">' + t("help.limitResetsLabel") + '</span></div>' +
-          '<div class="stat-value">02:00</div>' +
-          '<div class="stat-foot">' + t("help.limitResetsFoot") + "</div></div>" +
-        "</div>" +
+        // Four allowances, one row each. The numbers come from the same table the
+        // chips use, so the page can never contradict the header.
+        '<section class="panel limits">' +
+          '<h2 class="limits-title">' + t("help.limitsTitle") + "</h2>" +
+          '<ul class="limit-rows">' +
+            QUOTA_SECTIONS.map(function (section) {
+              return "<li><span>" + t("help.limitRow." + section) + "</span>" +
+                "<b>" + DAILY_LIMITS[section] + "</b></li>";
+            }).join("") +
+          "</ul>" +
+          '<p class="limits-note">' + t("help.limitsNote") + "</p>" +
+        "</section>" +
 
         (SUPPORT_WHATSAPP
           ? '<a class="panel contact-card" href="https://wa.me/' + encodeURIComponent(SUPPORT_WHATSAPP) +

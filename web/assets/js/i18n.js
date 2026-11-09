@@ -22,10 +22,10 @@ var ZafarI18n = (function () {
                    desc: "Textbooks for senior and junior secondary.",
                    searchPlaceholder: "Search textbooks by title or form…" },
       notes:     { title: "Notes", crumb: "Library", itemLabel: "note",
-                   desc: "Condensed notes — counted against your papers.",
+                   desc: "Condensed notes, with a daily allowance of their own.",
                    searchPlaceholder: "Search notes by subject…" },
       keys:      { title: "Marking Keys", crumb: "Library", itemLabel: "marking key",
-                   desc: "Official schemes — counted against your papers.",
+                   desc: "Official marking schemes, with a daily allowance of their own.",
                    searchPlaceholder: "Search marking keys by subject or year…" },
       favorites: { title: "Favorites", crumb: "Yours", itemLabel: "favorite",
                    desc: "Everything you've saved, in one list.",
@@ -39,32 +39,40 @@ var ZafarI18n = (function () {
       sortSizeDesc: "Largest first", sortSizeAsc: "Smallest first",
       checkingLimit: "Checking today's limit…",
       downloadsLeft: function (left, cap) { return left + " of " + cap + " left"; },
-      // Two independent allowances, so the notice names the one that ran out
-      // and says what is still there. Nothing says "tomorrow": the refill is
-      // 00:00 UTC, which is 02:00 in Malawi — a student who hits the limit at
-      // 01:00 gets it back the same local day.
-      // Nothing here claims the allowance is gone for good: an interrupted
-      // download's place frees itself after a few minutes, so 02:00 is the
-      // daily refill, not the only way back.
+      // Four independent allowances — papers, books, notes, marking keys — so
+      // the notice names the one that ran out and says what is still there in
+      // the others. Nothing says "tomorrow": the refill is 00:00 UTC, which is
+      // 02:00 in Malawi, so a student who hits the limit at 01:00 gets it back
+      // the same local day. Nothing claims an allowance is gone for good
+      // either: an interrupted download's place frees itself after a few
+      // minutes, so 02:00 is the daily refill, not the only way back.
       notice: {
-        papersTitle: "You're out of paper downloads for now",
-        papersWhy: "Notes and marking keys are charged to the same allowance, so those are spent too.",
-        booksTitle: "You're out of book downloads for now",
-        booksWhy: "Textbooks have their own allowance, separate from papers.",
-        spareBooks: function (n) {
-          return "You still have " + n + " book download" + (n === 1 ? "" : "s") + " today.";
+        title: {
+          papers: "You're out of paper downloads for now",
+          books: "You're out of book downloads for now",
+          notes: "You're out of note downloads for now",
+          "marking-keys": "You're out of marking key downloads for now",
         },
-        sparePapers: function (n) {
-          return "You still have " + n + " paper download" + (n === 1 ? "" : "s") +
-            " today — notes and marking keys share them.";
+        why: {
+          papers: "Papers have their own daily allowance — books, notes and marking keys are counted separately.",
+          books: "Books have their own daily allowance, separate from papers, notes and marking keys.",
+          notes: "Notes have their own daily allowance, separate from papers, books and marking keys.",
+          "marking-keys": "Marking keys have their own daily allowance, separate from papers, books and notes.",
         },
+        spare: function (list) { return "Still available today: " + list + "."; },
+        spareNone: "Every other allowance is spent for today too.",
         recovery: "An unfinished download holds its place for only a few minutes, so try again shortly — " +
           "the allowance itself refills at 02:00 in Malawi (00:00 UTC). ZAFAR is free for every " +
           "Malawian student, and these limits are what keep it that way.",
       },
+      sectionName: {
+        papers: "papers",
+        books: "books",
+        notes: "notes",
+        "marking-keys": "marking keys",
+      },
       openFavorites: "Open Favorites",
       downloadsLeftLabel: function (left, cap) { return left + " of " + cap + " downloads left today"; },
-      sharedBucket: ", shared with notes and marking keys",
       limitReached: "No downloads left",
       limitUnavailable: "Limit unavailable",
       // The check itself failed: say that, rather than report a refusal the
@@ -112,9 +120,15 @@ var ZafarI18n = (function () {
         "way. Short answers to the questions students ask most — still stuck, message the admin on " +
         "WhatsApp and include the email on your account.",
       backToPapers: "Back to papers",
-      paperLimitLabel: "Papers, notes & keys", paperLimitFoot: "one shared allowance",
-      bookLimitLabel: "Books", bookLimitFoot: "their own allowance",
-      limitResetsLabel: "Limit resets", limitResetsFoot: "Malawi time (00:00 UTC)",
+      limitsTitle: "Daily downloads",
+      limitRow: {
+        papers: "Papers",
+        books: "Books",
+        notes: "Notes",
+        "marking-keys": "Marking keys",
+      },
+      limitsNote: "Each section counts separately. Every allowance refills at 02:00 in Malawi " +
+        "(00:00 UTC), and the chip in the header shows what is left of the page you are on.",
       faqTitle: "Frequently asked",
       shortcutsTitle: "Keyboard shortcuts",
       shortcutSlash: "Focus the search box on any list page",
@@ -127,12 +141,14 @@ var ZafarI18n = (function () {
       contactCta: "Open WhatsApp",
       qa: [
         { id: "limits", q: "Why is there a daily download limit?",
-          a: "<p>ZAFAR is free for every Malawian student. To keep it free, and fair, every account " +
-             "gets the same number of downloads each day: 10 papers and 3 books. Notes and marking keys " +
-             "use the same 10 as your papers, so one allowance covers all three.</p>" +
-             "<p>If you reach the limit, tap the heart on what you need to save it to Favorites and come " +
-             "back later. The allowance refills at <b>02:00 in Malawi</b> (00:00 UTC), and the chip in the " +
-             "header always shows what is left — of the papers, or of the books, whichever page you are on.</p>" },
+          a: "<p>ZAFAR is free for every Malawian student. To keep it free, and fair, every account gets " +
+             "the same number of downloads each day, counted <b>separately for each section</b>: " +
+             "<b>10 papers</b>, <b>3 books</b>, <b>3 notes</b> and <b>10 marking keys</b>. Downloading a " +
+             "paper never costs you a book, and a note never costs you a paper.</p>" +
+             "<p>If a section runs out, tap the heart on what you need to save it to Favorites and come " +
+             "back later — the other sections still have their own allowance. Every allowance refills at " +
+             "<b>02:00 in Malawi</b> (00:00 UTC), and the chip in the header shows what is left of the page " +
+             "you are on.</p>" },
         { id: "download", q: "A download didn't start — what now?",
           a: "<p>Downloads are prepared on demand: the app asks the server for a short-lived signed link, then " +
              "fetches the file and hands it to your browser. If that link expires before the file finishes, just " +

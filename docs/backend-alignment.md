@@ -156,29 +156,33 @@ Frontend changes:
 
 ---
 
-## 6. Quota: the numbers are the server's, not ours (P1)
+## 6. Quota: the numbers are the server's, not ours — closed
 
-The backend returns `papers_limit` / `books_limit` in every `QuotaOut`
-(`daily_paper_limit = 10`, `daily_book_limit = 3` in `config.py`), plus
-`papers_downloaded_today` / `books_downloaded_today`.
+The backend keeps **four** buckets (`f30f39a`): `papers_*`, `books_*`,
+`notes_*`, `marking_keys_*`, each with `downloaded_today` / `limit` / `left`,
+from `daily_paper_limit = 10`, `daily_book_limit = 3`, `daily_notes_limit = 3`,
+`daily_marking_keys_limit = 10` in `config.py`. `SECTION_QUOTA_CATEGORY` maps
+the section slug (`marking-keys`) to the stored category (`marking_keys`), and
+every download response carries the whole `QuotaOut`, so one successful tap
+refreshes all four numbers at once.
 
-The frontend hardcodes 10 and 3 in `DAILY_LIMITS` and repeats them in the FAQ,
-the help page and the chip before the first answer arrives.
+What the frontend now does:
+- `QUOTA_FIELD` maps a page's slug to its field prefix (`marking-keys` →
+  `marking_keys`); the chip reads `<field>_left` and `<field>_limit` from the
+  same answer.
+- No reported ceiling means no chip. `DAILY_LIMITS` is the published policy the
+  Help page lists, never a number to render as if measured — no fallback.
+- The spent-allowance notice names the section that ran out and lists what the
+  others still have, from that same answer; with everything spent it says so.
+- The FAQ and the Help table describe four separate allowances, refilling at
+  midnight UTC (02:00 in Malawi).
 
-Frontend changes:
-- Treat `DAILY_LIMITS` strictly as the pre-response fallback, and say so in the
-  comment; the first `QuotaOut` must win everywhere, including copy.
-- The FAQ's "10 a day" / "3 a day" must not be a second source of truth — either
-  generate it from the last quota response or accept that it can be wrong.
-- Optional: use `*_downloaded_today` for "3 of 10 used today" on the help page.
-
-What already matches, and should stay: notes and marking keys draw from the
-papers bucket (`SECTION_QUOTA_CATEGORY`); the window is the UTC calendar day
-(`_count_today_by_category` uses UTC midnight); an unconfirmed download only
-counts until the signed link's TTL expires (300 s), which is what the "a few
-minutes" wording means.
-
----
+Settled by the backend, no longer a frontend question: the UTC calendar day
+(`_count_today_by_category`), the 300 s reservation TTL the "a few minutes"
+wording refers to, and the `429` body plus `X-Error-Code: limit_reached`. Rows
+written before `f30f39a` still carry `category = "paper"` for notes and marking
+keys, so an early-morning download can look like a paper until the UTC day
+rolls over; nothing in the UI claims otherwise.
 
 ## 7. The download flow (P1)
 
@@ -291,7 +295,7 @@ Frontend changes:
 1. **P0** — confirm the origin (§0); Gmail-only registration (§1);
    confirm the signing secret is set (§11.2).
 2. **P1** — legacy-username login field (§2); `/auth/me` and the name comments
-   (§3); 403/502/503 handling (§4); verify/reset attempt rules (§5); quota
-   numbers from the server (§6); `expires_in`, 404-refresh, and the `.pdf` name
+   (§3); 403/502/503 handling (§4); verify/reset attempt rules (§5); `expires_in`, 404-refresh, and the `.pdf` name
    (§7); data-driven category chips (§8); the stale reset FAQ answer (§9).
+   Done: quota numbers from the server (§6) — four buckets, read per section.
 3. **P2** — README endpoint table, dead strings, optional extras (§10).
