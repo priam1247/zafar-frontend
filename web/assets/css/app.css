@@ -185,7 +185,10 @@ a { color: inherit; }
   font-size: 12.5px;
   font-weight: 600;
   letter-spacing: .01em;
-  color: var(--on-72);
+  /* Opaque, not 72%: this is normal-size text on teal, and the translucent
+     cream only reached about 3.5:1 — under AA for a label you are meant to
+     read. The icon inherits it. */
+  color: var(--on);
 }
 
 .app-head {
