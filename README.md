@@ -72,12 +72,13 @@ search, tabs — while teal is kept for text, headers and the filled download
 button. Each page carries a one-line description under its title.
 
 The allowance chip sits beside the title so it stays visible while the
-catalogue scrolls. **Four sections, four counters: 10 papers, 10 marking keys,
-3 notes, 3 books.** A counter refills **24 hours after the first download in
-that section**, not at midnight, and the chip reads against each section's own
-ceiling (`3 of 3 left`, never `3 of 10`). Where the backend reports no count
-for a section, the chip states the policy (`3 a day`) instead of inventing a
-remaining number.
+catalogue scrolls. It reports what the server actually enforces: **10 paper
+downloads and 3 book downloads a day**, refilling **at midnight UTC**. Notes
+and marking keys are charged against the paper allowance, so those pages show
+the *same* number as Past Papers rather than advertising an allowance of their
+own — the chip's accessible label says so, and the page description reads
+"counted against your papers". Where the server reports no count, the chip
+stays hidden instead of quoting a policy the backend does not keep.
 
 Cards keep the same discipline as the auth screen: one hairline, no shadow, a
 mint tile for the file mark, the title, a category chip, then size and a single
@@ -104,11 +105,12 @@ sample catalogue — so every screen can be walked without credentials or a
 network. It lives entirely inside `server.js`: nothing is added to `web/`, and
 the deployed site never sees it.
 
-The stand-in mirrors the real rules rather than simplifying them: four counters
-(10 papers, 10 marking keys, 3 notes, 3 books), each refilling 24 hours after
-the first download in it; the allowance persists in `localStorage` across page
-loads; a spent allowance answers `429`, so the client's limit path is exercised
-for real.
+The stand-in mirrors the real rules rather than simplifying them: the same two
+buckets (10 papers shared by notes and marking keys, 3 books), refilling at
+midnight UTC; the allowance persists in `localStorage` across page loads and
+carries a schema version, so a record left by an older demo starts the day
+over rather than half-initialising; a spent allowance answers `429`, so the
+client's limit path is exercised for real.
 
 It also stands down the moment a real session exists. **Logging out ends the
 demo** (cookie and demo token both cleared), and `login.html?switch=1` hands the
@@ -146,6 +148,14 @@ from Drive with a correct `Content-Disposition`; the page then hands the browser
 a same-origin blob so the filename survives.
 
 ## Known gaps
+
+- **Per-section allowances are a backend change.** The aiming point is four
+  independent counters — 10 papers, 10 marking keys, 3 notes, 3 books — each
+  refilling 24 hours after its first download. Until `/auth/quota` reports
+  `notes_left` / `marking_keys_left` and the server stops charging notes and
+  marking keys to the paper bucket, the UI deliberately describes today's
+  shared bucket instead of promising the new one. Flipping it over is
+  `QUOTA_SECTION` in `config.js` plus three strings in `i18n.js`.
 
 - `assets/img/hero.jpg` (1.5 MB) is no longer used by any page. It is kept for
   a future landing page; nothing loads it today.

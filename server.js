@@ -44,19 +44,21 @@ const TYPES = {
    ------------------------------------------------------------ */
 const DEMO_SCRIPT = `<script>
 (function () {
-  // ---- limits -------------------------------------------------------------
-  // Every section runs its own counter: 10 papers, 10 marking keys, 3 notes,
-  // 3 books. Each refills 24 hours after the first download in that section,
-  // not at midnight.
-  var LIMITS = { papers: 10, "marking-keys": 10, notes: 3, books: 3 };
-  var FIELD = { papers: "papers", "marking-keys": "marking_keys", notes: "notes", books: "books" };
-  var WINDOW = 24 * 60 * 60 * 1000;
+  // ---- limits, exactly as the backend keeps them --------------------------
+  // One paper allowance of 10 a day that notes and marking keys also spend,
+  // one book allowance of 3, and both refill at midnight UTC. The demo has to
+  // mirror this: a demo that is more generous than production teaches the
+  // wrong thing.
+  var LIMITS = { papers: 10, books: 3 };
+  var BUCKET = { papers: "papers", notes: "papers", "marking-keys": "papers", books: "books" };
+  var QUOTA_VERSION = 2;
 
   var TOKEN_KEY = "zafar_token";
   var QUOTA_KEY = "zafar_demo_quota";
   var DEMO_TOKEN = "demo." + btoa(JSON.stringify({ sub: "student@zafar.mw" })).replace(/=+$/, "") + ".demo";
 
   function isDemoToken(t) { return !!t && t.indexOf("demo.") === 0; }
+  function utcDay() { return new Date().toISOString().slice(0, 10); }
 
   function readToken() {
     try { return localStorage.getItem(TOKEN_KEY) || sessionStorage.getItem(TOKEN_KEY); }
@@ -65,20 +67,27 @@ const DEMO_SCRIPT = `<script>
 
   // ---- allowance lives in localStorage, so it survives navigation ---------
   function freshQuota() {
-    var q = { started: null }; // set by the first download of the window
-    Object.keys(LIMITS).forEach(function (section) {
-      q[FIELD[section] + "_left"] = LIMITS[section];
-      q[FIELD[section] + "_limit"] = LIMITS[section];
-    });
-    return q;
+    return {
+      v: QUOTA_VERSION,
+      day: utcDay(),
+      papers_left: LIMITS.papers,
+      papers_limit: LIMITS.papers,
+      books_left: LIMITS.books,
+      books_limit: LIMITS.books,
+    };
   }
 
   function readQuota() {
     var q = null;
     try { q = JSON.parse(localStorage.getItem(QUOTA_KEY) || "null"); } catch (e) {}
-    if (!q || typeof q.papers_left !== "number") q = freshQuota();
-    else if (typeof q.started === "number" && Date.now() - q.started >= WINDOW) q = freshQuota();
-    writeQuota(q);
+    // A record from an older demo (no version, or per-section fields) and a
+    // record from an earlier UTC day are both stale: start the day over.
+    var usable = q && q.v === QUOTA_VERSION && q.day === utcDay() &&
+      typeof q.papers_left === "number" && typeof q.books_left === "number";
+    if (!usable) {
+      q = freshQuota();
+      writeQuota(q);
+    }
     return q;
   }
   function writeQuota(q) {
@@ -161,15 +170,13 @@ const DEMO_SCRIPT = `<script>
 
     if (url.indexOf("/drive/download/") !== -1) {
       var section = new URL(url, location.href).searchParams.get("section") || "papers";
-      var key = (FIELD[section] || "papers") + "_left";
+      var key = (BUCKET[section] || "papers") + "_left";
       var quota = readQuota();
       if (quota[key] <= 0) {
         // Same shape and status the backend uses, so the client's 429 path
         // ("Daily download limit reached") is exercised for real.
         return reply(429, { detail: "Daily download limit reached" });
       }
-      // The 24-hour window starts with the first download, not at page load.
-      if (quota.started === null) quota.started = Date.now();
       quota[key] = quota[key] - 1;
       writeQuota(quota);
       return reply(200, {

@@ -198,38 +198,29 @@ var ZafarList = (function () {
     }
 
     /* ---------- Daily allowance — shown in the header, not the sheet ----------
-       Every section runs its own counter: 10 papers, 10 marking keys, 3 notes,
-       3 books, each refilling 24 hours after the first download in it. The
-       quota response names its fields per section (papers_left, notes_left…),
-       so the section key is all we need — with a couple of spellings tried
-       for marking keys, whose field may be snake_case or camelCase. */
+       The server keeps two buckets today: papers (which notes and marking keys
+       are charged against as well) and books. QUOTA_SECTION maps this page to
+       the bucket it is really spending, so Notes and Marking Keys show the
+       paper count instead of advertising an allowance of their own. */
+    var bucket = QUOTA_SECTION[cfg.quotaKey] || cfg.quotaKey;
+    var cap = DAILY_LIMITS[bucket] || null;
     var left = null;
-    var cap = DAILY_LIMITS[cfg.quotaKey] || null;
+    // A download can land while the initial GET is still in flight. Its
+    // numbers are the newer ones, so the GET must not overwrite them.
+    var quotaDirty = false;
 
-    function fieldNames(key, suffix) {
-      return key === "marking-keys"
-        ? ["marking_keys_" + suffix, "markingKeys_" + suffix, "keys_" + suffix]
-        : [key + "_" + suffix];
-    }
     function pick(q, key, suffix) {
-      var names = fieldNames(key, suffix);
-      for (var i = 0; i < names.length; i++) {
-        if (q && typeof q[names[i]] === "number") return q[names[i]];
-      }
-      return null;
+      var field = key + "_" + suffix;
+      return q && typeof q[field] === "number" ? q[field] : null;
     }
 
     function renderLimit() {
       if (!el.limit) return;
 
-      // No per-section count yet (the backend may only track papers and
-      // books): state the policy rather than invent a remaining number.
+      // Nothing reported for this bucket: say nothing rather than imply an
+      // allowance we cannot measure.
       if (left === null) {
-        if (!cap) return;
-        el.limit.hidden = false;
-        el.limit.classList.remove("is-warn");
-        el.limitText.textContent = t("list.allowancePerDay", cap);
-        el.limit.setAttribute("aria-label", t("list.allowancePerDayLabel", cap));
+        el.limit.hidden = true;
         return;
       }
 
@@ -239,23 +230,29 @@ var ZafarList = (function () {
       el.limitText.textContent = allowed
         ? t("list.downloadsLeft", left, cap)
         : t("list.limitReached");
+
+      var shared = bucket === "papers" && cfg.quotaKey !== "papers"
+        ? t("list.sharedBucket")
+        : "";
       el.limit.setAttribute(
         "aria-label",
-        allowed ? t("list.downloadsLeftLabel", left, cap) : t("list.limitReached")
+        (allowed ? t("list.downloadsLeftLabel", left, cap) : t("list.limitReached")) + shared
       );
     }
 
     if (cfg.quotaKey && el.limit) {
       Zafar.authGet("/auth/quota")
         .then(function (q) {
-          left = pick(q, cfg.quotaKey, "left");
-          // A ceiling from the server beats the mirrored constant.
-          var reported = pick(q, cfg.quotaKey, "limit");
+          // A ceiling from the server beats the mirrored constant, and it is
+          // still worth taking even if a download has already reported.
+          var reported = pick(q, bucket, "limit");
           if (reported > 0) cap = reported;
+          if (quotaDirty) return;
+          left = pick(q, bucket, "left");
           renderLimit();
         })
         .catch(function () {
-          if (!el.limit) return;
+          if (!el.limit || quotaDirty) return;
           el.limit.hidden = false;
           el.limit.classList.add("is-warn");
           el.limitText.textContent = t("list.limitUnavailable");
@@ -332,8 +329,12 @@ var ZafarList = (function () {
       )
         .then(function (data) {
           if (cfg.quotaKey && data.quota) {
-            left = pick(data.quota, cfg.quotaKey, "left");
-            renderLimit();
+            var fresh = pick(data.quota, bucket, "left");
+            if (fresh !== null) {
+              quotaDirty = true;
+              left = fresh;
+              renderLimit();
+            }
           }
           var card = btn.closest(".item");
           Zafar.recordDownload({
