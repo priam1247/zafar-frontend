@@ -148,6 +148,9 @@ var ZafarList = (function () {
     var current = "loading";
     var renderedCount = 0;
 
+    // Pages without a list (Help) leave this hidden.
+    if (shell.meta) shell.meta.hidden = false;
+
     var el = {
       grid: root.querySelector("[data-grid]"),
       skeleton: root.querySelector("[data-skeleton]"),
