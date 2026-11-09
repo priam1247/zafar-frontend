@@ -209,6 +209,13 @@ it with a warning.
 caches, and activation retires the ones it does not recognise; a stale name is a
 stale app.
 
+If a worker ever ships a bad copy of the app, `reset.html` is the way back: it
+is deliberately not part of the shell, has no stylesheet or script of its own,
+and is therefore never stored. It unregisters the worker covering the page and
+deletes the `zafar-*` caches, then opens the app again. A phone stuck on a
+broken worker can always reach it, because the worker has no copy to answer
+with and falls through to the network.
+
 The demo removes *its own* worker rather than merely not registering one —
 registration is matched by script URL, so another app's worker on the same
 origin is left alone:
