@@ -125,28 +125,42 @@ var ZafarShell = (function () {
     }
   }
 
+  // Unregister and drop this worker's caches. Shared by ?sw=0 and by the demo,
+  // which must not be served by a worker left over from a real session: the
+  // dev server rewrites each page as it serves it, and a stored copy would be
+  // the wrong copy — a cached demo page can re-seed a demo session after a
+  // logout, and a cached real page cannot carry the demo stand-in at all.
+  function clearWorker() {
+    if (!("serviceWorker" in navigator)) return;
+    navigator.serviceWorker.getRegistrations().then(function (regs) {
+      regs.forEach(function (reg) { reg.unregister(); });
+    });
+    if (window.caches) {
+      caches.keys().then(function (names) {
+        names.forEach(function (name) {
+          if (name.indexOf("zafar-") === 0) caches.delete(name);
+        });
+      });
+    }
+  }
+
   function registerWorkerNow() {
     if (!("serviceWorker" in navigator)) return;
 
     var flag = new URLSearchParams(location.search).get("sw");
 
     if (flag === "0") {
-      navigator.serviceWorker.getRegistrations().then(function (regs) {
-        regs.forEach(function (reg) { reg.unregister(); });
-      });
-      if (window.caches) {
-        caches.keys().then(function (names) {
-          names.forEach(function (name) {
-            if (name.indexOf("zafar-") === 0) caches.delete(name);
-          });
-        });
-      }
+      clearWorker();
       return;
     }
 
     var demo = new URLSearchParams(location.search).get("demo") ||
       /^demo\./.test(Zafar.getToken() || "");
-    if (demo && flag !== "1") return;
+    if (demo && flag !== "1") {
+      // Not merely "do not register": take away anything already there.
+      clearWorker();
+      return;
+    }
 
     // Service workers need a secure origin; localhost counts as one.
     var secure = location.protocol === "https:" ||

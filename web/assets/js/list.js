@@ -143,6 +143,13 @@ var ZafarList = (function () {
     var root = shell.content;
     root.innerHTML = layout(cfg);
 
+    // What is on screen right now (loading / grid / empty / error / offline),
+    // so a signal drop can tell whether there is a list worth keeping.
+    var current = "loading";
+    var renderedCount = 0;
+    var requested = [];      // catalogue URLs this view asked for
+    var staleServed = false; // the worker answered at least one of them from its copy
+
     var el = {
       grid: root.querySelector("[data-grid]"),
       skeleton: root.querySelector("[data-skeleton]"),
@@ -232,22 +239,12 @@ var ZafarList = (function () {
     // numbers are the newer ones, so the GET must not overwrite them.
     var quotaDirty = false;
 
-    // A "no" is about a moment, not forever. A refusal can be caused by a
-    // reservation that ages out after the signed link's five minutes, and the
-    // allowance refills at 00:00 UTC. Past either, the zero is a guess and has
-    // to be re-checked before it is repeated to a student as "tomorrow".
-    var REFUSAL_TTL = 5 * 60 * 1000;
-    var refusedAt = 0;
-    var refusedDay = "";
-
-    function utcDay() {
-      return new Date().toISOString().slice(0, 10);
-    }
-
-    function refusalExpired() {
-      if (left === null || left > 0 || !refusedAt) return false;
-      return Date.now() - refusedAt > REFUSAL_TTL || utcDay() !== refusedDay;
-    }
+    // A remembered zero is a hint, never a verdict. The backend expires an
+    // unconfirmed reservation five minutes after the *download request*, not
+    // five minutes after we happen to hear about it, so no local timer can
+    // know when the answer changed. The only safe move when the count says
+    // zero is to ask the server again — one GET, only when the page is spent.
+    var quotaChecking = false;
 
     function pick(q, key, suffix) {
       var field = key + "_" + suffix;
@@ -264,7 +261,7 @@ var ZafarList = (function () {
       if (otherLeft > 0) {
         lines.push(isBooks ? t("list.notice.sparePapers", otherLeft) : t("list.notice.spareBooks", otherLeft));
       }
-      lines.push(t("list.notice.reset"));
+      lines.push(t("list.notice.recovery"));
       return {
         title: isBooks ? t("list.notice.booksTitle") : t("list.notice.papersTitle"),
         body: lines.join(" "),
@@ -323,17 +320,36 @@ var ZafarList = (function () {
 
       left = pick(q, bucket, "left");
       otherLeft = pick(q, otherBucket, "left");
-      refusedAt = left === 0 ? Date.now() : 0;
-      refusedDay = left === 0 ? utcDay() : "";
       if (fromTap) quotaDirty = true;
       renderLimit();
       return left;
     }
 
-    function refreshQuota() {
+    // Resolves to "ok" when the server actually spoke, "failed" when it did
+    // not. The caller must keep those apart: "I could not check" is not "you
+    // have none", and a student should never be told the second when the first
+    // is what happened.
+    function refreshQuota(onlyOther) {
       return Zafar.authGet("/auth/quota")
-        .then(function (q) { applyQuota(q, true); })
-        .catch(function () { /* stays as it was; the guard will not block on a guess */ });
+        .then(function (q) {
+          if (onlyOther) {
+            // After a 429 we only know about the bucket that refused. The
+            // notice quotes an exact number for the other one, and another tab
+            // may have spent it since — so refresh that, and leave the refusal
+            // standing.
+            var spareLimit = pick(q, otherBucket, "limit");
+            if (spareLimit > 0) otherCap = spareLimit;
+            var spare = pick(q, otherBucket, "left");
+            if (spare !== null) otherLeft = spare;
+            renderLimit();
+            return "ok";
+          }
+          applyQuota(q, true);
+          return "ok";
+        })
+        .catch(function () {
+          return "failed";
+        });
     }
 
     if (cfg.quotaKey && el.limit) {
@@ -388,19 +404,30 @@ var ZafarList = (function () {
       if (!navigator.onLine) return shell.showToast(t("list.noInternet"), "offline");
 
       if (cfg.quotaKey && left !== null && left <= 0) {
-        if (!refusalExpired()) {
-          revealNotice();
-          return shell.showToast(t("list.limitReached"), "alert");
-        }
-        // Holding an old no. Ask again before repeating it — a reservation
-        // from five minutes ago, or yesterday's allowance, may be gone.
-        if (btn.dataset.pending === "true") return;
+        // Whatever the stored zero says, the server has the last word: an
+        // unconfirmed reservation or the daily refill can have freed a place
+        // since it arrived.
+        if (quotaChecking) return;
+        quotaChecking = true;
         btn.dataset.pending = "true";
-        refreshQuota().then(function () {
+        refreshQuota().then(function (state) {
+          quotaChecking = false;
           btn.dataset.pending = "false";
-          if (left !== null && left > 0) return startDownload(btn);
-          revealNotice();
-          shell.showToast(t("list.limitReached"), "alert");
+
+          if (state === "ok" && left > 0) return startDownload(btn);
+          if (state === "ok") {
+            revealNotice();
+            return shell.showToast(t("list.limitReached"), "alert");
+          }
+
+          // The check failed. Report that, and do not dress it up as a limit
+          // the server never confirmed.
+          if (el.limit) {
+            el.limit.hidden = false;
+            el.limit.classList.add("is-warn");
+            el.limitText.textContent = t("list.limitUnavailable");
+          }
+          shell.showToast(t("list.limitCheckFailed"), "alert");
         });
         return;
       }
@@ -447,8 +474,6 @@ var ZafarList = (function () {
             if (fresh !== null) {
               quotaDirty = true;
               left = fresh;
-              refusedAt = fresh === 0 ? Date.now() : 0;
-              refusedDay = fresh === 0 ? utcDay() : "";
               renderLimit();
             }
           }
@@ -501,10 +526,11 @@ var ZafarList = (function () {
             if (cfg.quotaKey) {
               quotaDirty = true;
               left = 0;
-              refusedAt = Date.now();
-              refusedDay = utcDay();
               renderLimit();
               revealNotice();
+              // The refusal says nothing about the other allowance, and the
+              // notice quotes an exact number for it.
+              refreshQuota(true);
             }
             shell.showToast(t("list.limitReached"), "alert");
           } else {
@@ -566,6 +592,7 @@ var ZafarList = (function () {
     }
 
     function show(which) {
+      current = which;
       el.skeleton.style.display = which === "loading" ? "grid" : "none";
       el.grid.style.display = which === "grid" ? (cfg.favoritesOnly ? "" : "grid") : "none";
       el.empty.classList.toggle("show", which === "empty");
@@ -579,45 +606,78 @@ var ZafarList = (function () {
       renderCatChips();
       syncURL();
 
-      // Offline is no longer decided here. The service worker may still be
-      // holding the last answer for this view, and a cached list is worth more
-      // than a warning — the catch below reports "no answer at all".
+      // Fresh view: nothing yet claimed to be stale, and nothing rendered.
+      staleServed = false;
+      renderedCount = 0;
       show("loading");
       shell.count.textContent = t("list.loading");
 
-      // Favorites span every section, so that page passes a list of
-      // sections and the results are merged into one grid.
+      // Favorites span every section, so that page passes a list of sections
+      // and the results are merged into one grid. Each section is answered on
+      // its own: one section the worker has never seen must not hide the
+      // documents the others can still show.
       var sections = cfg.sections || [cfg.section];
+      var urls = [];
       var requests = sections.map(function (section) {
         var query = new URLSearchParams();
         query.set("section", section);
         if (state.category) query.set("category", state.category);
         if (state.q) query.set("q", state.q);
-        return Zafar.authGet("/drive/papers?" + query.toString());
+        var path = "/drive/papers?" + query.toString();
+        urls.push(API_BASE_URL + path);
+        return Zafar.authGet(path).then(
+          function (rows) { return { rows: rows || [] }; },
+          function (error) { return { error: error }; }
+        );
       });
+      requested = urls;
 
       Promise.all(requests)
         .then(function (results) {
+          var failures = results.filter(function (result) { return result.error; });
+
           // Tag each doc with the section it came from, so the
           // Favorites page can group by section without the
           // backend having to send one.
           var docs = [];
-          results.forEach(function (rows, i) {
-            (rows || []).forEach(function (d) {
+          results.forEach(function (result, i) {
+            (result.rows || []).forEach(function (d) {
               d._section = sections[i];
               docs.push(d);
             });
           });
+
+          // Nothing came back from anywhere.
+          if (!docs.length && failures.length) {
+            if (!navigator.onLine) {
+              shell.count.textContent = t("list.offline");
+              show("offline");
+            } else {
+              shell.count.textContent = "—";
+              show("error");
+              shell.showToast(
+                (failures[0].error && failures[0].error.message) || t("list.couldntLoad", cfg.itemLabel),
+                "alert"
+              );
+            }
+            return;
+          }
+
           if (cfg.favoritesOnly) {
             var saved = Zafar.getBookmarks();
             docs = docs.filter(function (d) { return saved.indexOf(d.id) !== -1; });
           }
           docs = docs.slice().sort(SORTS[state.sort] || SORTS["name-asc"]);
+          renderedCount = docs.length;
 
           var label = cfg.favoritesOnly
             ? t("list.savedCount", docs.length)
             : t("list.results", docs.length);
-          if (!navigator.onLine) label = t("list.offlineResults", docs.length);
+          // A list the worker answered from its copy is a copy, whether or not
+          // the radio is on — a captive portal leaves it on and the network
+          // useless, and the worker says so on the wire (see the message
+          // listener below).
+          if (!navigator.onLine || staleServed) label = t("list.offlineResults", docs.length);
           shell.count.textContent = label;
 
           if (!docs.length) {
@@ -645,18 +705,25 @@ var ZafarList = (function () {
             el.grid.innerHTML = docs.map(cardHTML).join("");
           }
           show("grid");
-        })
-        .catch(function (err) {
-          // Nothing from the network and nothing stored for this view.
-          if (!navigator.onLine) {
-            shell.count.textContent = t("list.offline");
-            show("offline");
-            return;
-          }
-          shell.count.textContent = "—";
-          show("error");
-          shell.showToast((err && err.message) || t("list.couldntLoad", cfg.itemLabel), "alert");
+
+          // Some sections answered and some did not: the list is real, but it
+          // is not the whole list.
+          if (failures.length) shell.showToast(t("list.partialResults"), "offline");
         });
+    }
+
+    // The worker tells the page when it answered a catalogue request from its
+    // stored copy, so the count can say so even with the radio on.
+    if (navigator.serviceWorker && navigator.serviceWorker.addEventListener) {
+      navigator.serviceWorker.addEventListener("message", function (event) {
+        var data = event.data;
+        if (!data || data.type !== "zafar-catalogue-cached") return;
+        if (requested.indexOf(data.url) === -1) return;
+        staleServed = true;
+        if (current === "grid" && renderedCount) {
+          shell.count.textContent = t("list.offlineResults", renderedCount);
+        }
+      });
     }
 
     root.querySelector("[data-retry]").addEventListener("click", load);
@@ -670,11 +737,14 @@ var ZafarList = (function () {
     });
 
     window.addEventListener("offline", function () {
-      // A list already on screen is still readable, so keep it and mark it
-      // rather than replacing a usable page with a warning.
-      var shown = el.grid.querySelectorAll(".item").length;
-      if (shown) shell.count.textContent = t("list.offlineResults", shown);
-      else show("offline");
+      // Only mark a list that is actually on screen — el.grid keeps its old
+      // cards while an empty or error panel is up, and those must not be
+      // counted as results.
+      if (current === "grid" && renderedCount) {
+        shell.count.textContent = t("list.offlineResults", renderedCount);
+      } else {
+        show("offline");
+      }
       shell.showToast(t("list.offlineTitle"), "offline");
     });
     window.addEventListener("online", function () {

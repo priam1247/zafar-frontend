@@ -43,10 +43,13 @@ var ZafarI18n = (function () {
       // and says what is still there. Nothing says "tomorrow": the refill is
       // 00:00 UTC, which is 02:00 in Malawi — a student who hits the limit at
       // 01:00 gets it back the same local day.
+      // Nothing here claims the allowance is gone for good: an interrupted
+      // download's place frees itself after a few minutes, so 02:00 is the
+      // daily refill, not the only way back.
       notice: {
-        papersTitle: "You've used today's paper downloads",
+        papersTitle: "You're out of paper downloads for now",
         papersWhy: "Notes and marking keys are charged to the same allowance, so those are spent too.",
-        booksTitle: "You've used today's book downloads",
+        booksTitle: "You're out of book downloads for now",
         booksWhy: "Textbooks have their own allowance, separate from papers.",
         spareBooks: function (n) {
           return "You still have " + n + " book download" + (n === 1 ? "" : "s") + " today.";
@@ -55,15 +58,19 @@ var ZafarI18n = (function () {
           return "You still have " + n + " paper download" + (n === 1 ? "" : "s") +
             " today — notes and marking keys share them.";
         },
-        reset: "ZAFAR is free for every Malawian student, and these limits are what keep it that way. " +
-          "The allowance refills at 02:00 in Malawi (midnight UTC), so save anything you need to " +
-          "Favorites until then.",
+        recovery: "An unfinished download holds its place for only a few minutes, so try again shortly — " +
+          "the allowance itself refills at 02:00 in Malawi (00:00 UTC). ZAFAR is free for every " +
+          "Malawian student, and these limits are what keep it that way.",
       },
       openFavorites: "Open Favorites",
       downloadsLeftLabel: function (left, cap) { return left + " of " + cap + " downloads left today"; },
       sharedBucket: ", shared with notes and marking keys",
       limitReached: "No downloads left",
       limitUnavailable: "Limit unavailable",
+      // The check itself failed: say that, rather than report a refusal the
+      // server never gave.
+      limitCheckFailed: "Couldn't check your allowance — try again in a moment",
+      partialResults: "Some sections couldn't load",
       sortLabel: "Sort",
       clearAll: "Clear all",
       clearCategory: "Clear category filter",

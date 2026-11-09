@@ -93,11 +93,14 @@ and when it refills: **02:00 in Malawi, which is midnight UTC**. It never says
 "tomorrow", because the refill is not a day away — a student who hits the limit
 at 01:00 has it back within the hour.
 
-A refusal is treated as a statement about a moment, not a permanent fact. The
-zero is stamped when it arrives, and after five minutes (the signed link's own
-TTL) or a change of UTC day, the next tap re-checks `/auth/quota` instead of
-repeating an answer that may no longer be true. Favorites has no allowance of
-its own, so a refusal there is a toast and nothing else — no amber chip, and no
+A refusal is a statement about a moment, not a permanent fact. The backend
+expires an unconfirmed reservation five minutes after the *download request*,
+not five minutes after we hear about it, so no local timer can know when the
+answer changed: whenever the stored count says zero, the next tap asks
+`/auth/quota` again and proceeds if the server has moved on. If that check
+cannot reach the server, the page says so ("couldn't check your allowance") and
+does not dress the failure up as a refusal. Favorites has no allowance of its
+own, so a refusal there is a toast and nothing else — no amber chip, and no
 notice whose button leads back to the page you are on.
 
 Cards keep the same discipline as the auth screen: one hairline, no shadow, a
@@ -148,23 +151,42 @@ notch and home indicator would sit on top of the bar and the tabs.
 
 | Route | Strategy | Why |
 | --- | --- | --- |
-| pages (`dashboard.html`, …) | stored copy, refreshed in the background | opens instantly, and opens with no signal |
-| css, js, font, icons | cache first | they only change when the version does |
-| `GET /drive/papers` | network first, stored copy as fallback | a fresh list beats an instant one; the copy is for when nothing answers |
-| `/auth/*`, downloads, anything but GET | untouched | an allowance or a token served from last week is a lie |
+| the six pages, and every listed css/js/font/icon | cache first | markup and the scripts it loads must come from the same deploy |
+| `GET /drive/papers`, on any origin | network first, stored copy as fallback | a fresh list beats an instant one; the copy is for when nothing answers |
+| `/auth/*`, `/drive/download`, `/drive/confirm`, every POST, every other origin | untouched | an allowance or a token served from last week is a lie |
 
-A list served from that copy says **offline** next to its count rather than
-letting a stored list pass for a live one, and losing signal mid-page leaves
-the list on screen instead of replacing it with a warning. Signing out deletes
-the stored catalogue — the app itself stays installed, which is the point.
+Four rules keep that safe:
 
-**Bump `VERSION` in `sw.js` on every deploy that changes `web/`.** The old
-cache is retired by name on activate; a forgotten bump means returning visitors
-keep yesterday's shell.
+- **Routed by path, not by host.** `?api` can point the app at this same
+  origin; the catalogue is still a catalogue, and `/auth/quota` is still never
+  cached.
+- **The catalogue belongs to an account.** Entries are keyed by the token's
+  `sub`, so one student's list can never answer the next student's request on a
+  shared phone. An expired token reads no cache at all — the 401 that follows
+  is what sends the phone back to the sign-in screen. Signing out, or any 401,
+  deletes every stored answer.
+- **Install is all or nothing.** If an essential page or script cannot be
+  stored the install fails and the previous worker keeps serving; icons are
+  optional and may fail quietly. A phone gets a stale app, never a half-built
+  one.
+- **Activation only retires its own caches.** Names beginning `zafar-shell-` or
+  `zafar-docs-` are deleted; another app on the origin keeps everything it has.
 
-The demo deliberately skips registration: `server.js` rewrites each page as it
-serves it, and a stored copy would be the wrong copy. `?sw=1` forces the worker
-on, `?sw=0` unregisters it and deletes its caches.
+A list served from the copy is labelled **offline** beside its count. That does
+not rely on `navigator.onLine` — a captive portal leaves the radio on and the
+network useless — so the worker posts a message when it answers from cache, and
+the page relabels itself. Losing signal mid-page leaves the readable list on
+screen instead of replacing it with a warning.
+
+**Bump `VERSION` in `sw.js` on every deploy that changes `web/`.** Pages and
+assets are both cache-first, so a bump moves the whole app together. Forget it
+and the whole app stays as it was — consistent, if out of date — rather than
+new markup running yesterday's scripts.
+
+The demo removes the worker rather than merely not registering one:
+`server.js` rewrites each page as it serves it, and a stored copy would be the
+wrong copy. `?sw=1` forces the worker on, `?sw=0` unregisters it and deletes
+its caches.
 
 ## Backend
 
@@ -208,10 +230,11 @@ a same-origin blob so the filename survives.
   shared bucket instead of promising the new one. Flipping it over is
   `QUOTA_SECTION` in `config.js` plus three strings in `i18n.js`.
 
-- **Offline covers what you have already seen.** The worker stores one
-  catalogue answer per exact view (section plus any filter), up to forty of
-  them, so a search never run online has nothing to fall back on — that view
-  shows the offline state, honestly. Downloads always need a connection.
+- **Offline covers what you have already seen, on the account that saw it.**
+  The worker stores one catalogue answer per exact view (section plus filters)
+  per account, up to forty in total, so a search never run online has nothing
+  to fall back on — that view shows the offline state, honestly. Downloads
+  always need a connection.
 
 - `/auth/forgot-password` and `/auth/reset-password` don't exist server-side
   yet. The sign-in screen has both panels built and wired to validation, but

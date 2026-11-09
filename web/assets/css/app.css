@@ -122,7 +122,11 @@ a { color: inherit; }
   z-index: 30;
   /* The top inset only exists on a notched phone in standalone mode, where
      viewport-fit=cover lets the page run under the status bar. Zero elsewhere. */
-  padding: calc(12px + env(safe-area-inset-top)) 18px 15px;
+  /* All four insets: viewport-fit=cover puts the page under the sensor
+     housing in landscape too, where it is the left and right edges that
+     matter. Zero on a screen without a notch. */
+  padding: calc(12px + env(safe-area-inset-top)) calc(18px + env(safe-area-inset-right)) 15px
+    calc(18px + env(safe-area-inset-left));
   background: var(--brand);
   color: var(--on);
 }
@@ -283,7 +287,9 @@ a { color: inherit; }
   flex: 1;
   min-width: 0;
   /* Room for the fixed tabs so the last card can still be scrolled clear. */
-  padding: 18px 16px calc(var(--bar) + 20px + env(safe-area-inset-bottom));
+  padding: 18px calc(16px + env(safe-area-inset-right))
+    calc(var(--bar) + 20px + env(safe-area-inset-bottom))
+    calc(16px + env(safe-area-inset-left));
   border-radius: 24px 24px 0 0;
   background: var(--sheet);
 }
@@ -420,8 +426,11 @@ a { color: inherit; }
 .cat-chips {
   display: flex;
   gap: 8px;
-  margin: 0 -16px;
-  padding: 0 16px 2px;
+  margin-right: calc(-16px - env(safe-area-inset-right));
+  margin-left: calc(-16px - env(safe-area-inset-left));
+  padding-right: calc(16px + env(safe-area-inset-right));
+  padding-bottom: 2px;
+  padding-left: calc(16px + env(safe-area-inset-left));
   overflow-x: auto;
   overscroll-behavior-x: contain;
   scrollbar-width: none;
@@ -848,7 +857,8 @@ a { color: inherit; }
   display: grid;
   grid-template-columns: repeat(5, 1fr);
   gap: 2px;
-  padding: 7px 6px calc(7px + env(safe-area-inset-bottom));
+  padding: 7px calc(6px + env(safe-area-inset-right)) calc(7px + env(safe-area-inset-bottom))
+    calc(6px + env(safe-area-inset-left));
   border-top: 1px solid var(--line);
   background: var(--sheet);
 }
@@ -1126,9 +1136,21 @@ a { color: inherit; }
    ============================================================ */
 
 @media (max-width: 380px) {
-  .app-bar { padding: calc(12px + env(safe-area-inset-top)) 15px 14px; }
-  .sheet { padding: 16px 13px calc(var(--bar) + 18px + env(safe-area-inset-bottom)); }
-  .cat-chips { margin: 0 -13px; padding: 0 13px 2px; }
+  .app-bar {
+    padding: calc(12px + env(safe-area-inset-top)) calc(15px + env(safe-area-inset-right)) 14px
+      calc(15px + env(safe-area-inset-left));
+  }
+  .sheet {
+    padding: 16px calc(13px + env(safe-area-inset-right))
+      calc(var(--bar) + 18px + env(safe-area-inset-bottom))
+      calc(13px + env(safe-area-inset-left));
+  }
+  .cat-chips {
+    margin-right: calc(-13px - env(safe-area-inset-right));
+    margin-left: calc(-13px - env(safe-area-inset-left));
+    padding-right: calc(13px + env(safe-area-inset-right));
+    padding-left: calc(13px + env(safe-area-inset-left));
+  }
   .app-title { font-size: 24px; }
   .item-title { font-size: 14px; }
   .stats { gap: 6px; }
