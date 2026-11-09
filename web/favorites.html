@@ -19,7 +19,7 @@
   <script>
     document.addEventListener("DOMContentLoaded", function () {
       var p = ZafarI18n.t("pages.favorites");
-      var shell = ZafarShell.init({ active: "favorites", title: p.title, crumb: p.crumb });
+      var shell = ZafarShell.init({ active: "favorites", title: p.title, crumb: p.crumb, desc: p.desc });
       if (!shell) return;
       // Favorites are stored per-account as a list of document ids, so the
       // page loads each section and keeps only the saved rows.

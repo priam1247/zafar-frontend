@@ -69,9 +69,15 @@ on the list pages, and Help / Log out sit as two round buttons in the bar.
 
 Glyphs are near-black ink (`--ink`) on the light surfaces — files, hearts,
 search, tabs — while teal is kept for text, headers and the filled download
-button. The allowance chip sits beside the title so it stays visible while the
-catalogue scrolls: **10 papers and 3 books a day**, with `3 of 3 left` reported
-against each section's own ceiling rather than one shared number.
+button. Each page carries a one-line description under its title.
+
+The allowance chip sits beside the title so it stays visible while the
+catalogue scrolls. **Four sections, four counters: 10 papers, 10 marking keys,
+3 notes, 3 books.** A counter refills **24 hours after the first download in
+that section**, not at midnight, and the chip reads against each section's own
+ceiling (`3 of 3 left`, never `3 of 10`). Where the backend reports no count
+for a section, the chip states the policy (`3 a day`) instead of inventing a
+remaining number.
 
 Cards keep the same discipline as the auth screen: one hairline, no shadow, a
 mint tile for the file mark, the title, a category chip, then size and a single
@@ -98,10 +104,11 @@ sample catalogue — so every screen can be walked without credentials or a
 network. It lives entirely inside `server.js`: nothing is added to `web/`, and
 the deployed site never sees it.
 
-The stand-in mirrors the real rules rather than simplifying them: 10 papers and
-3 books a day, with notes and marking keys drawing on the paper allowance; the
-allowance persists in `localStorage` across page loads and resets daily; a
-spent allowance answers `429`, so the client's limit path is exercised for real.
+The stand-in mirrors the real rules rather than simplifying them: four counters
+(10 papers, 10 marking keys, 3 notes, 3 books), each refilling 24 hours after
+the first download in it; the allowance persists in `localStorage` across page
+loads; a spent allowance answers `429`, so the client's limit path is exercised
+for real.
 
 It also stands down the moment a real session exists. **Logging out ends the
 demo** (cookie and demo token both cleared), and `login.html?switch=1` hands the

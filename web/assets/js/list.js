@@ -197,12 +197,42 @@ var ZafarList = (function () {
       }).join("");
     }
 
-    /* ---------- Daily allowance — shown in the header, not the sheet ---------- */
+    /* ---------- Daily allowance — shown in the header, not the sheet ----------
+       Every section runs its own counter: 10 papers, 10 marking keys, 3 notes,
+       3 books, each refilling 24 hours after the first download in it. The
+       quota response names its fields per section (papers_left, notes_left…),
+       so the section key is all we need — with a couple of spellings tried
+       for marking keys, whose field may be snake_case or camelCase. */
     var left = null;
-    var cap = cfg.quotaKey === "books" ? DAILY_BOOK_LIMIT : DAILY_PAPER_LIMIT;
+    var cap = DAILY_LIMITS[cfg.quotaKey] || null;
+
+    function fieldNames(key, suffix) {
+      return key === "marking-keys"
+        ? ["marking_keys_" + suffix, "markingKeys_" + suffix, "keys_" + suffix]
+        : [key + "_" + suffix];
+    }
+    function pick(q, key, suffix) {
+      var names = fieldNames(key, suffix);
+      for (var i = 0; i < names.length; i++) {
+        if (q && typeof q[names[i]] === "number") return q[names[i]];
+      }
+      return null;
+    }
 
     function renderLimit() {
-      if (!el.limit || left === null) return;
+      if (!el.limit) return;
+
+      // No per-section count yet (the backend may only track papers and
+      // books): state the policy rather than invent a remaining number.
+      if (left === null) {
+        if (!cap) return;
+        el.limit.hidden = false;
+        el.limit.classList.remove("is-warn");
+        el.limitText.textContent = t("list.allowancePerDay", cap);
+        el.limit.setAttribute("aria-label", t("list.allowancePerDayLabel", cap));
+        return;
+      }
+
       var allowed = left > 0;
       el.limit.hidden = false;
       el.limit.classList.toggle("is-warn", !allowed);
@@ -218,10 +248,10 @@ var ZafarList = (function () {
     if (cfg.quotaKey && el.limit) {
       Zafar.authGet("/auth/quota")
         .then(function (q) {
-          left = cfg.quotaKey === "books" ? q.books_left : q.papers_left;
+          left = pick(q, cfg.quotaKey, "left");
           // A ceiling from the server beats the mirrored constant.
-          var reported = cfg.quotaKey === "books" ? q.books_limit : q.papers_limit;
-          if (typeof reported === "number" && reported > 0) cap = reported;
+          var reported = pick(q, cfg.quotaKey, "limit");
+          if (reported > 0) cap = reported;
           renderLimit();
         })
         .catch(function () {
@@ -302,7 +332,7 @@ var ZafarList = (function () {
       )
         .then(function (data) {
           if (cfg.quotaKey && data.quota) {
-            left = cfg.quotaKey === "books" ? data.quota.books_left : data.quota.papers_left;
+            left = pick(data.quota, cfg.quotaKey, "left");
             renderLimit();
           }
           var card = btn.closest(".item");

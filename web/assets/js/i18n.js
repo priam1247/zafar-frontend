@@ -15,12 +15,23 @@ var ZafarI18n = (function () {
       studyLibrary: "Study library", logOut: "Log out",
     },
     pages: {
-      papers:    { title: "Past Papers", crumb: "Library", itemLabel: "paper", searchPlaceholder: "Search past papers by subject or year…" },
-      books:     { title: "Books", crumb: "Library", itemLabel: "book", searchPlaceholder: "Search textbooks by title or form…" },
-      notes:     { title: "Notes", crumb: "Library", itemLabel: "note", searchPlaceholder: "Search notes by subject…" },
-      keys:      { title: "Marking Keys", crumb: "Library", itemLabel: "marking key", searchPlaceholder: "Search marking keys by subject or year…" },
-      favorites: { title: "Favorites", crumb: "Yours", itemLabel: "favorite", searchPlaceholder: "Search your favorites…" },
-      help:      { title: "Help & FAQ", crumb: "Support" },
+      papers:    { title: "Past Papers", crumb: "Library", itemLabel: "paper",
+                   desc: "MSCE and JCE papers, mocks and more.",
+                   searchPlaceholder: "Search past papers by subject or year…" },
+      books:     { title: "Books", crumb: "Library", itemLabel: "book",
+                   desc: "Textbooks for senior and junior secondary.",
+                   searchPlaceholder: "Search textbooks by title or form…" },
+      notes:     { title: "Notes", crumb: "Library", itemLabel: "note",
+                   desc: "Condensed notes for every subject.",
+                   searchPlaceholder: "Search notes by subject…" },
+      keys:      { title: "Marking Keys", crumb: "Library", itemLabel: "marking key",
+                   desc: "Official schemes to check your own work.",
+                   searchPlaceholder: "Search marking keys by subject or year…" },
+      favorites: { title: "Favorites", crumb: "Yours", itemLabel: "favorite",
+                   desc: "Everything you've saved, in one list.",
+                   searchPlaceholder: "Search your favorites…" },
+      help:      { title: "Help & FAQ", crumb: "Support",
+                   desc: "Limits, downloads and account answers." },
     },
     list: {
       allCategories: "All categories",
@@ -28,6 +39,8 @@ var ZafarI18n = (function () {
       sortSizeDesc: "Largest first", sortSizeAsc: "Smallest first",
       checkingLimit: "Checking today's limit…",
       downloadsLeft: function (left, cap) { return left + " of " + cap + " left"; },
+      allowancePerDay: function (cap) { return cap + " a day"; },
+      allowancePerDayLabel: function (cap) { return cap + " downloads a day"; },
       downloadsLeftLabel: function (left, cap) { return left + " of " + cap + " downloads left today"; },
       limitReached: "No downloads left",
       limitUnavailable: "Limit unavailable",
@@ -67,9 +80,9 @@ var ZafarI18n = (function () {
       heroTitle: "How can we help?",
       heroBody: "Short answers to the questions students ask most. Still stuck? Reach the admin on WhatsApp and include the email on your account.",
       backToPapers: "Back to papers",
-      dailyLimitLabel: "Daily limit", dailyLimitFoot: "papers and books, each per day",
-      limitResetsLabel: "Limit resets", limitResetsFoot: "every night, automatically",
-      sectionsLabel: "Sections", sectionsFoot: "papers, books, notes, marking keys",
+      paperLimitLabel: "Papers & keys", paperLimitFoot: "each, per 24 hours",
+      bookLimitLabel: "Notes & books", bookLimitFoot: "each, per 24 hours",
+      limitResetsLabel: "Limit resets", limitResetsFoot: "24 hours after you start",
       faqTitle: "Frequently asked",
       shortcutsTitle: "Keyboard shortcuts",
       shortcutSlash: "Focus the search box on any list page",
@@ -82,10 +95,11 @@ var ZafarI18n = (function () {
       contactCta: "Open WhatsApp",
       qa: [
         { id: "limits", q: "Why is there a daily download limit?",
-          a: "<p>Every account gets 10 paper downloads and 10 book downloads per day. The cap keeps one " +
-             "heavy user from slowing the library down for everyone else, and it resets automatically at midnight.</p>" +
-             "<p>Notes and marking keys draw from the same paper allowance server-side, so keep an eye on the " +
-             "badge at the top of each section.</p>" },
+          a: "<p>Every account gets 10 past papers, 10 marking keys, 3 notes and 3 books. Each of the " +
+             "four runs its own counter, so spending your notes allowance never costs you a paper. The caps " +
+             "keep one heavy user from slowing the library down for everyone else.</p>" +
+             "<p>A counter refills 24 hours after your first download in that section &mdash; not at " +
+             "midnight. The chip in the header always shows what is left.</p>" },
         { id: "download", q: "A download didn't start — what now?",
           a: "<p>Downloads are prepared on demand: the app asks the server for a short-lived signed link, then " +
              "fetches the file and hands it to your browser. If that link expires before the file finishes, just " +

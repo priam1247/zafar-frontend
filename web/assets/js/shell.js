@@ -87,6 +87,7 @@ var ZafarShell = (function () {
           '<div class="app-head-text">' +
             '<div class="crumb">' + crumb + "</div>" +
             '<h1 class="app-title">' + title + "</h1>" +
+            (opts.desc ? '<p class="app-desc">' + Zafar.escapeHTML(opts.desc) + "</p>" : "") +
           "</div>" +
           // Filled by the list page when the section has a daily allowance.
           '<span class="quota" data-quota hidden>' + svg("download", 13, 2) +
@@ -128,6 +129,7 @@ var ZafarShell = (function () {
       active: opts.active,
       title: opts.title || "Zafar",
       crumb: opts.crumb,
+      desc: opts.desc || "",
     });
 
     Zafar.updateFavCountPill();

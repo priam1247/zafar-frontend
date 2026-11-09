@@ -19,11 +19,11 @@
   <script>
     document.addEventListener("DOMContentLoaded", function () {
       var p = ZafarI18n.t("pages.notes");
-      var shell = ZafarShell.init({ active: "notes", title: p.title, crumb: p.crumb });
+      var shell = ZafarShell.init({ active: "notes", title: p.title, crumb: p.crumb, desc: p.desc });
       if (!shell) return;
       ZafarList.init({
         section: "notes",
-        quotaKey: null,
+        quotaKey: "notes",
         itemLabel: p.itemLabel,
         searchPlaceholder: p.searchPlaceholder,
         categories: ["Senior", "Junior"],
