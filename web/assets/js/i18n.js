@@ -129,6 +129,9 @@ var ZafarI18n = (function () {
       },
       limitsNote: "Each section counts separately. Every allowance refills at 02:00 in Malawi " +
         "(00:00 UTC), and the chip in the header shows what is left of the page you are on.",
+      limitsNoteDefaults: "Your current allowances could not be read just now, so these are the " +
+        "published defaults — your account may be set differently. Each section counts separately, " +
+        "and every allowance refills at 02:00 in Malawi (00:00 UTC).",
       faqTitle: "Frequently asked",
       shortcutsTitle: "Keyboard shortcuts",
       shortcutSlash: "Focus the search box on any list page",
@@ -141,9 +144,12 @@ var ZafarI18n = (function () {
       contactCta: "Open WhatsApp",
       qa: [
         { id: "limits", q: "Why is there a daily download limit?",
+          // No figures in here: the table above this answer is filled from the
+          // server, so a number repeated in prose would be a second source of
+          // truth that goes stale the day an allowance is retuned.
           a: "<p>ZAFAR is free for every Malawian student. To keep it free, and fair, every account gets " +
-             "the same number of downloads each day, counted <b>separately for each section</b>: " +
-             "<b>10 papers</b>, <b>3 books</b>, <b>3 notes</b> and <b>10 marking keys</b>. Downloading a " +
+             "the same number of downloads each day, counted <b>separately for each section</b> — " +
+             "the <b>Daily downloads</b> table above lists them. Downloading a " +
              "paper never costs you a book, and a note never costs you a paper.</p>" +
              "<p>If a section runs out, tap the heart on what you need to save it to Favorites and come " +
              "back later — the other sections still have their own allowance. Every allowance refills at " +

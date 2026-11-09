@@ -174,8 +174,13 @@ What the frontend now does:
   Help page lists, never a number to render as if measured — no fallback.
 - The spent-allowance notice names the section that ran out and lists what the
   others still have, from that same answer; with everything spent it says so.
-- The FAQ and the Help table describe four separate allowances, refilling at
-  midnight UTC (02:00 in Malawi).
+- The Help table is filled from `/auth/quota` like the chips are, so a retuned
+  `DAILY_*_LIMIT` reaches it without a redeploy; `DAILY_LIMITS` appears only
+  when that request fails, and then it is labelled as the published defaults.
+  The FAQ answer no longer repeats the numbers, so the table stays the only
+  place they live.
+- Favorites sends each card's own section with the download, so a saved note
+  spends notes — the demo had exposed the old page-level behaviour.
 
 Settled by the backend, no longer a frontend question: the UTC calendar day
 (`_count_today_by_category`), the 300 s reservation TTL the "a few minutes"

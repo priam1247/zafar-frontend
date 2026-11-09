@@ -981,6 +981,10 @@ a { color: inherit; }
   font-variant-numeric: tabular-nums;
 }
 
+/* Published defaults, not the server's numbers: muted so the note that says so
+   is not the only cue. */
+.limit-rows.is-default b { color: var(--t-70); }
+
 .limits-note {
   margin: 6px 0 0;
   font-size: 12.5px;

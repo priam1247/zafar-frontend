@@ -174,14 +174,22 @@ const DEMO_SCRIPT = `<script>
 
     if (url.indexOf("/drive/download/") !== -1) {
       var section = new URL(url, location.href).searchParams.get("section") || "papers";
-      var key = (BUCKET[section] || "papers") + "_left";
+      // An unknown section is a client bug on the real server (400), so the
+      // demo refuses it the same way instead of quietly charging papers.
+      if (!BUCKET[section]) return reply(400, { detail: "Unknown section" });
+      var field = BUCKET[section];
+      var key = field + "_left";
+      var usedKey = field + "_downloaded_today";
       var quota = readQuota();
       if (quota[key] <= 0) {
         // Same shape and status the backend uses, so the client's 429 path
         // ("Daily download limit reached") is exercised for real.
         return reply(429, { detail: "Daily download limit reached" });
       }
+      // Both numbers move together, in one write: the detail and its total can
+      // never disagree, exactly as the server counts them from one table.
       quota[key] = quota[key] - 1;
+      quota[usedKey] = (quota[usedKey] || 0) + 1;
       writeQuota(quota);
       return reply(200, {
         url: URL.createObjectURL(new Blob(["%PDF-1.4 demo"], { type: "application/pdf" })),
