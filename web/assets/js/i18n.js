@@ -71,6 +71,9 @@ var ZafarI18n = (function () {
       // server never gave.
       limitCheckFailed: "Couldn't check your allowance — try again in a moment",
       partialResults: "Some sections couldn't load",
+      partialTitle: "Some sections didn't load",
+      partialBody: "Part of the library couldn't be reached, so this list may be missing " +
+        "documents — including saved ones. Try again in a moment.",
       sortLabel: "Sort",
       clearAll: "Clear all",
       clearCategory: "Clear category filter",

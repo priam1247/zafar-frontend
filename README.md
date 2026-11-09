@@ -151,39 +151,67 @@ notch and home indicator would sit on top of the bar and the tabs.
 
 | Route | Strategy | Why |
 | --- | --- | --- |
-| the six pages, and every listed css/js/font/icon | cache first | markup and the scripts it loads must come from the same deploy |
+| the six pages, and every listed css/js/font/icon | network first, stored copy as fallback | the copy is for a dead connection, never a substitute for a working one |
 | `GET /drive/papers`, on any origin | network first, stored copy as fallback | a fresh list beats an instant one; the copy is for when nothing answers |
 | `/auth/*`, `/drive/download`, `/drive/confirm`, every POST, every other origin | untouched | an allowance or a token served from last week is a lie |
 
-Four rules keep that safe:
+**Nothing is served from the cache while the network can answer.** That rule is
+not a preference. Serving a stored page as the first answer took the deployed
+site down: one stored response that the browser would not render is every
+navigation failing, with no page left to repair it from. Two consequences:
+
+- A navigation can end three ways — the network, the stored copy, or a small
+  ZAFAR page that says the phone is offline and offers **Try again**. There is
+  deliberately no fourth outcome, and no strategy is allowed to reject: if a
+  cache read throws, the request still goes to the network.
+- What is stored is re-wrapped, never passed through. A wire response carries
+  `Content-Encoding` and `Content-Length` for bytes the browser has already
+  decoded; storing that pair and handing it back later is how a cached page
+  fails to load. Entries are written as a fresh `Response` with a `Content-Type`
+  and nothing else.
+
+Five rules keep that safe:
 
 - **Routed by path, not by host.** `?api` can point the app at this same
   origin; the catalogue is still a catalogue, and `/auth/quota` is still never
   cached.
-- **The catalogue belongs to an account.** Entries are keyed by the token's
-  `sub`, so one student's list can never answer the next student's request on a
-  shared phone. An expired token reads no cache at all — the 401 that follows
-  is what sends the phone back to the sign-in screen. Signing out, or any 401,
-  deletes every stored answer.
+- **The catalogue belongs to a credential.** Entries are keyed by a one-way
+  fingerprint of the exact token that produced them — not by its `sub`. The
+  token is unsigned, so anyone can write any `sub` into one; keying by it would
+  let a forged token on a shared phone read the previous student's list. A
+  different (or edited) signature is a different key, and finds nothing. An
+  expired token reads no cache at all — the 401 that follows is what sends the
+  phone back to the sign-in screen. Signing out, or any 401, deletes every
+  stored answer.
 - **Install is all or nothing.** If an essential page or script cannot be
   stored the install fails and the previous worker keeps serving; icons are
   optional and may fail quietly. A phone gets a stale app, never a half-built
   one.
 - **Activation only retires its own caches.** Names beginning `zafar-shell-` or
   `zafar-docs-` are deleted; another app on the origin keeps everything it has.
+- **The worker's own script is never cached.** It registers with
+  `updateViaCache: "none"`, and `web/_headers` tells Cloudflare to serve
+  `/sw.js` with `Cache-Control: no-cache`. A fix has to reach the phone on the
+  next visit, not whenever the old script expires.
 
 A list served from the copy is labelled **offline** beside its count. That does
 not rely on `navigator.onLine` — a captive portal leaves the radio on and the
 network useless — so the worker posts a message when it answers from cache, and
-the page relabels itself. Losing signal mid-page leaves the readable list on
-screen instead of replacing it with a warning.
+the page relabels itself. The message goes to **the tab that asked**, named by
+`clientId`: broadcasting it would stamp another tab's live list as a copy. It
+carries the moment the copy was served, and a page ignores anything older than
+the load now on screen, so a late notice cannot relabel a list that has since
+been refreshed. An empty list is a result too, and is relabelled the same way.
+Losing signal mid-page leaves the readable list on screen instead of replacing
+it with a warning.
 
-**Bump `VERSION` in `sw.js` on every deploy that changes `web/`.** Pages and
-assets are both cache-first, so a bump moves the whole app together. Forget it
-and the whole app stays as it was — consistent, if out of date — rather than
-new markup running yesterday's scripts.
+**Bump `VERSION` in `sw.js` on every deploy that changes `web/`.** It names the
+caches, and activation retires the ones it does not recognise; a stale name is a
+stale app.
 
-The demo removes the worker rather than merely not registering one:
+The demo removes *its own* worker rather than merely not registering one —
+registration is matched by script URL, so another app's worker on the same
+origin is left alone:
 `server.js` rewrites each page as it serves it, and a stored copy would be the
 wrong copy. `?sw=1` forces the worker on, `?sw=0` unregisters it and deletes
 its caches.
@@ -230,7 +258,7 @@ a same-origin blob so the filename survives.
   shared bucket instead of promising the new one. Flipping it over is
   `QUOTA_SECTION` in `config.js` plus three strings in `i18n.js`.
 
-- **Offline covers what you have already seen, on the account that saw it.**
+- **Offline covers what you have already seen, on the credential that saw it.**
   The worker stores one catalogue answer per exact view (section plus filters)
   per account, up to forty in total, so a search never run online has nothing
   to fall back on — that view shows the offline state, honestly. Downloads

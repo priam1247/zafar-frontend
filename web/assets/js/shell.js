@@ -132,9 +132,21 @@ var ZafarShell = (function () {
   // logout, and a cached real page cannot carry the demo stand-in at all.
   function clearWorker() {
     if (!("serviceWorker" in navigator)) return;
+
+    // Only this app's registration. Other apps can share the origin, and their
+    // workers are not ours to remove just because a demo was opened.
+    var mine = new URL("sw.js", location.href).href;
     navigator.serviceWorker.getRegistrations().then(function (regs) {
-      regs.forEach(function (reg) { reg.unregister(); });
+      regs.forEach(function (reg) {
+        var workers = [reg.installing, reg.waiting, reg.active];
+        var ours = workers.some(function (worker) {
+          return worker && worker.scriptURL && worker.scriptURL === mine;
+        });
+        if (ours) reg.unregister();
+      });
     });
+
+    // Prefix-scoped, like the worker's own activation: zafar-* only.
     if (window.caches) {
       caches.keys().then(function (names) {
         names.forEach(function (name) {
@@ -170,7 +182,10 @@ var ZafarShell = (function () {
     // After load: registration is off the path to the first painting, and a
     // slow install can never hold the page up.
     var start = function () {
-      navigator.serviceWorker.register("sw.js").catch(function () {});
+      // updateViaCache: never answer the registration's own script from the
+      // HTTP cache. A fix to the worker must reach the phone on the next visit,
+      // not whenever the old script happens to expire.
+      navigator.serviceWorker.register("sw.js", { updateViaCache: "none" }).catch(function () {});
     };
     if (document.readyState === "complete") start();
     else window.addEventListener("load", start, { once: true });

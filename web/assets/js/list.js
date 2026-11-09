@@ -149,6 +149,7 @@ var ZafarList = (function () {
     var renderedCount = 0;
     var requested = [];      // catalogue URLs this view asked for
     var staleServed = false; // the worker answered at least one of them from its copy
+    var loadStartedAt = 0;   // when this view's requests went out
 
     var el = {
       grid: root.querySelector("[data-grid]"),
@@ -310,8 +311,9 @@ var ZafarList = (function () {
       if (el.notice.scrollIntoView) el.notice.scrollIntoView({ block: "nearest" });
     }
 
-    // The single place a server answer becomes state. A zero is stamped with
-    // the moment it arrived, which is what lets it expire.
+    // The single place a server answer becomes state. A zero is not stamped
+    // and does not expire on a timer: it is re-checked against /auth/quota on
+    // the next tap, because only the server knows when a place freed up.
     function applyQuota(q, fromTap) {
       var reported = pick(q, bucket, "limit");
       if (reported > 0) cap = reported;
@@ -421,12 +423,15 @@ var ZafarList = (function () {
           }
 
           // The check failed. Report that, and do not dress it up as a limit
-          // the server never confirmed.
+          // the server never confirmed — including for a screen reader, and
+          // including the notice already on screen.
           if (el.limit) {
             el.limit.hidden = false;
             el.limit.classList.add("is-warn");
             el.limitText.textContent = t("list.limitUnavailable");
+            el.limit.setAttribute("aria-label", t("list.limitUnavailable"));
           }
+          if (el.notice) el.notice.hidden = true;
           shell.showToast(t("list.limitCheckFailed"), "alert");
         });
         return;
@@ -520,16 +525,19 @@ var ZafarList = (function () {
         .catch(function (err) {
           restore();
           if (err && err.status === 429) {
-            // The server just spoke, so this zero is fresh — and the moment
-            // matters, because that is what expires. Favorites has no
+            // The server just refused, so zero is the honest count for this
+            // bucket until the next tap re-checks it. Favorites has no
             // allowance of its own: it gets the toast and nothing else.
             if (cfg.quotaKey) {
               quotaDirty = true;
               left = 0;
+              // The refusal says nothing about the other allowance, and the
+              // notice quotes an exact number for it — so quote nothing until
+              // a fresh answer arrives, and keep quoting nothing if the
+              // refresh cannot complete.
+              otherLeft = null;
               renderLimit();
               revealNotice();
-              // The refusal says nothing about the other allowance, and the
-              // notice quotes an exact number for it.
               refreshQuota(true);
             }
             shell.showToast(t("list.limitReached"), "alert");
@@ -607,8 +615,11 @@ var ZafarList = (function () {
       syncURL();
 
       // Fresh view: nothing yet claimed to be stale, and nothing rendered.
+      // The clock matters: a fallback notification from before this load must
+      // not relabel the new one.
       staleServed = false;
       renderedCount = 0;
+      loadStartedAt = Date.now();
       show("loading");
       shell.count.textContent = t("list.loading");
 
@@ -683,6 +694,16 @@ var ZafarList = (function () {
           if (!docs.length) {
             var p = el.empty.querySelector("p");
             var h = el.empty.querySelector("h3");
+            if (failures.length) {
+              // Part of the answer never arrived. "Nothing here" is a claim we
+              // cannot make when a section we asked about did not answer — and
+              // on Favorites that section may be where the saved documents are.
+              h.textContent = t("list.partialTitle");
+              p.textContent = t("list.partialBody");
+              show("empty");
+              shell.showToast(t("list.partialResults"), "offline");
+              return;
+            }
             if (cfg.favoritesOnly && !state.q && !state.category) {
               h.textContent = t("list.noFavoritesTitle");
               p.innerHTML = t("list.noFavoritesBody");
@@ -718,9 +739,16 @@ var ZafarList = (function () {
       navigator.serviceWorker.addEventListener("message", function (event) {
         var data = event.data;
         if (!data || data.type !== "zafar-catalogue-cached") return;
+
+        // Only a fallback newer than the load on screen may relabel it. A late
+        // notification from the previous load — a reload, a change of sort —
+        // would otherwise mark a live list as a copy.
+        if (typeof data.servedAt === "number" && data.servedAt < loadStartedAt) return;
         if (requested.indexOf(data.url) === -1) return;
+
         staleServed = true;
-        if (current === "grid" && renderedCount) {
+        // Empty is a result too: a stored "nothing here" is still a copy.
+        if (current === "grid" || current === "empty") {
           shell.count.textContent = t("list.offlineResults", renderedCount);
         }
       });
