@@ -263,7 +263,8 @@ var ZafarList = (function () {
       return q && typeof q[name] === "number" ? q[name] : null;
     }
 
-    // Which other sections still have downloads today, as one short phrase.
+    // Which other sections still have downloads today, as one short phrase:
+    // "3 books, 2 notes and 10 marking keys".
     function spareLine() {
       if (!others) return "";
       var spare = [];
@@ -271,21 +272,26 @@ var ZafarList = (function () {
         if (section === cfg.quotaKey) return;
         var field = QUOTA_FIELD[section];
         var count = others[field] ? others[field].left : null;
-        if (count > 0) spare.push(t("list.sectionName." + section) + " " + count);
+        if (!(count > 0)) return;
+        var name = count === 1
+          ? t("list.sectionOne." + section)
+          : t("list.sectionName." + section);
+        spare.push(count + " " + name);
       });
       if (!spare.length) return t("list.notice.spareNone");
-      return t("list.notice.spare", spare.join(" · "));
+      var last = spare.length > 1 ? spare.pop() : null;
+      return t("list.notice.spare", last ? spare.join(", ") + " and " + last : spare[0]);
     }
 
     // One bucket spent is not "today's downloads" spent: name the allowance
     // that ran out, and say what is still available in the others.
     function noticeCopy() {
-      var lines = [t("list.notice.why." + cfg.quotaKey)];
+      var lines = [t("list.notice.why", cfg.quotaKey)];
       var spare = spareLine();
       if (spare) lines.push(spare);
-      lines.push(t("list.notice.recovery"));
+      lines.push(t("list.notice.recovery", cfg.quotaKey));
       return {
-        title: t("list.notice.title." + cfg.quotaKey),
+        title: t("list.notice.title", cfg.quotaKey),
         body: lines.join(" "),
       };
     }
@@ -315,10 +321,12 @@ var ZafarList = (function () {
       el.limit.classList.toggle("is-warn", !allowed);
       el.limitText.textContent = allowed
         ? t("list.downloadsLeft", left, cap)
-        : t("list.limitReached");
+        : t("list.limitReached", cfg.quotaKey);
       el.limit.setAttribute(
         "aria-label",
-        (allowed ? t("list.downloadsLeftLabel", left, cap) : t("list.limitReached"))
+        allowed
+          ? t("list.downloadsLeftLabel", left, cfg.quotaKey)
+          : t("list.limitReached", cfg.quotaKey)
       );
     }
 
@@ -427,7 +435,7 @@ var ZafarList = (function () {
           if (state === "ok" && left > 0) return startDownload(btn);
           if (state === "ok") {
             revealNotice();
-            return shell.showToast(t("list.limitReached"), "alert");
+            return shell.showToast(t("list.notice.title", cfg.quotaKey), "alert");
           }
 
           // The check failed. Report that, and do not dress it up as a limit
@@ -547,7 +555,7 @@ var ZafarList = (function () {
               revealNotice();
               refreshQuota();
             }
-            shell.showToast(t("list.limitReached"), "alert");
+            shell.showToast(t("list.notice.title", section), "alert");
           } else {
             shell.showToast((err && err.message) || t("list.downloadStartFailed"), "alert");
           }

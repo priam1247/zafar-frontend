@@ -89,19 +89,24 @@ they are the published defaults and may not be your account's. Where the server
 reports no count — or no ceiling — the chip stays hidden instead of quoting a
 policy the backend does not keep.
 
-When an allowance runs out, a plain-English notice appears above the
-catalogue — and again if a download is refused — naming **which** allowance ran
-out, listing **how much the others still have** from that same answer, so the
-numbers are never stale, and when it refills: **02:00 in Malawi, which is
-midnight UTC**. It never says "tomorrow", because the refill is not a day
-away — a student who hits the limit at 01:00 has it back within the hour.
+When a section runs out, a plain-English notice appears above the catalogue —
+and again if a download is refused. It is written for a Form 3 student reading
+on a phone, not for a policy page: the section is named in the title and in the
+chip (*No paper downloads left* / *No papers left*), and the body is four short
+sentences — the section has its own daily limit, what the others still have
+(*You can still download 3 books, 2 notes and 10 marking keys.*), that it comes
+back at **02:00 in Malawi (00:00 UTC)**, and that a failed download frees its
+place after a few minutes. The numbers come from the same answer the chip read,
+so they are never stale, and the words "allowance", "reservation" and "counted
+separately" do not appear. It never says "tomorrow", because the refill is not
+a day away — a student who hits the limit at 01:00 has it back within the hour.
 
 A refusal is a statement about a moment, not a permanent fact. The backend
 expires an unconfirmed reservation five minutes after the *download request*,
 not five minutes after we hear about it, so no local timer can know when the
 answer changed: whenever the stored count says zero, the next tap asks
 `/auth/quota` again and proceeds if the server has moved on. If that check
-cannot reach the server, the page says so ("couldn't check your allowance") and
+cannot reach the server, the page says so ("couldn't check your downloads") and
 does not dress the failure up as a refusal. Favorites has no allowance of its
 own, so a refusal there is a toast and nothing else — no amber chip, and no
 notice whose button leads back to the page you are on. It still spends the

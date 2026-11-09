@@ -22,10 +22,10 @@ var ZafarI18n = (function () {
                    desc: "Textbooks for senior and junior secondary.",
                    searchPlaceholder: "Search textbooks by title or form…" },
       notes:     { title: "Notes", crumb: "Library", itemLabel: "note",
-                   desc: "Condensed notes, with a daily allowance of their own.",
+                   desc: "Condensed notes, with a daily limit of their own.",
                    searchPlaceholder: "Search notes by subject…" },
       keys:      { title: "Marking Keys", crumb: "Library", itemLabel: "marking key",
-                   desc: "Official marking schemes, with a daily allowance of their own.",
+                   desc: "Official marking schemes, with a daily limit of their own.",
                    searchPlaceholder: "Search marking keys by subject or year…" },
       favorites: { title: "Favorites", crumb: "Yours", itemLabel: "favorite",
                    desc: "Everything you've saved, in one list.",
@@ -47,37 +47,53 @@ var ZafarI18n = (function () {
       // either: an interrupted download's place frees itself after a few
       // minutes, so 02:00 is the daily refill, not the only way back.
       notice: {
-        title: {
-          papers: "You're out of paper downloads for now",
-          books: "You're out of book downloads for now",
-          notes: "You're out of note downloads for now",
-          "marking-keys": "You're out of marking key downloads for now",
+        // The hero notice. Plain words and short sentences on purpose: it is
+        // read on a phone, in a second language, at the moment nothing can be
+        // downloaded.
+        title: function (section) {
+          var one = T.list.sectionOne[section];
+          return one ? "No " + one + " downloads left" : "No downloads left";
         },
-        why: {
-          papers: "Papers have their own daily allowance — books, notes and marking keys are counted separately.",
-          books: "Books have their own daily allowance, separate from papers, notes and marking keys.",
-          notes: "Notes have their own daily allowance, separate from papers, books and marking keys.",
-          "marking-keys": "Marking keys have their own daily allowance, separate from papers, books and notes.",
+        why: function (section) {
+          var name = T.list.sectionName[section] || "This section";
+          return name.charAt(0).toUpperCase() + name.slice(1) + " have their own daily limit.";
         },
-        spare: function (list) { return "Still available today: " + list + "."; },
-        spareNone: "Every other allowance is spent for today too.",
-        recovery: "An unfinished download holds its place for only a few minutes, so try again shortly — " +
-          "the allowance itself refills at 02:00 in Malawi (00:00 UTC). ZAFAR is free for every " +
-          "Malawian student, and these limits are what keep it that way.",
+        spare: function (list) { return "You can still download " + list + "."; },
+        spareNone: "Nothing else is left today.",
+        recovery: function (section) {
+          return "Your " + (T.list.sectionName[section] || "downloads") +
+            " come back at 02:00 in Malawi (00:00 UTC). " +
+            "If a download failed, try again in a few minutes.";
+        },
       },
+      // "papers" / "books" / "notes" / "marking keys" for counts, and the
+      // singular of each, so a list can read "1 book and 3 notes".
       sectionName: {
         papers: "papers",
         books: "books",
         notes: "notes",
         "marking-keys": "marking keys",
       },
+      sectionOne: {
+        papers: "paper",
+        books: "book",
+        notes: "note",
+        "marking-keys": "marking key",
+      },
       openFavorites: "Open Favorites",
-      downloadsLeftLabel: function (left, cap) { return left + " of " + cap + " downloads left today"; },
-      limitReached: "No downloads left",
+      // The chip is narrow: name the section, but in three or four words.
+      limitReached: function (section) {
+        var name = T.list.sectionName[section];
+        return name ? "No " + name + " left" : "No downloads left";
+      },
+      downloadsLeftLabel: function (left, section) {
+        var name = left === 1 ? T.list.sectionOne[section] : T.list.sectionName[section];
+        return "You can download " + left + " more " + (name || "files") + " today.";
+      },
       limitUnavailable: "Limit unavailable",
       // The check itself failed: say that, rather than report a refusal the
       // server never gave.
-      limitCheckFailed: "Couldn't check your allowance — try again in a moment",
+      limitCheckFailed: "Couldn't check your downloads — try again in a moment",
       partialResults: "Some sections couldn't load",
       partialTitle: "Some sections didn't load",
       partialBody: "Part of the library couldn't be reached, so this list may be missing " +
@@ -127,11 +143,11 @@ var ZafarI18n = (function () {
         notes: "Notes",
         "marking-keys": "Marking keys",
       },
-      limitsNote: "Each section counts separately. Every allowance refills at 02:00 in Malawi " +
-        "(00:00 UTC), and the chip in the header shows what is left of the page you are on.",
-      limitsNoteDefaults: "Your current allowances could not be read just now, so these are the " +
-        "published defaults — your account may be set differently. Each section counts separately, " +
-        "and every allowance refills at 02:00 in Malawi (00:00 UTC).",
+      limitsNote: "Each section has its own limit. Every limit starts again at 02:00 in Malawi " +
+        "(00:00 UTC). The number at the top of a page shows what is left there.",
+      limitsNoteDefaults: "We could not read your own limits just now, so these are the usual ones. " +
+        "Yours may be different. Each section has its own limit, and every limit starts again at " +
+        "02:00 in Malawi (00:00 UTC).",
       faqTitle: "Frequently asked",
       shortcutsTitle: "Keyboard shortcuts",
       shortcutSlash: "Focus the search box on any list page",
@@ -147,14 +163,13 @@ var ZafarI18n = (function () {
           // No figures in here: the table above this answer is filled from the
           // server, so a number repeated in prose would be a second source of
           // truth that goes stale the day an allowance is retuned.
-          a: "<p>ZAFAR is free for every Malawian student. To keep it free, and fair, every account gets " +
-             "the same number of downloads each day, counted <b>separately for each section</b> — " +
-             "the <b>Daily downloads</b> table above lists them. Downloading a " +
-             "paper never costs you a book, and a note never costs you a paper.</p>" +
-             "<p>If a section runs out, tap the heart on what you need to save it to Favorites and come " +
-             "back later — the other sections still have their own allowance. Every allowance refills at " +
-             "<b>02:00 in Malawi</b> (00:00 UTC), and the chip in the header shows what is left of the page " +
-             "you are on.</p>" },
+          a: "<p>ZAFAR is free for every Malawian student. To keep it free, every account gets a " +
+             "few downloads each day, counted <b>separately for each section</b> — the " +
+             "<b>Daily downloads</b> table above shows the numbers. Downloading a paper never uses " +
+             "up a book, and a note never uses up a paper.</p>" +
+             "<p>If one section is finished, tap the heart to save what you need in Favorites, then " +
+             "come back later. The other sections still have their own downloads. Every limit starts " +
+             "again at <b>02:00 in Malawi</b> (00:00 UTC).</p>" },
         { id: "download", q: "A download didn't start — what now?",
           a: "<p>Downloads are prepared on demand: the app asks the server for a short-lived signed link, then " +
              "fetches the file and hands it to your browser. If that link expires before the file finishes, just " +
