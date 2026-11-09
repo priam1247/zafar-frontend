@@ -48,12 +48,19 @@ function token(sub) {
 }
 
 // A response stub shaped like the browser's: ok/status/json/headers.
-function reply(body, status) {
+function reply(body, status, headers) {
   const code = status || 200;
+  const map = {};
+  for (const name of Object.keys(headers || {})) map[name.toLowerCase()] = headers[name];
   return Promise.resolve({
     ok: code < 400,
     status: code,
-    headers: { get: () => null },
+    headers: {
+      get: (name) => {
+        const key = String(name).toLowerCase();
+        return Object.prototype.hasOwnProperty.call(map, key) ? map[key] : null;
+      },
+    },
     json: async () => body,
   });
 }
@@ -99,6 +106,35 @@ before(async () => {
 after(() => {
   if (server) server.kill();
 });
+
+// Every page needs the same four stubs before its scripts run: a fetch, a
+// service worker that is not there, caches that hold nothing, and blob URLs.
+// `hooks` can add storage and anything else the test wants in place first.
+function openPage(pathAndQuery, hooks) {
+  const opts = hooks || {};
+  return JSDOM.fromURL(origin + pathAndQuery, {
+    runScripts: "dangerously",
+    resources: "usable",
+    pretendToBeVisual: true,
+    virtualConsole: new VirtualConsole(),
+    beforeParse(win) {
+      win.fetch = opts.fetch || (() => Promise.reject(new TypeError("no network in tests")));
+      win.navigator.serviceWorker = new win.EventTarget();
+      win.navigator.serviceWorker.getRegistrations = async () => [];
+      win.caches = { keys: async () => [], delete: async () => true };
+      win.URL.createObjectURL = () => "blob:test";
+      win.URL.revokeObjectURL = () => {};
+      for (const key of Object.keys(opts.storage || {})) {
+        win.localStorage.setItem(key, opts.storage[key]);
+      }
+      if (opts.beforeParse) opts.beforeParse(win);
+    },
+  });
+}
+
+function submit(win, form) {
+  form.dispatchEvent(new win.Event("submit", { bubbles: true, cancelable: true }));
+}
 
 /* ---------- 1. the token never leaves for an unknown host ---------- */
 
@@ -258,7 +294,193 @@ test("the deployed API host is written in exactly one file", () => {
   assert.deepEqual(offenders, [], "these files hardcode the API host");
 });
 
-/* ---------- 7. the headers that cost nothing are actually served ---------- */
+/* ---------- 7. a conflict says which kind of conflict it is ---------- */
+
+test("a conflict marked 'unverified' goes to the code screen and resends", async () => {
+  const calls = [];
+  const dom = await openPage("/register.html", {
+    fetch: (input) => {
+      const url = String(input && input.url ? input.url : input);
+      calls.push(url);
+      if (/\/auth\/register/.test(url)) {
+        return reply({ detail: "That email is already registered" }, 409, {
+          "X-Error-Code": "unverified",
+        });
+      }
+      if (/\/auth\/resend/.test(url)) return reply({ message: "sent" });
+      return reply({});
+    },
+  });
+  await wait(300);
+
+  const d = dom.window.document;
+  const w = dom.window;
+  d.getElementById("fullName").value = "Test Student";
+  d.getElementById("email").value = "student@gmail.com";
+  d.getElementById("password").value = "hunter22";
+  d.getElementById("confirmPassword").value = "hunter22";
+  submit(w, d.getElementById("authForm"));
+  await wait(400);
+
+  assert.equal(
+    d.getElementById("panel-verify").hidden,
+    false,
+    "the code screen should be the visible one"
+  );
+  assert.equal(d.getElementById("verify-email-target").textContent, "student@gmail.com");
+  assert.ok(
+    calls.some((u) => /\/auth\/resend/.test(u)),
+    "an unverified account should be sent a fresh code"
+  );
+  assert.equal(w.sessionStorage.getItem("zafar_pending_email"), "student@gmail.com");
+  dom.window.close();
+});
+
+test("a conflict marked 'verified' lands on sign-in, not the code screen", async () => {
+  const dom = await openPage("/register.html", {
+    fetch: (input) => {
+      const url = String(input && input.url ? input.url : input);
+      if (/\/auth\/register/.test(url)) {
+        return reply({ detail: "That email is already registered" }, 409, {
+          "X-Error-Code": "verified",
+        });
+      }
+      return reply({});
+    },
+  });
+  await wait(300);
+
+  const d = dom.window.document;
+  const w = dom.window;
+  d.getElementById("fullName").value = "Test Student";
+  d.getElementById("email").value = "student@gmail.com";
+  d.getElementById("password").value = "hunter22";
+  d.getElementById("confirmPassword").value = "hunter22";
+  submit(w, d.getElementById("authForm"));
+  await wait(400);
+
+  assert.equal(d.getElementById("panel-verify").hidden, true, "no code screen for a verified account");
+  assert.equal(d.getElementById("txt-pageTitle").textContent, "Sign in");
+  assert.equal(d.getElementById("email").value, "student@gmail.com", "the address stays in the box");
+  assert.match(d.getElementById("authBanner").textContent, /already has an account/i);
+  dom.window.close();
+});
+
+test("an unverified sign-in is recognised by its code, not by its wording", async () => {
+  const dom = await openPage("/login.html", {
+    fetch: (input) => {
+      const url = String(input && input.url ? input.url : input);
+      if (/\/auth\/login/.test(url)) {
+        // Deliberately worded so the old /not verified/ test would fail.
+        return reply({ detail: "Account pending confirmation" }, 403, {
+          "X-Error-Code": "email_not_verified",
+        });
+      }
+      if (/\/auth\/resend/.test(url)) return reply({ message: "sent" });
+      return reply({});
+    },
+  });
+  await wait(300);
+
+  const d = dom.window.document;
+  const w = dom.window;
+  d.getElementById("email").value = "student@gmail.com";
+  d.getElementById("password").value = "hunter22";
+  submit(w, d.getElementById("authForm"));
+  await wait(400);
+
+  assert.equal(d.getElementById("panel-verify").hidden, false);
+  assert.equal(d.getElementById("verify-email-target").textContent, "student@gmail.com");
+  assert.equal(d.getElementById("authBanner").textContent, "", "no error banner: this is a flow, not a fault");
+  dom.window.close();
+});
+
+/* ---------- 8. a long catalogue is read a page at a time ---------- */
+
+function catalogue(count) {
+  const rows = [];
+  for (let i = 0; i < count; i++) {
+    rows.push({ id: "d" + i, name: "Document " + i + ".pdf", category: "Senior", size_bytes: 1000 });
+  }
+  return rows;
+}
+
+const QUOTA = {
+  notes_left: 3, notes_limit: 3,
+  papers_left: 10, papers_limit: 10,
+  books_left: 3, books_limit: 3,
+  marking_keys_left: 10, marking_keys_limit: 10,
+};
+
+test("a section larger than one page is read to the end and cached whole", async () => {
+  const all = catalogue(250);
+  const seen = [];
+  const dom = await openPage("/notes.html", {
+    storage: { zafar_token: token("student") },
+    fetch: (input) => {
+      const url = String(input && input.url ? input.url : input);
+      seen.push(url);
+      const u = new URL(url, origin + "/");
+      if (/\/auth\/quota/.test(u.pathname)) return reply(QUOTA);
+      if (/\/drive\/categories/.test(u.pathname)) return reply(["Senior", "Junior"]);
+      if (/\/drive\/papers/.test(u.pathname)) {
+        const limit = Number(u.searchParams.get("limit"));
+        const offset = Number(u.searchParams.get("offset")) || 0;
+        assert.ok(limit > 0, "the page should ask for a bounded page");
+        return reply(all.slice(offset, offset + limit));
+      }
+      return reply({});
+    },
+  });
+  await wait(900);
+
+  const d = dom.window.document;
+  const listCalls = seen.filter((u) => /\/drive\/papers/.test(u));
+  assert.equal(listCalls.length, 2, "one page of 200 and one of 50: " + listCalls.join(", "));
+  assert.ok(listCalls.some((u) => /offset=200/.test(u)), "the second page must be asked for");
+  assert.equal(d.querySelector("[data-count]").textContent, "250 results");
+  assert.equal(d.querySelectorAll(".item").length, 250);
+
+  // The same question again is answered from the cache, whole.
+  const input = d.querySelector("[data-search]");
+  input.dispatchEvent(new dom.window.Event("input", { bubbles: true }));
+  await wait(500);
+  assert.equal(
+    seen.filter((u) => /\/drive\/papers/.test(u)).length,
+    listCalls.length,
+    "a repeated question should not hit the server"
+  );
+  dom.window.close();
+});
+
+test("a backend that ignores offset is read once, not in a loop", async () => {
+  const all = catalogue(200);
+  const seen = [];
+  const dom = await openPage("/notes.html", {
+    storage: { zafar_token: token("student") },
+    fetch: (input) => {
+      const url = String(input && input.url ? input.url : input);
+      seen.push(url);
+      const u = new URL(url, origin + "/");
+      if (/\/auth\/quota/.test(u.pathname)) return reply(QUOTA);
+      if (/\/drive\/categories/.test(u.pathname)) return reply(["Senior", "Junior"]);
+      // An older backend: limit and offset are ignored, the whole list comes
+      // back every time.
+      if (/\/drive\/papers/.test(u.pathname)) return reply(all);
+      return reply({});
+    },
+  });
+  await wait(900);
+
+  const d = dom.window.document;
+  const listCalls = seen.filter((u) => /\/drive\/papers/.test(u));
+  assert.ok(listCalls.length <= 2, "it must stop when a page brings nothing new: " + listCalls.length);
+  assert.equal(d.querySelectorAll(".item").length, 200, "no duplicates from the repeated page");
+  assert.equal(d.querySelector("[data-count]").textContent, "200 results");
+  dom.window.close();
+});
+
+/* ---------- 9. the headers that cost nothing are actually served ---------- */
 
 test("_headers closes the obvious doors", () => {
   const headers = read(path.join(WEB, "_headers"));

@@ -710,19 +710,65 @@ var ZafarList = (function () {
     var cache = {};
     var loadSeq = 0;
 
+    // A section is read a page at a time. The backend takes `limit` and
+    // `offset`; while a page comes back full there may be more, so ask again
+    // and keep going until one comes back short. The pages are combined into
+    // one answer and cached under the query that produced it, so categories,
+    // search, favorites and rendering all see the same complete list — and a
+    // second identical question still costs nothing.
+    var PAGE_SIZE = 200;
+    var MAX_PAGES = 25;   // a stop, not a target: 5,000 documents
+
     function fetchSection(section, force) {
-      var query = new URLSearchParams();
-      query.set("section", section);
-      if (state.category) query.set("category", state.category);
-      if (state.q) query.set("q", state.q);
-      var key = query.toString();
+      var base = new URLSearchParams();
+      base.set("section", section);
+      if (state.category) base.set("category", state.category);
+      if (state.q) base.set("q", state.q);
+      var key = base.toString();
       var hit = cache[key];
       if (!force && hit && Date.now() - hit.at < CACHE_TTL_MS) {
         return Promise.resolve(hit.result);
       }
-      return Zafar.authGet("/drive/papers?" + key).then(
-        function (rows) {
-          var result = { rows: rows || [] };
+
+      var rows = [];
+      var seen = {};
+
+      // `pages` counts the pages already in hand; the caller starts at 0.
+      function page(offset, pages) {
+        var query = new URLSearchParams(base);
+        query.set("limit", String(PAGE_SIZE));
+        query.set("offset", String(offset));
+        return Zafar.authGet("/drive/papers?" + query.toString()).then(
+          function (batch) {
+            var list = Array.isArray(batch) ? batch : [];
+            var fresh = 0;
+            list.forEach(function (doc) {
+              if (!doc || !doc.id || seen[doc.id]) return;
+              seen[doc.id] = true;
+              rows.push(doc);
+              fresh += 1;
+            });
+            // A short page is the last page. A full page that brought nothing
+            // new means this backend ignored `offset` (an older one did):
+            // stop, rather than ask for the same page until the cap.
+            var more = list.length >= PAGE_SIZE && fresh > 0 && pages + 1 < MAX_PAGES;
+            return more ? page(offset + list.length, pages + 1) : rows;
+          },
+          function (error) {
+            // The first page failing is the section failing. A later page
+            // failing leaves a real, if shorter, list: keep it and say so.
+            if (pages > 0) {
+              rows.partial = true;
+              return rows;
+            }
+            throw error;
+          }
+        );
+      }
+
+      return page(0, 0).then(
+        function (all) {
+          var result = { rows: all };
           cache[key] = { at: Date.now(), result: result };
           return result;
         },
@@ -758,6 +804,10 @@ var ZafarList = (function () {
           // A newer search already answered; this one is history.
           if (mine !== loadSeq) return;
           var failures = results.filter(function (result) { return result.error; });
+          // One section answered in part: its last page did not arrive.
+          var cutShort = results.some(function (result) {
+            return result.rows && result.rows.partial;
+          });
 
           // Tag each doc with the section it came from, so the
           // Favorites page can group by section without the
@@ -839,9 +889,9 @@ var ZafarList = (function () {
           }
           show("grid");
 
-          // Some sections answered and some did not: the list is real, but it
-          // is not the whole list.
-          if (failures.length) shell.showToast(t("list.partialResults"), "offline");
+          // Some sections answered and some did not — or one stopped a page
+          // early: the list is real, but it is not the whole list.
+          if (failures.length || cutShort) shell.showToast(t("list.partialResults"), "offline");
         });
     }
 

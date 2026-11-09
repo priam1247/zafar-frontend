@@ -224,7 +224,7 @@ backend. Endpoints used:
 | POST | `/auth/forgot-password` | email a reset code — `{email}` |
 | POST | `/auth/reset-password` | set a new password — `{email, code, new_password}` |
 | GET | `/auth/quota` | today's remaining downloads, per section |
-| GET | `/drive/papers` | catalogue, filtered by `section`, `category`, `q` |
+| GET | `/drive/papers` | catalogue, filtered by `section`, `category`, `q`; read with `limit` + `offset`, a page at a time |
 | GET | `/drive/categories` | the folder names inside a `section` |
 | POST | `/drive/download/{id}` | spend quota, return a short-lived signed URL |
 | POST | `/drive/confirm/{download_id}` | confirm the bytes actually arrived |

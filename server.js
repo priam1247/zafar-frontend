@@ -226,10 +226,16 @@ const DEMO_SCRIPT = `<script>
       var wanted = q.get("section") || "papers";
       var category = q.get("category") || "";
       var term = (q.get("q") || "").toLowerCase();
-      return reply(200, (DOCS[wanted] || []).filter(function (d) {
+      var matches = (DOCS[wanted] || []).filter(function (d) {
         if (category && d.category !== category) return false;
         return !term || d.name.toLowerCase().indexOf(term) !== -1;
-      }));
+      });
+      // The real route takes limit/offset; the demo does the same, so a bug in
+      // the page's paging shows up here rather than only in production.
+      var limit = Number(q.get("limit"));
+      var offset = Math.max(0, Number(q.get("offset")) || 0);
+      if (isFinite(limit) && limit > 0) matches = matches.slice(offset, offset + limit);
+      return reply(200, matches);
     }
 
     // Anything else (register, verify, resend, password reset) is a real

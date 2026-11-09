@@ -189,16 +189,35 @@ should be told; if the count matters, a transactional provider is the fix.
 **Test:** with the sender raising, `/auth/register` answers 503, not a fake
 success.
 
-## 10. P3 — two things the frontend would like, when convenient
+## 10. P1 — the two contracts the frontend now relies on
 
-- `routers/auth.py` register: the 409 body is a sentence. Add
-  `code: "unverified"` (or `"verified"`) to it, so the form can send a student
-  whose account exists but was never verified straight to the code screen
-  instead of the sign-in form.
-- `GET /drive/papers` returns a whole section as one array and filters in
-  Python. Fine at a few hundred files; add `limit`/`offset` (and keep `q`)
-  before the library grows, so the page can ask for a page rather than a
-  library.
+The app already consumes both of these; until the server sends them, it falls
+back (sign-in on a conflict, the whole array in one request). Neither fallback
+is as good as the real thing, and the paging one will not survive the library
+growing.
+
+- **`X-Error-Code` on the two "account needs a code" answers.** The frontend
+  reads `err.code` from that header and no longer matches English text.
+  - `POST /auth/register` → 409 with `X-Error-Code: unverified` when the
+    account exists but was never verified, and `verified` when it was. The app
+    sends `unverified` straight to the code screen and quietly re-sends a code;
+    `verified` goes to sign-in with the address kept. Without a code it assumes
+    sign-in, which is the one road that cannot leave a student stuck.
+  - `POST /auth/login` → 403 with `X-Error-Code: email_not_verified` (and, as
+    today, the 403 itself). The app then opens the code screen and resends.
+  Both codes must also be added to `expose_headers`, or the browser will not
+  let the app read them.
+- **`limit`/`offset` on `GET /drive/papers`.** The app asks for
+  `?limit=200&offset=0`, then 200, 400, … and stops at the first short page,
+  combining the pages into one cached list. `limit` must cap the page and
+  `offset` must skip, on the **filtered** result (section + category + q), in a
+  stable order — otherwise pages overlap or skip documents. Guard the values
+  (`limit` 1–500, `offset` ≥ 0) and keep returning a plain array.
+
+**Tests:** register 409 carries `code` for both cases; login 403 carries
+`email_not_verified`; `?limit=2&offset=2` on a five-document section returns
+documents 3 and 4, and the same query twice returns the same ids in the same
+order.
 
 ## Definition of done
 

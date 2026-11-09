@@ -335,6 +335,15 @@ var ZafarAuth = (function () {
   // The backend only accepts @gmail.com (that is where the code is sent from),
   // so say so in the form instead of after a round trip.
   function isGmail(v) { return /@gmail\.com$/i.test(v); }
+  // The backend says "this account needs a code" with a machine code in
+  // X-Error-Code, which config.js carries on the error as `code`. The English
+  // sentence is only the fallback for a backend that does not send one yet —
+  // never the first check, because wording is not a contract.
+  function needsVerification(err) {
+    if (!err) return false;
+    if (err.code) return err.code === "email_not_verified";
+    return /not verified/i.test(err.message || "");
+  }
 
   /* ---------------- render ---------------- */
   function refreshReveal(btn) {
@@ -567,7 +576,7 @@ var ZafarAuth = (function () {
           })
           .catch(function (err) {
             busy(false, t.continueBtn);
-            if (err && err.message && /not verified/i.test(err.message)) return goToVerify(email, true);
+            if (needsVerification(err)) return goToVerify(email, true);
             showBanner("authBanner", friendlyError(err), true);
           });
       } else {
@@ -584,10 +593,14 @@ var ZafarAuth = (function () {
           .catch(function (err) {
             busy(false, t.createBtn);
             // The only 409 this form can produce is "that address is already
-            // registered". Send them to sign-in with the address still in the
-            // box: if the account exists but was never verified, signing in
-            // leads straight to the code screen and a fresh code.
+            // registered", and the backend now says which kind:
+            //   unverified — the account never got a code used: go to the code
+            //                screen and quietly send a fresh one;
+            //   verified   — sign in, with the address still in the box.
+            // A backend that sends neither code gets the sign-in road, which
+            // is the one that cannot leave anyone stuck.
             if (err && err.status === 409) {
+              if (err.code === "unverified") return goToVerify(email, true);
               setMode("signin");
               el("email").value = email;
               showBanner("authBanner", t.errAccountExists, false);
