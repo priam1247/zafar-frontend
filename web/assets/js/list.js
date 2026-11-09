@@ -108,8 +108,13 @@ var ZafarList = (function () {
     return chips.join("");
   }
 
-  function cardHTML(doc) {
+  // pageSection is the fallback for a list that came from one section: on
+  // Favorites the documents arrive from several, and each one carries the
+  // section it came from, so a saved note spends the notes allowance rather
+  // than the papers one it happened to be listed under.
+  function cardHTML(doc, pageSection) {
     var t = ZafarI18n.t;
+    var section = doc._section || pageSection || "";
     var title = Zafar.escapeHTML(doc.name.replace(/\.pdf$/i, ""));
     var filename = /\.pdf$/i.test(doc.name) ? doc.name : doc.name + ".pdf";
     var saved = Zafar.getBookmarks().indexOf(doc.id) !== -1;
@@ -131,7 +136,9 @@ var ZafarList = (function () {
             '</span><span class="type">' + t("list.pdfDocument") + "</span></span>" +
           "</div>" +
           '<button class="btn btn-primary btn-sm" data-download="' + Zafar.escapeHTML(doc.id) +
-            '" data-filename="' + Zafar.escapeHTML(filename) + '" aria-label="' + t("list.download") + '">' +
+            '" data-filename="' + Zafar.escapeHTML(filename) +
+            (section ? '" data-section="' + Zafar.escapeHTML(section) : "") +
+            '" aria-label="' + t("list.download") + '">' +
             svg("download", 14) + '<span class="btn-label">' + t("list.download") + "</span></button>" +
         "</div>" +
       "</article>"
@@ -218,7 +225,9 @@ var ZafarList = (function () {
         var label = SECTION_LABELS[key] || key;
         return '<h3 class="group-title">' + Zafar.escapeHTML(label) +
           '<span class="group-count">' + groups[key].length + "</span></h3>" +
-          '<div class="grid">' + groups[key].map(cardHTML).join("") + "</div>";
+          '<div class="grid">' + groups[key].map(function (d) {
+            return cardHTML(d, key);
+          }).join("") + "</div>";
       }).join("");
     }
 
@@ -467,8 +476,12 @@ var ZafarList = (function () {
         setTimeout(restore, 1800);
       }
 
+      // The card knows which section its document came from; Favorites has no
+      // section of its own, so without it a saved note would be charged to
+      // papers.
+      var section = btn.dataset.section || cfg.section;
       Zafar.authPostJSON(
-        "/drive/download/" + encodeURIComponent(id) + "?section=" + encodeURIComponent(cfg.section)
+        "/drive/download/" + encodeURIComponent(id) + "?section=" + encodeURIComponent(section)
       )
         .then(function (data) {
           // The download answer carries all four buckets, so it can replace
@@ -705,7 +718,9 @@ var ZafarList = (function () {
             el.grid.innerHTML = groupedBySection(docs);
           } else {
             el.grid.classList.remove("grouped");
-            el.grid.innerHTML = docs.map(cardHTML).join("");
+            el.grid.innerHTML = docs.map(function (d) {
+              return cardHTML(d, cfg.section);
+            }).join("");
           }
           show("grid");
 

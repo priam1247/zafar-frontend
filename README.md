@@ -82,9 +82,12 @@ keys** a day, each on its own UTC day. `QUOTA_FIELD` in `config.js` maps a page
 to the field prefix its numbers live under — the `marking-keys` section reads
 `marking_keys_left` / `marking_keys_limit`, with the underscore the API uses.
 Both the count and the ceiling come from that answer, because both are server
-settings (`DAILY_*_LIMIT`); `DAILY_LIMITS` is only the policy table the Help
-page prints. Where the server reports no count — or no ceiling — the chip stays
-hidden instead of quoting a policy the backend does not keep.
+settings (`DAILY_*_LIMIT`). The Help page reads the same answer for its table,
+so a retuned allowance shows up in both places at once; the numbers in
+`DAILY_LIMITS` are printed only if that request fails, with a note that says
+they are the published defaults and may not be your account's. Where the server
+reports no count — or no ceiling — the chip stays hidden instead of quoting a
+policy the backend does not keep.
 
 When an allowance runs out, a plain-English notice appears above the
 catalogue — and again if a download is refused — naming **which** allowance ran
@@ -101,7 +104,10 @@ answer changed: whenever the stored count says zero, the next tap asks
 cannot reach the server, the page says so ("couldn't check your allowance") and
 does not dress the failure up as a refusal. Favorites has no allowance of its
 own, so a refusal there is a toast and nothing else — no amber chip, and no
-notice whose button leads back to the page you are on.
+notice whose button leads back to the page you are on. It still spends the
+right one: every card carries the section its document came from, so a saved
+note is charged to notes rather than to the papers the page is nominally
+about.
 
 Cards keep the same discipline as the auth screen: one hairline, no shadow, a
 mint tile for the file mark, the title, a category chip, then size and a single
@@ -129,8 +135,9 @@ network. It lives entirely inside `server.js`: nothing is added to `web/`, and
 the deployed site never sees it.
 
 The stand-in mirrors the real rules rather than simplifying them: the same four
-buckets (10 papers, 3 books, 3 notes, 10 marking keys), refilling at midnight
-UTC; the allowance persists in `localStorage` across page loads and
+buckets (10 papers, 3 books, 3 notes, 10 marking keys), each download moving
+that bucket's remaining count and its used-today total together, and every
+bucket refilling at midnight UTC; the allowance persists in `localStorage` across page loads and
 carries a schema version, so a record left by an older demo starts the day
 over rather than half-initialising; a spent allowance answers `429`, so the
 client's limit path is exercised for real.
@@ -230,8 +237,9 @@ a same-origin blob so the filename survives.
   day, reported as `papers_*`, `books_*`, `notes_*` and `marking_keys_*` in
   every `/auth/quota` and download response. The section key and the field
   prefix differ for one page (`marking-keys` → `marking_keys`), which is what
-  `QUOTA_FIELD` in `config.js` is for; `DAILY_LIMITS` is only the fallback
-  shown before the first answer, because the real numbers are server settings.
+  `QUOTA_FIELD` in `config.js` is for. The Help table is filled from
+  `/auth/quota` too, so the two never disagree; `DAILY_LIMITS` appears only
+  when that request fails, labelled as the published defaults.
 
 - **Legacy download rows cannot be split.** Rows created before this change
   carry `category` of `paper` for anything charged to the old shared bucket, so

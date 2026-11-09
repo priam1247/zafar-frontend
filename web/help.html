@@ -41,17 +41,19 @@
           '<a class="btn btn-on-teal btn-sm" href="dashboard.html">' + t("help.backToPapers") + "</a>" +
         "</section>" +
 
-        // Four allowances, one row each. The numbers come from the same table the
-        // chips use, so the page can never contradict the header.
+        // Four allowances, one row each. The figures are filled in below from
+        // /auth/quota — the same answer the header chips read — because an
+        // administrator can change DAILY_*_LIMIT without touching this site.
+        // Until that answer arrives the rows hold a dash rather than a guess.
         '<section class="panel limits">' +
           '<h2 class="limits-title">' + t("help.limitsTitle") + "</h2>" +
           '<ul class="limit-rows">' +
             QUOTA_SECTIONS.map(function (section) {
               return "<li><span>" + t("help.limitRow." + section) + "</span>" +
-                "<b>" + DAILY_LIMITS[section] + "</b></li>";
+                '<b data-limit="' + section + '">—</b></li>';
             }).join("") +
           "</ul>" +
-          '<p class="limits-note">' + t("help.limitsNote") + "</p>" +
+          '<p class="limits-note" data-limits-note>' + t("help.limitsNote") + "</p>" +
         "</section>" +
 
         (SUPPORT_WHATSAPP
@@ -90,6 +92,47 @@
         shell.count.textContent = t("help.answers", n);
       }
       renderCount(QA.length);
+
+      /* ---------- Daily allowances, as the server keeps them ----------
+         The chips on each section page report the allowance the server is
+         actually enforcing, so this table has to read the same answer or the
+         two disagree the moment an administrator changes DAILY_*_LIMIT. A
+         number the server did not send is not invented here: the rows keep a
+         dash until the answer arrives, and if it never arrives the published
+         defaults appear marked as such. */
+      var limitCells = {};
+      QUOTA_SECTIONS.forEach(function (section) {
+        limitCells[section] = shell.content.querySelector('[data-limit="' + section + '"]');
+      });
+      var limitNote = shell.content.querySelector("[data-limits-note]");
+      var limitList = shell.content.querySelector(".limit-rows");
+
+      function showLimits(numbers, note, areDefaults) {
+        QUOTA_SECTIONS.forEach(function (section) {
+          var cell = limitCells[section];
+          if (!cell) return;
+          var n = numbers[section];
+          cell.textContent = typeof n === "number" ? String(n) : "—";
+        });
+        if (limitList) limitList.classList.toggle("is-default", !!areDefaults);
+        if (limitNote && note) limitNote.textContent = note;
+      }
+
+      Zafar.authGet("/auth/quota")
+        .then(function (q) {
+          var numbers = {};
+          var complete = true;
+          QUOTA_SECTIONS.forEach(function (section) {
+            var n = q ? q[QUOTA_FIELD[section] + "_limit"] : null;
+            if (typeof n !== "number") complete = false;
+            numbers[section] = typeof n === "number" ? n : null;
+          });
+          if (!complete) throw new Error("quota answer missing a limit");
+          showLimits(numbers, t("help.limitsNote"), false);
+        })
+        .catch(function () {
+          showLimits(DAILY_LIMITS, t("help.limitsNoteDefaults"), true);
+        });
 
       /* ---------- Live FAQ filter ---------- */
       var searchInput = shell.content.querySelector("[data-faq-search]");
