@@ -87,15 +87,21 @@ var ZafarShell = (function () {
           '<div class="app-head-text">' +
             '<div class="crumb">' + crumb + "</div>" +
             '<h1 class="app-title">' + title + "</h1>" +
-            (opts.desc ? '<p class="app-desc">' + Zafar.escapeHTML(opts.desc) + "</p>" : "") +
           "</div>" +
           // Filled by the list page when the section has a daily allowance.
           '<span class="quota" data-quota hidden>' + svg("download", 13, 2) +
             '<span data-quota-text></span></span>' +
         "</div>" +
-        '<div class="app-meta"><span class="count" data-count>' + t("list.loading") + "</span></div>" +
       "</header>" +
-      '<main class="sheet"><div class="content" data-content></div></main>' +
+      // The running count lives on the sheet, not in the teal bar: the bar says
+      // which page you are on, and every pixel of it is a pixel of list you
+      // cannot see. Shown by the list page; hidden on pages that have no list.
+      '<main class="sheet">' +
+        '<div class="list-meta" data-meta hidden>' +
+          '<span class="count" data-count>' + t("list.loading") + "</span>" +
+        "</div>" +
+        '<div class="content" data-content></div>' +
+      "</main>" +
       '<nav class="tabbar" aria-label="Sections">' + tabsHTML(opts.active) + "</nav>" +
       '<div class="toast" data-toast role="status"></div>'
     );
@@ -184,7 +190,6 @@ var ZafarShell = (function () {
       active: opts.active,
       title: opts.title || "Zafar",
       crumb: opts.crumb,
-      desc: opts.desc || "",
     });
 
     Zafar.updateFavCountPill();
@@ -202,6 +207,7 @@ var ZafarShell = (function () {
     return {
       content: root.querySelector("[data-content]"),
       count: root.querySelector("[data-count]"),
+      meta: root.querySelector("[data-meta]"),
       quota: root.querySelector("[data-quota]"),
       showToast: showToast,
       svg: svg,
