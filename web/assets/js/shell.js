@@ -1,27 +1,25 @@
 /* ============================================================
    Zafar — app shell
-   Renders the sidebar + topbar for every signed-in page from one
-   place, and owns the mobile drawer, toasts and the auth guard.
-   (Theme and language toggles were removed — the app is now
-   light-only and English-only.)
+   Renders the bar, the sheet and the bottom tabs for every signed-in
+   page from one place, and owns toasts and the auth guard.
+
+   Phone-first, like the auth screen: the bar sticks to the top, the
+   tabs stick to the bottom, and the column keeps its phone width on
+   any display. There is no sidebar — categories live as chips on the
+   list pages, and Help / Log out sit in the bar.
    ============================================================ */
 
 var ZafarShell = (function () {
   var ICONS = {
     // Same open-book mark as the auth screen, so the brand reads as one thing.
     logo: '<path d="M12 5C10.2 3.6 7.6 3 5 3v13c2.6 0 5.2.6 7 2 1.8-1.4 4.4-2 7-2V3c-2.6 0-5.2.6-7 2Z"/><path d="M12 5v13"/>',
-    home: '<path d="M15 21v-8a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v8"/><path d="M3 10a2 2 0 0 1 .709-1.528l7-6a2 2 0 0 1 2.582 0l7 6A2 2 0 0 1 21 10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>',
     book: '<path d="M12 5v16"/><path d="M20.001 19A2 2 0 0022 17V5a2 2 0 00-1.999-2L16 3.002A5 5 0 0012 5a5 5 0 00-4-2H4a2 2 0 00-2 2v12a2 2 0 001.999 2H8a5 5 0 014 2 5 5 0 014-2z"/>',
-    file: '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/>',
+    file: '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><path d="M9 15h6"/>',
     heart: '<path d="M2 9.5a5.5 5.5 0 0 1 9.591-3.676.56.56 0 0 0 .818 0A5.49 5.49 0 0 1 22 9.5c0 2.29-1.5 4-3 5.5l-5.492 5.313a2 2 0 0 1-3 .019L5 15c-1.5-1.5-3-3.2-3-5.5"/>',
     notes: '<path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1"/><path d="M8 11h8"/><path d="M8 16h5"/>',
     check: '<path d="M20 6 9 17l-5-5"/>',
     help: '<circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><path d="M12 17h.01"/>',
     logout: '<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/>',
-    sun: '<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/>',
-    chevron: '<path d="m9 18 6-6-6-6"/>',
-    menu: '<path d="M4 12h16"/><path d="M4 6h16"/><path d="M4 18h16"/>',
-    close: '<path d="M18 6 6 18M6 6l12 12"/>',
     download: '<path d="M12 15V3"/><path d="m7 10 5 5 5-5"/><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>',
     bolt: '<path d="M14 8a1 1 0 0 1 1 1v2a1 1 0 0 0 1 1h3.293a.707.707 0 0 1 .5 1.207l-6.939 6.939a1.207 1.207 0 0 1-1.708 0l-6.94-6.94a.707.707 0 0 1 .5-1.206H8a1 1 0 0 0 1-1V9a1 1 0 0 1 1-1z"/><path d="M9 4h6"/>',
     search: '<circle cx="11" cy="11" r="7"/><path d="m20 20-3.2-3.2"/>',
@@ -34,101 +32,64 @@ var ZafarShell = (function () {
     list: '<line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/>',
   };
 
-  function svg(name, size) {
+  function svg(name, size, stroke) {
     var s = size || 18;
     return (
       '<svg width="' + s + '" height="' + s + '" viewBox="0 0 24 24" fill="none" ' +
-      'stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" ' +
+      'stroke="currentColor" stroke-width="' + (stroke || 1.8) + '" stroke-linecap="round" stroke-linejoin="round" ' +
       'aria-hidden="true">' + (ICONS[name] || "") + "</svg>"
     );
   }
 
-  /* ---------- Nav model ---------- */
+  /* ---------- Nav model — the source of truth for labels and hrefs ---------- */
   function navModel() {
     var t = ZafarI18n.t;
     return [
-      { label: t("nav.library") },
-      {
-        id: "papers", icon: "file", text: t("nav.pastPapers"), href: "dashboard.html",
-        children: [
-          { text: "MSCE Maneb", href: "dashboard.html?category=MSCE%20Maneb" },
-          { text: "JCE Maneb", href: "dashboard.html?category=JCE%20Maneb" },
-          { text: "Mock", href: "dashboard.html?category=Mock" },
-          { text: "Other Past Papers", href: "dashboard.html?category=Other%20Past%20Papers" },
-        ],
-      },
-      {
-        id: "books", icon: "book", text: t("nav.books"), href: "books.html",
-        children: [
-          { text: "Senior", href: "books.html?category=Senior" },
-          { text: "Junior", href: "books.html?category=Junior" },
-        ],
-      },
+      { id: "papers", icon: "file", text: t("nav.pastPapers"), href: "dashboard.html" },
+      { id: "books", icon: "book", text: t("nav.books"), href: "books.html" },
       { id: "notes", icon: "notes", text: t("nav.notes"), href: "notes.html" },
       { id: "keys", icon: "check", text: t("nav.markingKeys"), href: "marking-keys.html" },
-      { label: t("nav.yours") },
       { id: "favorites", icon: "heart", text: t("nav.favorites"), href: "favorites.html", favCount: true },
-      { label: t("nav.support") },
-      { id: "help", icon: "help", text: t("nav.help"), href: "help.html" },
     ];
   }
 
-  function navHTML(active, activeCategory) {
-    return navModel().map(function (entry, i) {
-      if (entry.label) return '<div class="nav-label">' + entry.label + "</div>";
-
-      var isActive = entry.id === active;
-      var kids = entry.children || null;
-      var openKids = isActive && kids;
-
-      var item =
-        '<a class="nav-item' + (isActive ? " active" : "") + (openKids ? " open" : "") + '" href="' +
-        entry.href + '"' + (kids ? ' data-sub="sub-' + entry.id + '"' : "") + ">" +
-        svg(entry.icon) +
-        "<span>" + entry.text + "</span>" +
-        (entry.favCount ? '<span class="pill" data-fav-count style="display:none">0</span>' : "") +
-        (kids ? '<span class="chevron">' + svg("chevron", 15) + "</span>" : "") +
-        "</a>";
-
-      if (!kids) return item;
-
-      var subs = kids.map(function (kid) {
-        var cat = new URLSearchParams(kid.href.split("?")[1] || "").get("category");
-        var on = isActive && activeCategory && cat === activeCategory;
-        return '<a class="sub-item' + (on ? " active" : "") + '" href="' + kid.href + '">' + kid.text + "</a>";
-      }).join("");
-
-      return item + '<div class="sub-nav' + (openKids ? " open" : "") + '" id="sub-' + entry.id + '"><div>' + subs + "</div></div>";
+  function tabsHTML(active) {
+    return navModel().map(function (entry) {
+      var on = entry.id === active;
+      return (
+        '<a class="tab' + (on ? " active" : "") + '" href="' + entry.href + '"' +
+          (on ? ' aria-current="page"' : "") + ">" +
+          '<span class="tab-ic">' + svg(entry.icon, 19, on ? 2 : 1.7) + "</span>" +
+          "<span>" + entry.text + "</span>" +
+          (entry.favCount ? '<span class="pill" data-fav-count style="display:none">0</span>' : "") +
+        "</a>"
+      );
     }).join("");
   }
 
   function shellHTML(opts) {
     var t = ZafarI18n.t;
+    var title = Zafar.escapeHTML(opts.title || "Zafar");
+    var crumb = Zafar.escapeHTML(opts.crumb || t("nav.studyLibrary"));
+
     return (
-      '<div class="overlay" data-overlay></div>' +
-      '<aside class="sidebar" data-sidebar>' +
-        '<div class="sidebar-header">' +
-          '<a class="brand" href="dashboard.html">' +
-            '<span class="brand-mark">' + svg("logo", 19) + "</span>" +
-            '<span class="brand-text"><span class="brand-name">ZAFAR</span>' +
-            '<span class="brand-sub">' + t("nav.studyLibrary") + "</span></span>" +
+      '<header class="app-bar">' +
+        '<div class="bar-top">' +
+          '<a class="wordmark" href="dashboard.html">' +
+            '<span class="glyph">' + svg("logo", 15, 2) + "</span>ZAFAR" +
           "</a>" +
-          '<button class="icon-btn close-btn" data-close aria-label="Close menu">' + svg("close", 18) + "</button>" +
+          '<div class="bar-actions">' +
+            '<a class="bar-btn" href="help.html" aria-label="Help">' + svg("help", 17) + "</a>" +
+            '<a class="bar-btn" href="login.html" data-logout aria-label="Log out">' + svg("logout", 17) + "</a>" +
+          "</div>" +
         "</div>" +
-        '<nav class="nav">' + navHTML(opts.active, opts.activeCategory) + "</nav>" +
-        '<div class="sidebar-footer">' +
-          '<a class="nav-item" data-logout href="login.html">' + svg("logout") + "<span>" + t("nav.logOut") + "</span></a>" +
-        "</div>" +
-      "</aside>" +
-      '<main class="main">' +
-        '<header class="topbar">' +
-          '<button class="icon-btn hamburger" data-open aria-label="Open menu">' + svg("menu", 20) + "</button>" +
-          "<div><div class=\"crumb\">" + (opts.crumb || "Zafar") + '</div><h1>' + opts.title + "</h1></div>" +
-          '<div class="topbar-right"><span class="count-tag" data-count>' + t("list.loading") + "</span></div>" +
-        "</header>" +
-        '<div class="content" data-content></div>' +
-      "</main>" +
-      '<div class="toast" data-toast></div>'
+        '<div class="crumb">' + crumb + "</div>" +
+        '<h1 class="app-title">' + title + "</h1>" +
+        '<div class="app-meta"><span class="count" data-count>' + t("list.loading") + "</span></div>" +
+      "</header>" +
+      '<main class="sheet"><div class="content" data-content></div></main>' +
+      '<nav class="tabbar" aria-label="Sections">' + tabsHTML(opts.active) + "</nav>" +
+      '<div class="toast" data-toast role="status"></div>'
     );
   }
 
@@ -137,7 +98,7 @@ var ZafarShell = (function () {
   function showToast(msg, icon) {
     var el = document.querySelector("[data-toast]");
     if (!el) return;
-    el.innerHTML = svg(icon || "bolt", 16) + "<span>" + Zafar.escapeHTML(msg) + "</span>";
+    el.innerHTML = svg(icon || "bolt", 15) + "<span>" + Zafar.escapeHTML(msg) + "</span>";
     el.classList.add("show");
     clearTimeout(toastTimer);
     toastTimer = setTimeout(function () { el.classList.remove("show"); }, 2600);
@@ -149,8 +110,6 @@ var ZafarShell = (function () {
   function init(opts) {
     opts = opts || {};
 
-    var params = new URLSearchParams(location.search);
-
     if (!Zafar.getToken()) {
       location.href = "login.html";
       return null;
@@ -160,41 +119,18 @@ var ZafarShell = (function () {
     root.className = "app";
     root.innerHTML = shellHTML({
       active: opts.active,
-      activeCategory: params.get("category"),
       title: opts.title || "Zafar",
       crumb: opts.crumb,
     });
 
     Zafar.updateFavCountPill();
 
-    var sidebar = root.querySelector("[data-sidebar]");
-    var overlay = root.querySelector("[data-overlay]");
-    function setDrawer(open) {
-      sidebar.classList.toggle("open", open);
-      overlay.classList.toggle("show", open);
-    }
-    root.querySelector("[data-open]").addEventListener("click", function () { setDrawer(true); });
-    root.querySelector("[data-close]").addEventListener("click", function () { setDrawer(false); });
-    overlay.addEventListener("click", function () { setDrawer(false); });
-    document.addEventListener("keydown", function (e) {
-      if (e.key === "Escape") setDrawer(false);
-    });
-
-    // Collapsible sections: clicking the chevron expands in place, clicking
-    // the label still navigates to the section's own page.
-    root.querySelectorAll(".nav-item[data-sub]").forEach(function (item) {
-      item.addEventListener("click", function (e) {
-        if (!e.target.closest(".chevron")) return;
-        e.preventDefault();
-        item.classList.toggle("open");
-        var sub = document.getElementById(item.dataset.sub);
-        if (sub) sub.classList.toggle("open");
-      });
-    });
-
     root.querySelector("[data-logout]").addEventListener("click", function () {
       Zafar.clearToken();
     });
+
+    // The bar is sticky, so a long page still needs its landmark announced.
+    root.querySelector(".app-title").setAttribute("tabindex", "-1");
 
     return {
       content: root.querySelector("[data-content]"),

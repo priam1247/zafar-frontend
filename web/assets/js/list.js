@@ -24,43 +24,25 @@ var ZafarList = (function () {
     "size-asc":  function (a, b) { return (a.size_bytes || 0) - (b.size_bytes || 0); },
   };
 
-  /* Category -> spine colour. A curated green/grey family so the card
-     grid keeps a visual rhythm without breaking the brand palette. */
-  var SPINE = {
-    "MSCE Maneb":        "#0c3a2d",
-    "JCE Maneb":         "#2a7259",
-    "Mock":              "#4a7c6a",
-    "Other Past Papers": "#8a8071",
-    "Senior":            "#175946",
-    "Junior":            "#4a7c6a",
-  };
-  function spineColor(cat) { return SPINE[cat] || "#a9c6b8"; }
-
   function layout(cfg) {
     var t = ZafarI18n.t;
     var activeCat = (new URLSearchParams(location.search).get("category")) || "";
     return (
-      (cfg.quotaKey
-        ? '<div class="row"><span class="badge badge-ok" data-limit>' + svg("bolt", 14) +
-          '<span data-limit-text>' + t("list.checkingLimit") + "</span></span></div>"
-        : "") +
-
       '<div class="toolbar">' +
         '<label class="search">' + svg("search", 18) +
           '<input type="search" data-search placeholder="' +
           Zafar.escapeHTML(cfg.searchPlaceholder || t("list.allCategories")) + '" aria-label="Search">' +
         "</label>" +
-        '<select class="select" data-sort aria-label="Sort results">' +
-          '<option value="name-asc">' + t("list.sortNameAsc") + "</option>" +
-          '<option value="name-desc">' + t("list.sortNameDesc") + "</option>" +
-          '<option value="size-desc">' + t("list.sortSizeDesc") + "</option>" +
-          '<option value="size-asc">' + t("list.sortSizeAsc") + "</option>" +
-        "</select>" +
         '<div class="view-toggle" role="group" aria-label="View">' +
           '<button type="button" class="view-btn" data-view="grid" aria-label="Grid view" aria-pressed="true">' + svg("grid", 16) + "</button>" +
           '<button type="button" class="view-btn" data-view="list" aria-label="List view" aria-pressed="false">' + svg("list", 16) + "</button>" +
         "</div>" +
       "</div>" +
+
+      (cfg.quotaKey
+        ? '<div class="row"><span class="badge" data-limit>' + svg("bolt", 13) +
+          '<span data-limit-text>' + t("list.checkingLimit") + "</span></span></div>"
+        : "") +
 
       (cfg.categories && cfg.categories.length
         ? '<div class="cat-chips" data-cat-chips></div>'
@@ -68,18 +50,28 @@ var ZafarList = (function () {
 
       '<div class="chips" data-chips style="display:none"></div>' +
 
-      '<div class="skeleton" data-skeleton>' + skeletonHTML(6) + "</div>" +
+      '<div class="sort-row">' +
+        '<span class="sort-label">' + t("list.sortLabel") + "</span>" +
+        '<select class="select" data-sort aria-label="Sort results">' +
+          '<option value="name-asc">' + t("list.sortNameAsc") + "</option>" +
+          '<option value="name-desc">' + t("list.sortNameDesc") + "</option>" +
+          '<option value="size-desc">' + t("list.sortSizeDesc") + "</option>" +
+          '<option value="size-asc">' + t("list.sortSizeAsc") + "</option>" +
+        "</select>" +
+      "</div>" +
+
+      '<div class="skeleton" data-skeleton>' + skeletonHTML(5) + "</div>" +
       '<div class="grid" data-grid style="display:none"></div>' +
 
-      '<div class="state" data-empty>' + svg("empty", 40) +
+      '<div class="state" data-empty>' + svg("empty", 38) +
         "<h3>" + t("list.emptySectionTitle") + "</h3><p></p></div>" +
 
-      '<div class="state danger" data-error>' + svg("alert", 40) +
+      '<div class="state danger" data-error>' + svg("alert", 38) +
         "<h3>" + t("list.couldntLoad", cfg.itemLabel) + "</h3>" +
         "<p>" + t("list.loadError") + "</p>" +
         '<button class="btn btn-ghost btn-sm" data-retry>' + t("list.tryAgain") + "</button></div>" +
 
-      '<div class="state" data-offline>' + svg("offline", 40) +
+      '<div class="state" data-offline>' + svg("offline", 38) +
         "<h3>" + t("list.offlineTitle") + "</h3><p>" + t("list.offlineBody") + "</p></div>"
     );
   }
@@ -113,24 +105,25 @@ var ZafarList = (function () {
     var filename = /\.pdf$/i.test(doc.name) ? doc.name : doc.name + ".pdf";
     var saved = Zafar.getBookmarks().indexOf(doc.id) !== -1;
     return (
-      '<article class="doc" data-id="' + Zafar.escapeHTML(doc.id) + '">' +
-        '<span class="doc-spine" style="background:' + spineColor(doc.category) + '"></span>' +
-        '<div class="doc-top">' +
-          '<span class="badge">' + Zafar.escapeHTML(doc.category || t("list.document")) + "</span>" +
+      '<article class="item" data-id="' + Zafar.escapeHTML(doc.id) + '">' +
+        '<div class="item-top">' +
+          '<span class="glyph-tile">' + svg("file", 19) + "</span>" +
+          '<div class="item-head">' +
+            '<h3 class="item-title">' + title + "</h3>" +
+            '<span class="item-cat">' + Zafar.escapeHTML(doc.category || t("list.document")) + "</span>" +
+          "</div>" +
           '<button class="fav-btn' + (saved ? " on" : "") + '" data-fav="' + Zafar.escapeHTML(doc.id) +
             '" aria-pressed="' + saved + '" aria-label="' +
             (saved ? "Remove from favorites" : "Save to favorites") + '">' + svg("heart", 17) + "</button>" +
         "</div>" +
-        '<h3 class="doc-title">' + title + "</h3>" +
-        '<div class="doc-foot">' +
+        '<div class="item-foot">' +
           '<div class="file-meta">' +
-            '<span class="file-glyph">' + svg("file", 18) + "</span>" +
             '<span class="lines"><span class="size">' + Zafar.formatSize(doc.size_bytes) +
-            '</span><br><span class="type">' + t("list.pdfDocument") + "</span></span>" +
+            '</span><span class="type">' + t("list.pdfDocument") + "</span></span>" +
           "</div>" +
           '<button class="btn btn-primary btn-sm" data-download="' + Zafar.escapeHTML(doc.id) +
             '" data-filename="' + Zafar.escapeHTML(filename) + '" aria-label="' + t("list.download") + '">' +
-            svg("download", 15) + '<span class="btn-label">' + t("list.download") + "</span></button>" +
+            svg("download", 14) + '<span class="btn-label">' + t("list.download") + "</span></button>" +
         "</div>" +
       "</article>"
     );
@@ -304,11 +297,11 @@ var ZafarList = (function () {
             left = cfg.quotaKey === "books" ? data.quota.books_left : data.quota.papers_left;
             renderLimit();
           }
-          var card = btn.closest(".doc");
+          var card = btn.closest(".item");
           Zafar.recordDownload({
             id: id,
-            name: card ? card.querySelector(".doc-title").textContent : btn.dataset.filename,
-            category: card ? card.querySelector(".badge").textContent : "",
+            name: card ? card.querySelector(".item-title").textContent : btn.dataset.filename,
+            category: card ? card.querySelector(".item-cat").textContent : "",
           });
 
           if (!data.url) {
