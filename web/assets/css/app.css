@@ -36,6 +36,13 @@
   --line: rgba(var(--brand-rgb), .15);
   --line-2: rgba(var(--brand-rgb), .30);
 
+  /* Icon ink. Glyphs sit near-black on light surfaces; teal stays for text,
+     headers and filled buttons. */
+  --ink: #101413;
+  --ink-70: rgba(16, 20, 19, .70);
+  --ink-45: rgba(16, 20, 19, .45);
+  --ink-30: rgba(16, 20, 19, .30);
+
   --t-80: rgba(var(--brand-rgb), .80);
   --t-70: rgba(var(--brand-rgb), .70);
   --t-60: rgba(var(--brand-rgb), .60);
@@ -142,7 +149,7 @@ a { color: inherit; }
   display: grid;
   place-items: center;
   background: var(--mint);
-  color: var(--brand);
+  color: var(--ink);
 }
 
 .bar-actions {
@@ -166,8 +173,17 @@ a { color: inherit; }
 }
 .bar-btn:hover { color: var(--on); border-color: var(--on-30); }
 
-.crumb {
+.app-head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 12px;
   margin-top: 18px;
+}
+
+.app-head-text { min-width: 0; }
+
+.crumb {
   font-size: 9.5px;
   font-weight: 650;
   letter-spacing: .18em;
@@ -191,6 +207,29 @@ a { color: inherit; }
   gap: 8px;
   min-height: 24px;
 }
+
+/* Daily allowance — sits in the header beside the title, where it stays
+   visible while the catalogue scrolls. */
+.quota {
+  flex: none;
+  align-self: flex-end;
+  margin-bottom: 4px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 25px;
+  padding: 0 11px;
+  border-radius: 999px;
+  background: var(--mint);
+  color: var(--brand);
+  font-size: 11.5px;
+  font-weight: 650;
+  letter-spacing: .005em;
+  white-space: nowrap;
+}
+.quota svg { color: var(--ink); }
+.quota.is-warn { background: var(--warn-wash); color: var(--warn); }
+.quota.is-warn svg { color: var(--warn); }
 
 .count {
   display: inline-flex;
@@ -247,13 +286,13 @@ a { color: inherit; }
   border-radius: 999px;
   background: var(--field);
   border: 1px solid transparent;
-  color: var(--t-45);
+  color: var(--ink-45);
   transition: background .18s var(--ease), border-color .18s var(--ease), color .18s var(--ease);
 }
 .search:focus-within {
   background: var(--sheet);
   border-color: var(--line-2);
-  color: var(--brand);
+  color: var(--ink);
 }
 
 .search input {
@@ -285,39 +324,15 @@ a { color: inherit; }
   border: 1px solid transparent;
   border-radius: 999px;
   background: transparent;
-  color: var(--t-45);
+  color: var(--ink-45);
   cursor: pointer;
   transition: color .18s var(--ease), background .18s var(--ease);
 }
-.view-btn:hover { color: var(--brand); }
+.view-btn:hover { color: var(--ink); }
 .view-btn.active {
   background: var(--sheet);
   border-color: var(--line);
-  color: var(--brand);
-}
-
-/* ============================================================
-   Download allowance
-   ============================================================ */
-
-.row { display: flex; }
-
-.badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-  padding: 7px 13px;
-  border-radius: 999px;
-  font-size: 12px;
-  font-weight: 600;
-  letter-spacing: .005em;
-  background: var(--mint);
-  color: var(--brand);
-}
-
-.badge-warn {
-  background: var(--warn-wash);
-  color: var(--warn);
+  color: var(--ink);
 }
 
 /* ============================================================
@@ -428,7 +443,7 @@ a { color: inherit; }
   border: 1px solid var(--line);
   border-radius: 999px;
   background-color: transparent;
-  background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6' fill='none' stroke='%23006D7C' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M1 1l4 4 4-4'/%3E%3C/svg%3E");
+  background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6' fill='none' stroke='%23101413' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M1 1l4 4 4-4'/%3E%3C/svg%3E");
   background-repeat: no-repeat;
   background-position: right 12px center;
   font: inherit;
@@ -480,7 +495,7 @@ a { color: inherit; }
   place-items: center;
   border-radius: 12px;
   background: var(--mint);
-  color: var(--brand);
+  color: var(--ink);
 }
 
 .item-head { flex: 1; min-width: 0; }
@@ -521,12 +536,12 @@ a { color: inherit; }
   border: 1px solid transparent;
   border-radius: 999px;
   background: transparent;
-  color: var(--t-45);
+  color: var(--ink-45);
   cursor: pointer;
   transition: color .18s var(--ease), background .18s var(--ease);
 }
-.fav-btn:hover { color: var(--brand); background: var(--field); }
-.fav-btn.on { color: var(--brand); background: var(--mint); }
+.fav-btn:hover { color: var(--ink); background: var(--field); }
+.fav-btn.on { color: var(--ink); background: var(--mint); }
 .fav-btn.bounce svg { animation: pop .32s var(--ease); }
 
 .item-foot {
@@ -639,7 +654,7 @@ a { color: inherit; }
   text-align: center;
 }
 .state.show { display: flex; }
-.state svg { color: var(--t-45); margin-bottom: 4px; }
+.state svg { color: var(--ink-30); margin-bottom: 4px; }
 .state.danger svg { color: var(--warn); }
 
 .state h3 {
@@ -768,7 +783,9 @@ a { color: inherit; }
   gap: 4px;
   padding: 4px 0 2px;
   text-decoration: none;
-  color: var(--t-45);
+  /* Labels are text, so they stay teal — a shade stronger than before so they
+     hold their own next to the darker icons. */
+  color: var(--t-70);
   font-size: 10px;
   font-weight: 600;
   letter-spacing: .01em;
@@ -783,9 +800,11 @@ a { color: inherit; }
   display: grid;
   place-items: center;
   border-radius: 999px;
-  transition: background .18s var(--ease);
+  color: var(--ink-45);
+  transition: background .18s var(--ease), color .18s var(--ease);
 }
-.tab.active .tab-ic { background: var(--mint); }
+.tab:hover .tab-ic { color: var(--ink-70); }
+.tab.active .tab-ic { background: var(--mint); color: var(--ink); }
 
 .tab .pill {
   position: absolute;
@@ -868,7 +887,7 @@ a { color: inherit; }
   place-items: center;
   border-radius: 7px;
   background: var(--mint);
-  color: var(--brand);
+  color: var(--ink);
 }
 
 .stat-value {
@@ -984,8 +1003,8 @@ a { color: inherit; }
   width: 9px;
   height: 9px;
   flex: none;
-  border-right: 1.8px solid var(--t-45);
-  border-bottom: 1.8px solid var(--t-45);
+  border-right: 1.8px solid var(--ink-45);
+  border-bottom: 1.8px solid var(--ink-45);
   transform: rotate(45deg) translateY(-2px);
   transition: transform .2s var(--ease);
 }

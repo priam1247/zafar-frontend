@@ -13,11 +13,11 @@ var ZafarShell = (function () {
   var ICONS = {
     // Same open-book mark as the auth screen, so the brand reads as one thing.
     logo: '<path d="M12 5C10.2 3.6 7.6 3 5 3v13c2.6 0 5.2.6 7 2 1.8-1.4 4.4-2 7-2V3c-2.6 0-5.2.6-7 2Z"/><path d="M12 5v13"/>',
-    book: '<path d="M12 5v16"/><path d="M20.001 19A2 2 0 0022 17V5a2 2 0 00-1.999-2L16 3.002A5 5 0 0012 5a5 5 0 00-4-2H4a2 2 0 00-2 2v12a2 2 0 001.999 2H8a5 5 0 014 2 5 5 0 014-2z"/>',
-    file: '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><path d="M9 15h6"/>',
+    book: '<path d="M12 7.2C10.4 5.7 8.2 5 6 5H4v13.2h2c2.2 0 4.4.7 6 2.2 1.6-1.5 3.8-2.2 6-2.2h2V5h-2c-2.2 0-4.4.7-6 2.2Z"/><path d="M12 7.2v13.2"/>',
+    file: '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><path d="M8.5 13h7"/><path d="M8.5 17h4"/>',
     heart: '<path d="M2 9.5a5.5 5.5 0 0 1 9.591-3.676.56.56 0 0 0 .818 0A5.49 5.49 0 0 1 22 9.5c0 2.29-1.5 4-3 5.5l-5.492 5.313a2 2 0 0 1-3 .019L5 15c-1.5-1.5-3-3.2-3-5.5"/>',
-    notes: '<path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1"/><path d="M8 11h8"/><path d="M8 16h5"/>',
-    check: '<path d="M20 6 9 17l-5-5"/>',
+    notes: '<path d="M8 5H6a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2"/><rect x="8" y="2.4" width="8" height="3.6" rx="1.2"/><path d="M8.5 12h7"/><path d="M8.5 16h4.5"/>',
+    check: '<circle cx="12" cy="12" r="9"/><path d="m8.4 12.2 2.5 2.5 4.7-5"/>',
     help: '<circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><path d="M12 17h.01"/>',
     logout: '<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/>',
     download: '<path d="M12 15V3"/><path d="m7 10 5 5 5-5"/><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>',
@@ -83,8 +83,15 @@ var ZafarShell = (function () {
             '<a class="bar-btn" href="login.html" data-logout aria-label="Log out">' + svg("logout", 17) + "</a>" +
           "</div>" +
         "</div>" +
-        '<div class="crumb">' + crumb + "</div>" +
-        '<h1 class="app-title">' + title + "</h1>" +
+        '<div class="app-head">' +
+          '<div class="app-head-text">' +
+            '<div class="crumb">' + crumb + "</div>" +
+            '<h1 class="app-title">' + title + "</h1>" +
+          "</div>" +
+          // Filled by the list page when the section has a daily allowance.
+          '<span class="quota" data-quota hidden>' + svg("download", 13, 2) +
+            '<span data-quota-text></span></span>' +
+        "</div>" +
         '<div class="app-meta"><span class="count" data-count>' + t("list.loading") + "</span></div>" +
       "</header>" +
       '<main class="sheet"><div class="content" data-content></div></main>' +
@@ -135,6 +142,7 @@ var ZafarShell = (function () {
     return {
       content: root.querySelector("[data-content]"),
       count: root.querySelector("[data-count]"),
+      quota: root.querySelector("[data-quota]"),
       showToast: showToast,
       svg: svg,
     };
