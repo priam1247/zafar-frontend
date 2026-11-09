@@ -117,7 +117,8 @@ img { display: block; }
      showing, so the estimate is the small one rather than the hopeful one. */
   min-height: 25vh;
   min-height: 25svh;
-  padding: 12px 18px 0;
+  justify-content: center;
+  padding: 12px 18px 14px;
   background: var(--brand);
   color: var(--on);
 }
@@ -154,9 +155,12 @@ img { display: block; }
   margin: 10px 0 0;
   font-size: 23px;
   font-weight: 640;
-  line-height: 1.1;
+  line-height: 1.15;
   letter-spacing: -.03em;
   color: var(--on);
+  /* Two even lines instead of one long one and a stray word. Older browsers
+     ignore this and simply wrap where they wrap. */
+  text-wrap: balance;
 }
 
 /* Never smaller than 15px and never dimmer than 88%: this is the sentence
@@ -175,53 +179,19 @@ img { display: block; }
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
-  margin: 10px 0 0;
+  margin: 8px 0 0;
   padding: 0;
   list-style: none;
 }
 .mast-chips li {
-  padding: 3px 9px;
-  border: 1px solid var(--on-30);
+  padding: 5px 12px;
   border-radius: 999px;
-  background: rgba(250, 245, 233, .07);
-  font-size: 11.5px;
+  background: rgba(250, 245, 233, .16);
+  font-size: 12px;
   font-weight: 600;
   letter-spacing: .01em;
-  color: rgba(250, 245, 233, .94);
+  color: rgba(250, 245, 233, .96);
 }
-
-/* ---------- The library, drawn ----------
-   Book spines of different widths and heights, thin gaps, one leaning over.
-   Pure CSS, so it costs zero bytes — which matters on a Malawian data bundle.
-   Hidden on short screens: there the form needs the room more than the
-   decoration does. */
-
-.lib {
-  flex: 1 1 auto;
-  min-height: 0;
-  height: 44px;
-  max-height: 64px;
-  margin: 10px -18px 0;
-  padding: 0 18px 10px;
-}
-
-.spines {
-  height: 100%;
-  display: flex;
-  align-items: flex-end;
-  gap: 2px;
-  border-bottom: 2px solid var(--on-30);
-}
-.spines i {
-  display: block;
-  flex: none;
-  border-radius: 2px 2px 0 0;
-  background: var(--on-30);
-  transform-origin: bottom left;
-}
-.spines i.w { background: var(--on-56); }
-.spines i.a { background: var(--mint); }
-.spines i.lean { transform: rotate(-9deg); margin-right: 4px; }
 
 /* ---------- Sheet ---------- */
 
@@ -244,11 +214,21 @@ img { display: block; }
   max-width: 420px;
 }
 
+/* The page's one picture, sitting where the gap above the heading used to be.
+   It is the first thing inside the white card, so it carries the eye from the
+   teal down to the form. */
+.card-art {
+  display: flex;
+  justify-content: center;
+  margin: 2px 0 6px;
+}
+.card-art svg { display: block; }
+
 .panel { width: 100%; }
 
 /* ---------- Centred head ---------- */
 
-.head { text-align: center; margin: 0 0 22px; padding-top: 26px; }
+.head { text-align: center; margin: 0 0 22px; }
 
 .head h1 {
   margin: 0 0 6px;
@@ -592,10 +572,10 @@ img { display: block; }
   .form { gap: 11px; }
 }
 
-/* A short screen has no room for both the shelf and the form. The form wins:
-   every student who lands here is one step from signing in. */
-@media (max-height: 780px) {
-  .lib { display: none; }
+/* A short screen has less room for the picture, not less room for the form. */
+@media (max-height: 700px) {
+  .card-art { margin: 0 0 2px; }
+  .card-art svg { width: 58px; height: 52px; }
 }
 @media (max-height: 640px) {
   .mast { padding-top: 10px; }
