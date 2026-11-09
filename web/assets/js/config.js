@@ -6,13 +6,23 @@
 // Can be overridden at runtime with ?api=https://... for testing.
 var API_BASE_URL = "https://bloody-brigitta-ahzafar-de9b1709.koyeb.app";
 
-// The backend's /auth/quota endpoint reports how many papers/books are left
-// today, not the caps themselves — mirrored here so the header can say
-// "3 of 3 left" rather than "3 of 10". Books have their own, smaller daily
-// allowance. If the quota response ever carries papers_limit / books_limit,
-// the list page prefers that over these.
-var DAILY_PAPER_LIMIT = 10;
-var DAILY_BOOK_LIMIT = 3;
+// Each section has its own allowance, and each one refills 24 hours after
+// the first download in that section — not at midnight.
+//
+// The backend's /auth/quota endpoint reports how many are left, not the caps,
+// so the caps are mirrored here for the header ("3 of 3 left") and the help
+// page. If a quota response carries <section>_limit, the list page prefers
+// that over these numbers.
+var DAILY_LIMITS = {
+  papers: 10,
+  "marking-keys": 10,
+  notes: 3,
+  books: 3,
+};
+
+// Kept as named aliases for the pages that show a single number.
+var DAILY_PAPER_LIMIT = DAILY_LIMITS.papers;
+var DAILY_BOOK_LIMIT = DAILY_LIMITS.books;
 
 // The admin's WhatsApp number in international format — digits only,
 // country code included, no "+" (e.g. "265991234567"). Leave empty to

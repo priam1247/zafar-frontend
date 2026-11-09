@@ -200,6 +200,15 @@ a { color: inherit; }
   color: var(--on);
 }
 
+.app-desc {
+  margin: 9px 0 0;
+  max-width: 38ch;
+  font-size: 13px;
+  line-height: 1.42;
+  letter-spacing: -.005em;
+  color: var(--on-72);
+}
+
 .app-meta {
   margin-top: 11px;
   display: flex;

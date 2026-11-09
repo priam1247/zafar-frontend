@@ -19,7 +19,7 @@
     document.addEventListener("DOMContentLoaded", function () {
       var t = ZafarI18n.t;
       var p = t("pages.help");
-      var shell = ZafarShell.init({ active: "help", title: p.title, crumb: p.crumb });
+      var shell = ZafarShell.init({ active: "help", title: p.title, crumb: p.crumb, desc: p.desc });
       if (!shell) return;
 
       var QA = t("help.qa");
@@ -33,20 +33,20 @@
         "</section>" +
 
         '<div class="stats">' +
-          '<div class="stat"><div class="stat-head"><span class="stat-glyph">' + icon("download", 14) +
-          '</span><span class="stat-label">' + t("help.dailyLimitLabel") + '</span></div>' +
-          '<div class="stat-value">' + DAILY_PAPER_LIMIT + "</div>" +
-          '<div class="stat-foot">' + t("help.dailyLimitFoot") + "</div></div>" +
+          '<div class="stat"><div class="stat-head"><span class="stat-glyph">' + icon("file", 14) +
+          '</span><span class="stat-label">' + t("help.paperLimitLabel") + '</span></div>' +
+          '<div class="stat-value">' + DAILY_LIMITS.papers + "</div>" +
+          '<div class="stat-foot">' + t("help.paperLimitFoot") + "</div></div>" +
+
+          '<div class="stat"><div class="stat-head"><span class="stat-glyph">' + icon("book", 14) +
+          '</span><span class="stat-label">' + t("help.bookLimitLabel") + '</span></div>' +
+          '<div class="stat-value">' + DAILY_LIMITS.notes + "</div>" +
+          '<div class="stat-foot">' + t("help.bookLimitFoot") + "</div></div>" +
 
           '<div class="stat"><div class="stat-head"><span class="stat-glyph">' + icon("clock", 14) +
           '</span><span class="stat-label">' + t("help.limitResetsLabel") + '</span></div>' +
-          '<div class="stat-value">00:00</div>' +
+          '<div class="stat-value">24h</div>' +
           '<div class="stat-foot">' + t("help.limitResetsFoot") + "</div></div>" +
-
-          '<div class="stat"><div class="stat-head"><span class="stat-glyph">' + icon("layers", 14) +
-          '</span><span class="stat-label">' + t("help.sectionsLabel") + '</span></div>' +
-          '<div class="stat-value">4</div>' +
-          '<div class="stat-foot">' + t("help.sectionsFoot") + "</div></div>" +
         "</div>" +
 
         (SUPPORT_WHATSAPP
