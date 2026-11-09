@@ -61,11 +61,17 @@ a shelf of book spines — which costs zero bytes. Phones therefore never
 download a hero image.
 
 **The signed-in app** (`app.css`) is the same system, built the same way. A
-teal bar carries the wordmark, the page title and a running count; the white
-sheet carries the catalogue; five tabs pinned to the bottom hold the sections
-(Past Papers, Books, Notes, Marking Keys, Favorites). There is no sidebar and
-no drawer — categories are chips that scroll sideways on the list pages, and
-Help / Log out sit as two round buttons in the bar.
+teal bar carries the wordmark, the page title, the day's download allowance and
+a running count; the white sheet carries the catalogue; five tabs pinned to the
+bottom hold the sections (Past Papers, Books, Notes, Marking Keys, Favorites).
+There is no sidebar and no drawer — categories are chips that scroll sideways
+on the list pages, and Help / Log out sit as two round buttons in the bar.
+
+Glyphs are near-black ink (`--ink`) on the light surfaces — files, hearts,
+search, tabs — while teal is kept for text, headers and the filled download
+button. The allowance chip sits beside the title so it stays visible while the
+catalogue scrolls: **10 papers and 3 books a day**, with `3 of 3 left` reported
+against each section's own ceiling rather than one shared number.
 
 Cards keep the same discipline as the auth screen: one hairline, no shadow, a
 mint tile for the file mark, the title, a category chip, then size and a single

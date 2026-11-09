@@ -6,10 +6,13 @@
 // Can be overridden at runtime with ?api=https://... for testing.
 var API_BASE_URL = "https://bloody-brigitta-ahzafar-de9b1709.koyeb.app";
 
-// The backend's /auth/quota endpoint only reports how many papers/books are
-// left today, not the cap itself — mirrored here purely for progress bars.
-// Keep in sync with the backend's daily_paper_limit (config.py default: 10).
+// The backend's /auth/quota endpoint reports how many papers/books are left
+// today, not the caps themselves — mirrored here so the header can say
+// "3 of 3 left" rather than "3 of 10". Books have their own, smaller daily
+// allowance. If the quota response ever carries papers_limit / books_limit,
+// the list page prefers that over these.
 var DAILY_PAPER_LIMIT = 10;
+var DAILY_BOOK_LIMIT = 3;
 
 // The admin's WhatsApp number in international format — digits only,
 // country code included, no "+" (e.g. "265991234567"). Leave empty to

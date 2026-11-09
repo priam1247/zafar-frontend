@@ -39,11 +39,6 @@ var ZafarList = (function () {
         "</div>" +
       "</div>" +
 
-      (cfg.quotaKey
-        ? '<div class="row"><span class="badge" data-limit>' + svg("bolt", 13) +
-          '<span data-limit-text>' + t("list.checkingLimit") + "</span></span></div>"
-        : "") +
-
       (cfg.categories && cfg.categories.length
         ? '<div class="cat-chips" data-cat-chips></div>'
         : "") +
@@ -144,8 +139,8 @@ var ZafarList = (function () {
       catChips: root.querySelector("[data-cat-chips]"),
       search: root.querySelector("[data-search]"),
       sort: root.querySelector("[data-sort]"),
-      limit: root.querySelector("[data-limit]"),
-      limitText: root.querySelector("[data-limit-text]"),
+      limit: shell.quota || null,
+      limitText: shell.quota ? shell.quota.querySelector("[data-quota-text]") : null,
     };
 
     var params = new URLSearchParams(location.search);
@@ -202,25 +197,38 @@ var ZafarList = (function () {
       }).join("");
     }
 
-    /* ---------- Quota badge ---------- */
+    /* ---------- Daily allowance — shown in the header, not the sheet ---------- */
     var left = null;
+    var cap = cfg.quotaKey === "books" ? DAILY_BOOK_LIMIT : DAILY_PAPER_LIMIT;
+
     function renderLimit() {
       if (!el.limit || left === null) return;
-      el.limitText.textContent =
-        left > 0
-          ? t("list.downloadsLeft", left, DAILY_PAPER_LIMIT)
-          : t("list.limitReached");
-      el.limit.classList.toggle("badge-ok", left > 0);
-      el.limit.classList.toggle("badge-warn", left <= 0);
+      var allowed = left > 0;
+      el.limit.hidden = false;
+      el.limit.classList.toggle("is-warn", !allowed);
+      el.limitText.textContent = allowed
+        ? t("list.downloadsLeft", left, cap)
+        : t("list.limitReached");
+      el.limit.setAttribute(
+        "aria-label",
+        allowed ? t("list.downloadsLeftLabel", left, cap) : t("list.limitReached")
+      );
     }
+
     if (cfg.quotaKey && el.limit) {
       Zafar.authGet("/auth/quota")
         .then(function (q) {
           left = cfg.quotaKey === "books" ? q.books_left : q.papers_left;
+          // A ceiling from the server beats the mirrored constant.
+          var reported = cfg.quotaKey === "books" ? q.books_limit : q.papers_limit;
+          if (typeof reported === "number" && reported > 0) cap = reported;
           renderLimit();
         })
         .catch(function () {
-          if (el.limitText) el.limitText.textContent = t("list.limitUnavailable");
+          if (!el.limit) return;
+          el.limit.hidden = false;
+          el.limit.classList.add("is-warn");
+          el.limitText.textContent = t("list.limitUnavailable");
         });
     }
 
