@@ -1,0 +1,7 @@
+# Cloudflare serves these as-is; the service worker fixes itself only if the
+# browser is allowed to look at the file.
+/sw.js
+  Cache-Control: no-cache
+
+/*.html
+  Cache-Control: no-cache
