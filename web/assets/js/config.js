@@ -6,18 +6,27 @@
 // Can be overridden at runtime with ?api=https://... for testing.
 var API_BASE_URL = "https://bloody-brigitta-ahzafar-de9b1709.koyeb.app";
 
-// Each section has its own allowance, and each one refills 24 hours after
-// the first download in that section — not at midnight.
+// Daily allowances, as the backend enforces them today:
+//   papers  10 a day — notes AND marking keys are charged against this one
+//   books    3 a day
+// The window is a UTC calendar day: everything refills at 00:00 UTC, not 24
+// hours after a first download. The chips, the help page and the FAQ all say
+// so; nothing in the UI should promise a per-section counter until the
+// backend actually keeps one.
 //
-// The backend's /auth/quota endpoint reports how many are left, not the caps,
-// so the caps are mirrored here for the header ("3 of 3 left") and the help
-// page. If a quota response carries <section>_limit, the list page prefers
-// that over these numbers.
+// QUOTA_SECTION maps a page's section to the bucket the server charges. When
+// the backend grows real per-section counters and a rolling window, change
+// this table and the copy in i18n.js — the list page needs nothing else.
 var DAILY_LIMITS = {
   papers: 10,
-  "marking-keys": 10,
-  notes: 3,
   books: 3,
+};
+
+var QUOTA_SECTION = {
+  papers: "papers",
+  notes: "papers",
+  "marking-keys": "papers",
+  books: "books",
 };
 
 // Kept as named aliases for the pages that show a single number.

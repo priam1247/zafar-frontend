@@ -22,10 +22,10 @@ var ZafarI18n = (function () {
                    desc: "Textbooks for senior and junior secondary.",
                    searchPlaceholder: "Search textbooks by title or form…" },
       notes:     { title: "Notes", crumb: "Library", itemLabel: "note",
-                   desc: "Condensed notes for every subject.",
+                   desc: "Condensed notes — counted against your papers.",
                    searchPlaceholder: "Search notes by subject…" },
       keys:      { title: "Marking Keys", crumb: "Library", itemLabel: "marking key",
-                   desc: "Official schemes to check your own work.",
+                   desc: "Official schemes — counted against your papers.",
                    searchPlaceholder: "Search marking keys by subject or year…" },
       favorites: { title: "Favorites", crumb: "Yours", itemLabel: "favorite",
                    desc: "Everything you've saved, in one list.",
@@ -39,9 +39,8 @@ var ZafarI18n = (function () {
       sortSizeDesc: "Largest first", sortSizeAsc: "Smallest first",
       checkingLimit: "Checking today's limit…",
       downloadsLeft: function (left, cap) { return left + " of " + cap + " left"; },
-      allowancePerDay: function (cap) { return cap + " a day"; },
-      allowancePerDayLabel: function (cap) { return cap + " downloads a day"; },
       downloadsLeftLabel: function (left, cap) { return left + " of " + cap + " downloads left today"; },
+      sharedBucket: ", shared with notes and marking keys",
       limitReached: "No downloads left",
       limitUnavailable: "Limit unavailable",
       sortLabel: "Sort",
@@ -80,9 +79,9 @@ var ZafarI18n = (function () {
       heroTitle: "How can we help?",
       heroBody: "Short answers to the questions students ask most. Still stuck? Reach the admin on WhatsApp and include the email on your account.",
       backToPapers: "Back to papers",
-      paperLimitLabel: "Papers & keys", paperLimitFoot: "each, per 24 hours",
-      bookLimitLabel: "Notes & books", bookLimitFoot: "each, per 24 hours",
-      limitResetsLabel: "Limit resets", limitResetsFoot: "24 hours after you start",
+      paperLimitLabel: "Papers, notes & keys", paperLimitFoot: "one shared allowance",
+      bookLimitLabel: "Books", bookLimitFoot: "their own allowance",
+      limitResetsLabel: "Limit resets", limitResetsFoot: "at midnight, UTC",
       faqTitle: "Frequently asked",
       shortcutsTitle: "Keyboard shortcuts",
       shortcutSlash: "Focus the search box on any list page",
@@ -95,11 +94,11 @@ var ZafarI18n = (function () {
       contactCta: "Open WhatsApp",
       qa: [
         { id: "limits", q: "Why is there a daily download limit?",
-          a: "<p>Every account gets 10 past papers, 10 marking keys, 3 notes and 3 books. Each of the " +
-             "four runs its own counter, so spending your notes allowance never costs you a paper. The caps " +
-             "keep one heavy user from slowing the library down for everyone else.</p>" +
-             "<p>A counter refills 24 hours after your first download in that section &mdash; not at " +
-             "midnight. The chip in the header always shows what is left.</p>" },
+          a: "<p>Every account gets 10 downloads a day from the paper allowance and 3 from the book " +
+             "allowance. Notes and marking keys are charged against the paper allowance &mdash; they share " +
+             "it, so a note or a marking key spends the same ten as a past paper.</p>" +
+             "<p>Both allowances refill at midnight UTC. The chip in the header shows what is left, and it " +
+             "is the same number on the papers, notes and marking key pages.</p>" },
         { id: "download", q: "A download didn't start — what now?",
           a: "<p>Downloads are prepared on demand: the app asks the server for a short-lived signed link, then " +
              "fetches the file and hands it to your browser. If that link expires before the file finishes, just " +
