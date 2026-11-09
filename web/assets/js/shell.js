@@ -118,6 +118,14 @@ var ZafarShell = (function () {
      server.js rewrites each page as it serves it, and a stored copy would be
      the wrong copy. ?sw=1 forces it on, ?sw=0 removes it and its caches. */
   function registerWorker() {
+    try {
+      registerWorkerNow();
+    } catch (error) {
+      // An install is a bonus. It is never worth a broken page.
+    }
+  }
+
+  function registerWorkerNow() {
     if (!("serviceWorker" in navigator)) return;
 
     var flag = new URLSearchParams(location.search).get("sw");
@@ -145,9 +153,13 @@ var ZafarShell = (function () {
       location.hostname === "localhost" || location.hostname === "127.0.0.1";
     if (!secure) return;
 
-    navigator.serviceWorker.register("sw.js").catch(function () {
-      // Installing is an enhancement — a failure must never surface.
-    });
+    // After load: registration is off the path to the first painting, and a
+    // slow install can never hold the page up.
+    var start = function () {
+      navigator.serviceWorker.register("sw.js").catch(function () {});
+    };
+    if (document.readyState === "complete") start();
+    else window.addEventListener("load", start, { once: true });
   }
 
   /* ---------- Init ---------- */
