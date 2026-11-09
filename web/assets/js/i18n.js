@@ -152,11 +152,14 @@ var ZafarI18n = (function () {
           a: "<p>The library mirrors what's been published to the Zafar Drive folders. If a subject or year isn't " +
              "there yet, it hasn't been uploaded — send the request through and it usually appears within a few days.</p>" },
         { id: "offline", q: "Can I use Zafar offline?",
-          a: "<p>Partly, and deliberately. ZAFAR keeps its own pages on your phone, so the app opens with no " +
-             "signal, and the last list you loaded on each page is still there — marked <b>offline</b> so you " +
-             "know it is a copy. Favourites work either way, because they live on your device.</p>" +
-             "<p>Downloading needs a connection, since the file comes from the server. Add the app to your home " +
-             "screen and it opens like any other app, offline shell and all.</p>" },
+          a: "<p>No. ZAFAR needs a connection: the catalogue, the papers and your daily allowance all come " +
+             "from the server, so anything stored on the phone would be a list you could not download from. " +
+             "Downloading also needs the server to hand out the file, so there is nothing an offline copy " +
+             "could honestly do.</p>" +
+             "<p>Your <b>favourites</b> are the exception — they are saved on this device, so they are still " +
+             "there when you come back online.</p>" +
+             "<p>You can still add ZAFAR to your home screen; it opens like any other app, it just needs " +
+             "signal like the rest of the web.</p>" },
       ],
     },
   };

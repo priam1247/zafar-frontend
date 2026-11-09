@@ -1,6 +1,9 @@
-# Cloudflare serves these as-is; the service worker fixes itself only if the
-# browser is allowed to look at the file.
+# Cloudflare serves these as-is. A phone must never keep a stale copy of the
+# worker — the fix has to arrive on the next visit, not days later.
 /sw.js
+  Cache-Control: no-cache
+
+/reset.html
   Cache-Control: no-cache
 
 /*.html

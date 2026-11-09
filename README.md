@@ -24,8 +24,9 @@ web/                     static frontend (no build step, no framework)
   assets/img/icon-*.png  the same mark rasterised for a home screen: 192, 512,
                          a 512 maskable, and a 180 apple-touch icon
   manifest.webmanifest   name, colours and icons for "Add to Home Screen"
-  sw.js                  service worker — the shell and the last catalogue
-                         answer, kept on the device
+  sw.js                  the uninstaller — retires the worker older versions
+                         installed; caches nothing
+  reset.html             standalone recovery page, never cached
   assets/js/config.js    API client, token storage, favorites, formatting
   assets/js/i18n.js      the English string table for the signed-in app
   assets/js/shell.js     top bar + bottom tabs + toasts
@@ -147,81 +148,53 @@ page's `<head>` also carries the iOS metas and `apple-touch-icon`, and
 `viewport-fit=cover` — without it `env(safe-area-inset-*)` reports zero and the
 notch and home indicator would sit on top of the bar and the tabs.
 
-`sw.js` keeps two things on the device, and nothing else:
+**ZAFAR keeps nothing on the phone.** There is no service worker, no cache,
+no stored copy of any page, and no offline list. Every request goes to the
+network.
 
-| Route | Strategy | Why |
-| --- | --- | --- |
-| the six pages, and every listed css/js/font/icon | network first, stored copy as fallback | the copy is for a dead connection, never a substitute for a working one |
-| `GET /drive/papers`, on any origin | network first, stored copy as fallback | a fresh list beats an instant one; the copy is for when nothing answers |
-| `/auth/*`, `/drive/download`, `/drive/confirm`, every POST, every other origin | untouched | an allowance or a token served from last week is a lie |
+That is a decision, made after the alternative took the site down. Offline
+reading stored the last catalogue answer per view and served the app's own pages
+from the device; when a stored page was the *first* answer for a navigation, one
+entry the browser would not render was every page failing, with no page inside
+the app left to repair it from. It is also worth being honest about what the
+feature bought: a stored list carries **no download URLs** — the download is a
+`POST /drive/download/{id}` that spends the allowance, and the file link is a
+signed URL that lives five minutes — so an offline phone could see a list of
+filenames and download none of them. A list you cannot act on is not worth a
+class of failure that can brick the app.
 
-**Nothing is served from the cache while the network can answer.** That rule is
-not a preference. Serving a stored page as the first answer took the deployed
-site down: one stored response that the browser would not render is every
-navigation failing, with no page left to repair it from. Two consequences:
+What remains, and why:
 
-- A navigation can end three ways — the network, the stored copy, or a small
-  ZAFAR page that says the phone is offline and offers **Try again**. There is
-  deliberately no fourth outcome, and no strategy is allowed to reject: if a
-  cache read throws, the request still goes to the network.
-- What is stored is re-wrapped, never passed through. A wire response carries
-  `Content-Encoding` and `Content-Length` for bytes the browser has already
-  decoded; storing that pair and handing it back later is how a cached page
-  fails to load. Entries are written as a fresh `Response` with a `Content-Type`
-  and nothing else.
+- **`web/sw.js` is an uninstaller.** Phones that installed an older version
+  still have its worker and its stored pages. The browser checks a
+  registration's script on the next visit, so this version reaches them, deletes
+  the `zafar-*` caches, and unregisters itself. It has no fetch handler and no
+  cache of its own. It can be deleted once the installed base has had a few
+  weeks to update.
+- **`shell.js` retires the worker from the page side**, on load, for browsers
+  that never run the new script. Matching is by script URL, so another app's
+  worker on a shared origin is left alone.
+- **`web/_headers` serves `/sw.js` and every page with `Cache-Control:
+  no-cache`.** Without it a phone can keep a stale script, and a fix arrives
+  days late.
+- **`reset.html` is the way back** for a phone still stuck on an old copy. It is
+  standalone — no stylesheet, no script file, nothing an older version could
+  have stored — unregisters only the registration whose script URL is ZAFAR's,
+  deletes only `zafar-*` caches, and then checks the browser again before it
+  claims success. If another tab put the worker back, it says so instead of
+  reporting a reset that did not happen.
 
-Five rules keep that safe:
+**It is not a guarantee, and the README used to pretend otherwise.** A worker
+that answers every navigation can answer `reset.html` too — that is precisely
+the failure it exists to repair. When even the reset page will not load, only
+the browser can clear the site, and the page carries those steps (Chrome on
+Android: Settings → Site settings → All sites → the site → Clear & reset;
+Safari on iPhone: Settings → Safari → Advanced → Website Data → Delete). Close
+every ZAFAR tab before and after; an open tab can put the old copy back.
 
-- **Routed by path, not by host.** `?api` can point the app at this same
-  origin; the catalogue is still a catalogue, and `/auth/quota` is still never
-  cached.
-- **The catalogue belongs to a credential.** Entries are keyed by a one-way
-  fingerprint of the exact token that produced them — not by its `sub`. The
-  token is unsigned, so anyone can write any `sub` into one; keying by it would
-  let a forged token on a shared phone read the previous student's list. A
-  different (or edited) signature is a different key, and finds nothing. An
-  expired token reads no cache at all — the 401 that follows is what sends the
-  phone back to the sign-in screen. Signing out, or any 401, deletes every
-  stored answer.
-- **Install is all or nothing.** If an essential page or script cannot be
-  stored the install fails and the previous worker keeps serving; icons are
-  optional and may fail quietly. A phone gets a stale app, never a half-built
-  one.
-- **Activation only retires its own caches.** Names beginning `zafar-shell-` or
-  `zafar-docs-` are deleted; another app on the origin keeps everything it has.
-- **The worker's own script is never cached.** It registers with
-  `updateViaCache: "none"`, and `web/_headers` tells Cloudflare to serve
-  `/sw.js` with `Cache-Control: no-cache`. A fix has to reach the phone on the
-  next visit, not whenever the old script expires.
-
-A list served from the copy is labelled **offline** beside its count. That does
-not rely on `navigator.onLine` — a captive portal leaves the radio on and the
-network useless — so the worker posts a message when it answers from cache, and
-the page relabels itself. The message goes to **the tab that asked**, named by
-`clientId`: broadcasting it would stamp another tab's live list as a copy. It
-carries the moment the copy was served, and a page ignores anything older than
-the load now on screen, so a late notice cannot relabel a list that has since
-been refreshed. An empty list is a result too, and is relabelled the same way.
-Losing signal mid-page leaves the readable list on screen instead of replacing
-it with a warning.
-
-**Bump `VERSION` in `sw.js` on every deploy that changes `web/`.** It names the
-caches, and activation retires the ones it does not recognise; a stale name is a
-stale app.
-
-If a worker ever ships a bad copy of the app, `reset.html` is the way back: it
-is deliberately not part of the shell, has no stylesheet or script of its own,
-and is therefore never stored. It unregisters the worker covering the page and
-deletes the `zafar-*` caches, then opens the app again. A phone stuck on a
-broken worker can always reach it, because the worker has no copy to answer
-with and falls through to the network.
-
-The demo removes *its own* worker rather than merely not registering one —
-registration is matched by script URL, so another app's worker on the same
-origin is left alone:
-`server.js` rewrites each page as it serves it, and a stored copy would be the
-wrong copy. `?sw=1` forces the worker on, `?sw=0` unregisters it and deletes
-its caches.
+There is no `?sw=1` any more — nothing to force on. Demo mode and `?sw=0` still
+clear any leftover worker and its caches, because `server.js` rewrites each page
+as it serves it and a stored page would be the wrong page.
 
 ## Backend
 

@@ -4,23 +4,33 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#006D7C">
-  <title>Reset ZAFAR — offline copy</title>
-  <!-- Deliberately standalone: no stylesheet, no script, nothing cached. If a
-       service worker ever ships a bad copy of the app, this page still loads,
-       because it is not part of the shell the worker keeps. -->
+  <title>Reset ZAFAR on this phone</title>
+  <!-- Standalone on purpose: no stylesheet, no script file, nothing an older
+       version of the app could have stored. It is the page to try when the app
+       itself will not open.
+
+       It is not a guarantee. If a worker installed by an older version answers
+       every navigation, it can answer this URL too — that is the failure this
+       page exists to repair, and the browser-level steps below are the way out
+       when it happens. -->
   <style>
-    :root { --brand: #006D7C; --paper: #FAF5E9; --sheet: #FFFDF8; --ink: #101413; }
+    :root { --brand: #006D7C; --paper: #FAF5E9; }
     * { box-sizing: border-box; }
-    html, body { margin: 0; height: 100%; }
+    html, body { margin: 0; min-height: 100%; }
     body {
       background: var(--brand); color: var(--paper);
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
       padding: calc(28px + env(safe-area-inset-top)) 22px calc(28px + env(safe-area-inset-bottom));
-      display: flex; align-items: center; justify-content: center;
+      display: flex; align-items: flex-start; justify-content: center;
     }
-    main { max-width: 360px; width: 100%; }
+    main { max-width: 380px; width: 100%; }
     h1 { font-size: 22px; line-height: 1.25; letter-spacing: -.02em; margin: 0 0 10px; }
-    p { font-size: 14px; line-height: 1.55; margin: 0 0 14px; color: rgba(250,245,233,.78); }
+    h2 { font-size: 14px; letter-spacing: .02em; text-transform: uppercase;
+         color: rgba(250,245,233,.55); margin: 26px 0 8px; }
+    p, li { font-size: 14px; line-height: 1.55; margin: 0 0 12px; color: rgba(250,245,233,.80); }
+    ul { margin: 0 0 12px; padding-left: 18px; }
+    li { margin-bottom: 6px; }
+    b { color: #FAF5E9; }
     button, a.action {
       display: flex; align-items: center; justify-content: center;
       width: 100%; height: 48px; margin-top: 18px;
@@ -33,25 +43,44 @@
     .detail {
       background: rgba(255,253,248,.10); border-radius: 14px;
       padding: 14px 16px; font-size: 13px; line-height: 1.5;
-      color: rgba(250,245,233,.82); margin-top: 16px;
+      color: rgba(250,245,233,.85); margin-top: 16px;
     }
     .detail[hidden] { display: none; }
+    .detail.warn { background: rgba(255,214,153,.16); color: #FFE7BE; }
     .note { font-size: 12.5px; color: rgba(250,245,233,.55); margin-top: 16px; }
   </style>
 </head>
 <body>
   <main>
-    <h1>Reset the offline copy</h1>
-    <p>Use this if ZAFAR will not open on this phone. It removes the copy the
-      app keeps for offline reading — not your account, not your downloads, not
-      your favourites.</p>
+    <h1>Reset ZAFAR on this phone</h1>
+    <p>ZAFAR no longer keeps a copy of the app on your phone. An older version
+      left one behind, and this removes it — not your account, not your
+      downloads, not your favourites.</p>
 
     <button type="button" id="reset">Reset ZAFAR on this phone</button>
     <div class="detail" id="detail" hidden></div>
 
     <a class="action" href="dashboard.html" id="go">Open ZAFAR</a>
-    <p class="note">Signing in again may be needed. This page is the one part of
-      ZAFAR that is never stored on the phone.</p>
+
+    <h2>If this page will not load</h2>
+    <p>Then an older copy is intercepting the page as well, and only the
+      browser can clear it. The menu names move between versions, but the
+      setting is the same one:</p>
+    <ul>
+      <li><b>Chrome on Android:</b> ⋮ → Settings → Site settings → All sites →
+        find this site → <b>Clear &amp; reset</b>. Or tap the padlock in the
+        address bar → Cookies and site data → Manage.</li>
+      <li><b>Safari on iPhone:</b> Settings app → Safari → Advanced → Website
+        Data → find this site → Delete. (Settings → Apps → Safari on newer
+        versions.)</li>
+      <li><b>Firefox on Android:</b> tap the site's padlock → Site settings →
+        <b>Clear data</b>.</li>
+      <li><b>Any browser:</b> close every ZAFAR tab before and after — a tab
+        still open can put the old copy back.</li>
+    </ul>
+    <p class="note">Clearing site data signs you out. Nothing else is lost —
+      your account and your downloads are on the server, and favourites are
+      stored with the site data, so save anything you want to keep.</p>
   </main>
 
   <script>
@@ -60,48 +89,92 @@
       var detail = document.getElementById("detail");
       var go = document.getElementById("go");
 
-      function say(text) {
+      // This app's worker, identified the same way the app identifies it: by
+      // script URL. A registration that merely *covers* this page might belong
+      // to another application on a shared origin, and is not ours to remove.
+      var SCRIPT = new URL("sw.js", location.href).href;
+
+      function isOurs(reg) {
+        var workers = [reg.installing, reg.waiting, reg.active];
+        return workers.some(function (worker) {
+          return worker && worker.scriptURL === SCRIPT;
+        });
+      }
+
+      function say(text, warn) {
         detail.hidden = false;
+        detail.classList.toggle("warn", !!warn);
         detail.textContent = text;
+      }
+
+      function sleep(ms) {
+        return new Promise(function (resolve) { setTimeout(resolve, ms); });
+      }
+
+      function registrations() {
+        if (!navigator.serviceWorker || !navigator.serviceWorker.getRegistrations) {
+          return Promise.resolve([]);
+        }
+        return navigator.serviceWorker.getRegistrations();
+      }
+
+      function dropOurWorkers() {
+        return registrations().then(function (regs) {
+          return Promise.all(regs.filter(isOurs).map(function (reg) {
+            return reg.unregister();
+          }));
+        });
+      }
+
+      function dropOurCaches() {
+        if (!window.caches) return Promise.resolve();
+        return caches.keys().then(function (names) {
+          return Promise.all(names.map(function (name) {
+            if (name.indexOf("zafar-") === 0) return caches.delete(name);
+          }));
+        });
       }
 
       button.addEventListener("click", function () {
         button.disabled = true;
-        var steps = [];
 
-        if (navigator.serviceWorker && navigator.serviceWorker.getRegistrations) {
-          steps.push(
-            navigator.serviceWorker.getRegistrations().then(function (regs) {
-              // Only workers that cover this page. Another app on the same
-              // origin is not ours to remove.
-              return Promise.all(regs.map(function (reg) {
-                if (reg.scope && location.href.indexOf(reg.scope) === 0) {
-                  return reg.unregister();
-                }
-              }));
-            })
-          );
-        }
+        // Tell other ZAFAR tabs what is happening, so one running this version
+        // does nothing worker-related while the reset runs.
+        var channel = null;
+        try {
+          if ("BroadcastChannel" in window) {
+            channel = new BroadcastChannel("zafar-reset");
+            channel.postMessage({ type: "reset" });
+          }
+        } catch (error) { /* not available — the checks below still hold */ }
 
-        if (window.caches) {
-          steps.push(
-            caches.keys().then(function (names) {
-              return Promise.all(names.map(function (name) {
-                if (name.indexOf("zafar-") === 0) return caches.delete(name);
-              }));
-            })
-          );
-        }
-
-        Promise.all(steps)
-          .then(function () {
-            say("Done. Reloading ZAFAR with a clean copy…");
-            setTimeout(function () { location.href = go.getAttribute("href"); }, 600);
+        dropOurWorkers()
+          .then(function () { return sleep(250); })
+          // Ask the browser again rather than trusting the first snapshot: a
+          // tab that was loading while we enumerated can register the worker
+          // straight back, and then this reset has achieved nothing.
+          .then(dropOurWorkers)
+          .then(dropOurCaches)
+          .then(function () { return registrations(); })
+          .then(function (regs) {
+            var left = regs.filter(isOurs);
+            if (left.length) {
+              button.disabled = false;
+              say("Another ZAFAR tab put the old copy back. Close every ZAFAR " +
+                  "tab — this one included — then open this page again and press " +
+                  "Reset.", true);
+              return;
+            }
+            say("Done. Reloading ZAFAR with nothing stored on the phone…");
+            setTimeout(function () { location.href = go.getAttribute("href"); }, 700);
           })
           .catch(function (error) {
             button.disabled = false;
             say("Could not finish: " + (error && error.message ? error.message : "unknown error") +
-              ". Try again, or clear site data for this site in your browser settings.");
+              ". Try again, or use the browser steps above.", true);
+          })
+          .then(function () {
+            if (channel) channel.close();
           });
       });
     })();
