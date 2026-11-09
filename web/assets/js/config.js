@@ -247,6 +247,12 @@ var Zafar = {
 
   _unauthorized: function () {
     this.clearToken();
+    // The token is gone, so the catalogue copy the worker holds is no longer
+    // anybody's to read — drop it before the redirect, or an offline visit
+    // could answer this request from the account that just expired.
+    if (navigator.serviceWorker && navigator.serviceWorker.controller) {
+      navigator.serviceWorker.controller.postMessage({ type: "clear-catalogue" });
+    }
     location.href = "login.html";
     // Never resolves — the page is already navigating away, so no .catch()
     // downstream fires a toast on a page that's on its way out.
