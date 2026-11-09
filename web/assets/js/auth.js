@@ -124,22 +124,27 @@ var ZafarAuth = (function () {
 
   /* ---------------- markup ---------------- */
 
-  // A shelf of books: spines of different widths and heights, thin gaps, and
-  // one leaning. Pure CSS, so it costs no bytes — which matters on a Malawian
-  // data bundle — and it is hidden on short screens where the form needs the
-  // room more.
-  function libraryHTML() {
-    var spines = [
-      [9, 62], [7, 48], [11, 74], [6, 40], [8, 56], [10, 84],
-      [7, 52], [9, 68], [6, 44], [11, 78], [8, 58], [7, 46],
-    ];
-    var html = "";
-    for (var i = 0; i < spines.length; i++) {
-      var cls = (i % 5 === 2 ? " a" : i % 4 === 0 ? " w" : "") + (i === 3 ? " lean" : "");
-      html += '<i class="' + cls + '" style="width:' + spines[i][0] + "px;height:" +
-        spines[i][1] + '%"></i>';
-    }
-    return '<div class="lib" aria-hidden="true"><div class="spines">' + html + "</div></div>";
+  // The page's one picture: a stack of books, set at the top of the white
+  // card where the eye lands before it reads "Sign in". Inline SVG with the
+  // palette baked in, so it costs one short string instead of an image
+  // request — which matters on a Malawian data bundle.
+  function cardArtHTML() {
+    return (
+      '<div class="card-art" aria-hidden="true">' +
+        '<svg width="72" height="64" viewBox="0 0 72 64" focusable="false">' +
+          '<rect x="8" y="44" width="52" height="12" rx="3" fill="#006D7C"/>' +
+          '<rect x="14" y="30" width="46" height="12" rx="3" fill="#4FA7AD"/>' +
+          '<rect x="6" y="16" width="48" height="12" rx="3" fill="#A9D8D2"/>' +
+          '<rect x="14" y="48" width="30" height="2.5" rx="1.2" fill="#D6EFE9"/>' +
+          '<rect x="22" y="34" width="24" height="2.5" rx="1.2" fill="#D6EFE9"/>' +
+          '<rect x="14" y="20" width="26" height="2.5" rx="1.2" fill="#006D7C" opacity=".5"/>' +
+          '<g transform="rotate(14 60 20)">' +
+            '<rect x="54" y="2" width="9" height="30" rx="2" fill="#006D7C"/>' +
+            '<rect x="56" y="6" width="5" height="2" rx="1" fill="#D6EFE9"/>' +
+          "</g>" +
+        "</svg>" +
+      "</div>"
+    );
   }
 
   function fieldMarkup(o) {
@@ -181,11 +186,11 @@ var ZafarAuth = (function () {
           '<p class="mast-head" id="txt-headline"></p>' +
           '<p class="mast-lede" id="txt-subtitle"></p>' +
           '<ul class="mast-chips" id="txt-chips" aria-label="What is inside"></ul>' +
-          libraryHTML() +
         "</header>" +
 
         '<section class="sheet">' +
           '<div class="sheet-body">' +
+            cardArtHTML() +
 
             /* ---------- auth ---------- */
             '<div class="panel" id="panel-auth">' +

@@ -501,8 +501,25 @@ test("the hero says what StudyMW is, on every auth page", async () => {
     ["MSCE", "JCE", "Marking keys", "Notes"]
   );
   assert.equal(d.querySelector("#txt-footer").textContent, "PAPERS · MARKING KEYS · BOOKS · NOTES · FREE");
-  assert.ok(d.querySelectorAll(".spines i").length > 0, "the illustration is book spines");
-  assert.equal(d.querySelectorAll(".doc").length, 0, "the floating bar-chart cards are gone");
+
+  // The one picture lives in the white card now, above the heading — not in
+  // the teal hero, where it cost height the form needed.
+  // The wordmark's own glyph is the only drawing the hero keeps.
+  assert.equal(
+    d.querySelectorAll(".mast .spines, .mast .doc, .mast .lib, .mast .card-art").length,
+    0,
+    "the hero carries no illustration"
+  );
+  const art = d.querySelector(".sheet-body .card-art svg");
+  assert.ok(art, "the book stack is the first thing in the sheet");
+  assert.ok(art.querySelectorAll("rect").length >= 6, "the stack is drawn, not a placeholder");
+  const body = d.querySelector(".sheet-body");
+  assert.equal(body.firstElementChild.className, "card-art", "it sits where the gap above Sign in used to be");
+  const children = [...body.children];
+  assert.ok(
+    children.indexOf(d.querySelector(".card-art")) < children.indexOf(d.querySelector("#panel-auth")),
+    "the art comes before the form, and so before Sign in"
+  );
   dom.window.close();
 
   // It is a promise, not a greeting: it belongs on the create form too.
