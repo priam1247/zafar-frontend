@@ -120,7 +120,9 @@ a { color: inherit; }
   position: sticky;
   top: 0;
   z-index: 30;
-  padding: 12px 18px 18px;
+  /* The top inset only exists on a notched phone in standalone mode, where
+     viewport-fit=cover lets the page run under the status bar. Zero elsewhere. */
+  padding: calc(12px + env(safe-area-inset-top)) 18px 18px;
   background: var(--brand);
   color: var(--on);
 }
@@ -1118,7 +1120,7 @@ a { color: inherit; }
    ============================================================ */
 
 @media (max-width: 380px) {
-  .app-bar { padding: 12px 15px 17px; }
+  .app-bar { padding: calc(12px + env(safe-area-inset-top)) 15px 17px; }
   .sheet { padding: 16px 13px calc(var(--bar) + 18px + env(safe-area-inset-bottom)); }
   .cat-chips { margin: 0 -13px; padding: 0 13px 2px; }
   .app-title { font-size: 24px; }

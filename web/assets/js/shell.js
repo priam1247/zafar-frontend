@@ -112,6 +112,44 @@ var ZafarShell = (function () {
     toastTimer = setTimeout(function () { el.classList.remove("show"); }, 2600);
   }
 
+  /* ---------- Installable / offline ----------
+     The service worker keeps the shell and the last catalogue on the device,
+     so the app opens when the connection does not. It is skipped in the demo:
+     server.js rewrites each page as it serves it, and a stored copy would be
+     the wrong copy. ?sw=1 forces it on, ?sw=0 removes it and its caches. */
+  function registerWorker() {
+    if (!("serviceWorker" in navigator)) return;
+
+    var flag = new URLSearchParams(location.search).get("sw");
+
+    if (flag === "0") {
+      navigator.serviceWorker.getRegistrations().then(function (regs) {
+        regs.forEach(function (reg) { reg.unregister(); });
+      });
+      if (window.caches) {
+        caches.keys().then(function (names) {
+          names.forEach(function (name) {
+            if (name.indexOf("zafar-") === 0) caches.delete(name);
+          });
+        });
+      }
+      return;
+    }
+
+    var demo = new URLSearchParams(location.search).get("demo") ||
+      /^demo\./.test(Zafar.getToken() || "");
+    if (demo && flag !== "1") return;
+
+    // Service workers need a secure origin; localhost counts as one.
+    var secure = location.protocol === "https:" ||
+      location.hostname === "localhost" || location.hostname === "127.0.0.1";
+    if (!secure) return;
+
+    navigator.serviceWorker.register("sw.js").catch(function () {
+      // Installing is an enhancement — a failure must never surface.
+    });
+  }
+
   /* ---------- Init ---------- */
   // Returns null when the visitor isn't signed in (page is already
   // navigating to login.html), so page scripts can bail out early.
@@ -133,9 +171,15 @@ var ZafarShell = (function () {
     });
 
     Zafar.updateFavCountPill();
+    registerWorker();
 
     root.querySelector("[data-logout]").addEventListener("click", function () {
       Zafar.clearToken();
+      // A shared phone should not keep the last account's catalogue in its
+      // cache. The shell itself stays installed — that is just the app.
+      if (navigator.serviceWorker && navigator.serviceWorker.controller) {
+        navigator.serviceWorker.controller.postMessage({ type: "clear-catalogue" });
+      }
     });
 
     // The bar is sticky, so a long page still needs its landmark announced.

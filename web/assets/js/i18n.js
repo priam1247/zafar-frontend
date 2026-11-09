@@ -67,6 +67,10 @@ var ZafarI18n = (function () {
       savedCount: function (n) { return n + " saved"; },
       loading: "Loading…",
       offline: "Offline",
+      // The list came from the copy the service worker keeps.
+      offlineResults: function (n) {
+        return n + (n === 1 ? " result" : " results") + " · offline";
+      },
       savedToFavorites: "Saved to favorites",
       removedFromFavorites: "Removed from favorites",
       noInternet: "No internet connection",
@@ -122,8 +126,11 @@ var ZafarI18n = (function () {
           a: "<p>The library mirrors what's been published to the Zafar Drive folders. If a subject or year isn't " +
              "there yet, it hasn't been uploaded — send the request through and it usually appears within a few days.</p>" },
         { id: "offline", q: "Can I use Zafar offline?",
-          a: "<p>Browsing needs a connection, because the catalogue lives on the server. Files you've already " +
-             "downloaded stay on your device and open without internet.</p>" },
+          a: "<p>Partly, and deliberately. ZAFAR keeps its own pages on your phone, so the app opens with no " +
+             "signal, and the last list you loaded on each page is still there — marked <b>offline</b> so you " +
+             "know it is a copy. Favourites work either way, because they live on your device.</p>" +
+             "<p>Downloading needs a connection, since the file comes from the server. Add the app to your home " +
+             "screen and it opens like any other app, offline shell and all.</p>" },
       ],
     },
   };
