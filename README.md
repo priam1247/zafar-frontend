@@ -87,9 +87,18 @@ own — the chip's accessible label says so, and the page description reads
 stays hidden instead of quoting a policy the backend does not keep.
 
 When the allowance runs out, a plain-English notice appears above the
-catalogue — and again if a download is refused — saying that ZAFAR is free, why
-the limits exist, and that saving to Favorites and coming back tomorrow is the
-way through, with a button straight to that tab.
+catalogue — and again if a download is refused — naming **which** allowance ran
+out (papers, or books), saying how many of the other one are still available,
+and when it refills: **02:00 in Malawi, which is midnight UTC**. It never says
+"tomorrow", because the refill is not a day away — a student who hits the limit
+at 01:00 has it back within the hour.
+
+A refusal is treated as a statement about a moment, not a permanent fact. The
+zero is stamped when it arrives, and after five minutes (the signed link's own
+TTL) or a change of UTC day, the next tap re-checks `/auth/quota` instead of
+repeating an answer that may no longer be true. Favorites has no allowance of
+its own, so a refusal there is a toast and nothing else — no amber chip, and no
+notice whose button leads back to the page you are on.
 
 Cards keep the same discipline as the auth screen: one hairline, no shadow, a
 mint tile for the file mark, the title, a category chip, then size and a single

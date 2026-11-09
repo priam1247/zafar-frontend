@@ -19,7 +19,7 @@
    everything else deleted on activate.
    ============================================================ */
 
-var VERSION = "2026-11-09.1";
+var VERSION = "2026-11-09.2";
 
 var SHELL_CACHE = "zafar-shell-" + VERSION;
 var DOCS_CACHE = "zafar-docs-" + VERSION;

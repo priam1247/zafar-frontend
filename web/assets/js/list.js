@@ -28,15 +28,19 @@ var ZafarList = (function () {
     var t = ZafarI18n.t;
     var activeCat = (new URLSearchParams(location.search).get("category")) || "";
     return (
-      '<div class="notice" data-notice hidden>' +
-        '<span class="notice-glyph">' + svg("alert", 17) + "</span>" +
-        '<div class="notice-text">' +
-          '<h2 class="notice-title">' + t("list.limitNoticeTitle") + "</h2>" +
-          "<p>" + t("list.limitNoticeBody") + "</p>" +
-          '<a class="btn btn-ghost btn-sm notice-cta" href="favorites.html">' +
-            t("list.openFavorites") + "</a>" +
-        "</div>" +
-      "</div>" +
+      // Favorites has no allowance of its own, so it gets no notice: there is
+      // nothing to explain there that isn't a link back to the page you are on.
+      (cfg.quotaKey
+        ? '<div class="notice" data-notice hidden>' +
+            '<span class="notice-glyph">' + svg("alert", 17) + "</span>" +
+            '<div class="notice-text">' +
+              '<h2 class="notice-title" data-notice-title></h2>' +
+              "<p data-notice-body></p>" +
+              '<a class="btn btn-ghost btn-sm notice-cta" href="favorites.html">' +
+                t("list.openFavorites") + "</a>" +
+            "</div>" +
+          "</div>"
+        : "") +
 
       '<div class="toolbar">' +
         '<label class="search">' + svg("search", 18) +
@@ -148,6 +152,8 @@ var ZafarList = (function () {
       chips: root.querySelector("[data-chips]"),
       catChips: root.querySelector("[data-cat-chips]"),
       notice: root.querySelector("[data-notice]"),
+      noticeTitle: root.querySelector("[data-notice-title]"),
+      noticeBody: root.querySelector("[data-notice-body]"),
       search: root.querySelector("[data-search]"),
       sort: root.querySelector("[data-sort]"),
       limit: shell.quota || null,
@@ -214,22 +220,69 @@ var ZafarList = (function () {
        the bucket it is really spending, so Notes and Marking Keys show the
        paper count instead of advertising an allowance of their own. */
     var bucket = QUOTA_SECTION[cfg.quotaKey] || cfg.quotaKey;
+    // The two allowances are independent, so this page also tracks the other
+    // one: "you've run out of papers" is only half the story when there are
+    // still books to download.
+    var otherBucket = bucket === "books" ? "papers" : "books";
     var cap = DAILY_LIMITS[bucket] || null;
-    var left = null;
+    var otherCap = DAILY_LIMITS[otherBucket] || null;
+    var left = null;        // this page's allowance, as the server last said
+    var otherLeft = null;   // the other one, when the server said
     // A download can land while the initial GET is still in flight. Its
     // numbers are the newer ones, so the GET must not overwrite them.
     var quotaDirty = false;
+
+    // A "no" is about a moment, not forever. A refusal can be caused by a
+    // reservation that ages out after the signed link's five minutes, and the
+    // allowance refills at 00:00 UTC. Past either, the zero is a guess and has
+    // to be re-checked before it is repeated to a student as "tomorrow".
+    var REFUSAL_TTL = 5 * 60 * 1000;
+    var refusedAt = 0;
+    var refusedDay = "";
+
+    function utcDay() {
+      return new Date().toISOString().slice(0, 10);
+    }
+
+    function refusalExpired() {
+      if (left === null || left > 0 || !refusedAt) return false;
+      return Date.now() - refusedAt > REFUSAL_TTL || utcDay() !== refusedDay;
+    }
 
     function pick(q, key, suffix) {
       var field = key + "_" + suffix;
       return q && typeof q[field] === "number" ? q[field] : null;
     }
 
+    // One bucket spent is not "today's downloads" spent: say which allowance
+    // ran out, and what is still available.
+    function noticeCopy() {
+      var isBooks = bucket === "books";
+      var lines = [
+        isBooks ? t("list.notice.booksWhy") : t("list.notice.papersWhy"),
+      ];
+      if (otherLeft > 0) {
+        lines.push(isBooks ? t("list.notice.sparePapers", otherLeft) : t("list.notice.spareBooks", otherLeft));
+      }
+      lines.push(t("list.notice.reset"));
+      return {
+        title: isBooks ? t("list.notice.booksTitle") : t("list.notice.papersTitle"),
+        body: lines.join(" "),
+      };
+    }
+
     function renderLimit() {
       if (!el.limit) return;
 
       // The explanation appears exactly when it is true.
-      if (el.notice) el.notice.hidden = left !== 0;
+      if (el.notice) {
+        el.notice.hidden = left !== 0;
+        if (left === 0) {
+          var copy = noticeCopy();
+          if (el.noticeTitle) el.noticeTitle.textContent = copy.title;
+          if (el.noticeBody) el.noticeBody.textContent = copy.body;
+        }
+      }
 
       // Nothing reported for this bucket: say nothing rather than imply an
       // allowance we cannot measure.
@@ -260,16 +313,35 @@ var ZafarList = (function () {
       if (el.notice.scrollIntoView) el.notice.scrollIntoView({ block: "nearest" });
     }
 
+    // The single place a server answer becomes state. A zero is stamped with
+    // the moment it arrived, which is what lets it expire.
+    function applyQuota(q, fromTap) {
+      var reported = pick(q, bucket, "limit");
+      if (reported > 0) cap = reported;
+      var otherReported = pick(q, otherBucket, "limit");
+      if (otherReported > 0) otherCap = otherReported;
+
+      left = pick(q, bucket, "left");
+      otherLeft = pick(q, otherBucket, "left");
+      refusedAt = left === 0 ? Date.now() : 0;
+      refusedDay = left === 0 ? utcDay() : "";
+      if (fromTap) quotaDirty = true;
+      renderLimit();
+      return left;
+    }
+
+    function refreshQuota() {
+      return Zafar.authGet("/auth/quota")
+        .then(function (q) { applyQuota(q, true); })
+        .catch(function () { /* stays as it was; the guard will not block on a guess */ });
+    }
+
     if (cfg.quotaKey && el.limit) {
       Zafar.authGet("/auth/quota")
         .then(function (q) {
-          // A ceiling from the server beats the mirrored constant, and it is
-          // still worth taking even if a download has already reported.
-          var reported = pick(q, bucket, "limit");
-          if (reported > 0) cap = reported;
+          // A download already reported newer numbers than this.
           if (quotaDirty) return;
-          left = pick(q, bucket, "left");
-          renderLimit();
+          applyQuota(q);
         })
         .catch(function () {
           if (!el.limit || quotaDirty) return;
@@ -314,11 +386,30 @@ var ZafarList = (function () {
       e.preventDefault();
       if (btn.dataset.pending === "true") return;
       if (!navigator.onLine) return shell.showToast(t("list.noInternet"), "offline");
+
       if (cfg.quotaKey && left !== null && left <= 0) {
-        revealNotice();
-        return shell.showToast(t("list.limitReached"), "alert");
+        if (!refusalExpired()) {
+          revealNotice();
+          return shell.showToast(t("list.limitReached"), "alert");
+        }
+        // Holding an old no. Ask again before repeating it — a reservation
+        // from five minutes ago, or yesterday's allowance, may be gone.
+        if (btn.dataset.pending === "true") return;
+        btn.dataset.pending = "true";
+        refreshQuota().then(function () {
+          btn.dataset.pending = "false";
+          if (left !== null && left > 0) return startDownload(btn);
+          revealNotice();
+          shell.showToast(t("list.limitReached"), "alert");
+        });
+        return;
       }
 
+      startDownload(btn);
+    });
+
+    // One download, from the request to the file landing in the phone.
+    function startDownload(btn) {
       var id = btn.dataset.download;
       var original = btn.innerHTML;
       btn.dataset.pending = "true";
@@ -351,9 +442,13 @@ var ZafarList = (function () {
         .then(function (data) {
           if (cfg.quotaKey && data.quota) {
             var fresh = pick(data.quota, bucket, "left");
+            var freshOther = pick(data.quota, otherBucket, "left");
+            if (freshOther !== null) otherLeft = freshOther;
             if (fresh !== null) {
               quotaDirty = true;
               left = fresh;
+              refusedAt = fresh === 0 ? Date.now() : 0;
+              refusedDay = fresh === 0 ? utcDay() : "";
               renderLimit();
             }
           }
@@ -400,15 +495,23 @@ var ZafarList = (function () {
         .catch(function (err) {
           restore();
           if (err && err.status === 429) {
-            left = 0;
-            renderLimit();
-            revealNotice();
+            // The server just spoke, so this zero is fresh — and the moment
+            // matters, because that is what expires. Favorites has no
+            // allowance of its own: it gets the toast and nothing else.
+            if (cfg.quotaKey) {
+              quotaDirty = true;
+              left = 0;
+              refusedAt = Date.now();
+              refusedDay = utcDay();
+              renderLimit();
+              revealNotice();
+            }
             shell.showToast(t("list.limitReached"), "alert");
           } else {
             shell.showToast((err && err.message) || t("list.downloadStartFailed"), "alert");
           }
         });
-    });
+    }
 
     /* ---------- Category chips ---------- */
     function renderCatChips() {
