@@ -1,5 +1,5 @@
 /* ============================================================
-   Zafar — document list page
+   StudyMW — document list page
    Shared by Past Papers, Books, Notes, Marking Keys and Favorites.
    Each page script just calls ZafarList.init({...}) with its section and
    (if downloads count against a daily limit) which quota field to read.

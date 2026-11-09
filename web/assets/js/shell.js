@@ -1,5 +1,5 @@
 /* ============================================================
-   Zafar — app shell
+   StudyMW — app shell
    Renders the bar, the sheet and the bottom tabs for every signed-in
    page from one place, and owns toasts and the auth guard.
 
@@ -76,7 +76,7 @@ var ZafarShell = (function () {
       '<header class="app-bar">' +
         '<div class="bar-top">' +
           '<a class="wordmark" href="dashboard.html">' +
-            '<span class="glyph">' + svg("logo", 15, 2) + "</span>ZAFAR" +
+            '<span class="glyph">' + svg("logo", 15, 2) + "</span>STUDYMW" +
           "</a>" +
           '<div class="bar-actions">' +
             '<a class="bar-btn bar-btn-wide" href="help.html">' + svg("help", 16) + "<span>Help</span></a>" +
@@ -122,7 +122,7 @@ var ZafarShell = (function () {
   }
 
   /* ---------- Nothing is stored on the phone ----------
-     ZAFAR used to install a service worker that kept the app's pages and the
+     StudyMW used to install a service worker that kept the app's pages and the
      last catalogue answer, so it opened without a connection. It is gone. This
      is a download site: a stored list carried no download links, so it could
      only ever show filenames the phone had no way to fetch. What is left below
@@ -191,7 +191,7 @@ var ZafarShell = (function () {
     root.className = "app";
     root.innerHTML = shellHTML({
       active: opts.active,
-      title: opts.title || "Zafar",
+      title: opts.title || "StudyMW",
       crumb: opts.crumb,
     });
 

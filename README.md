@@ -1,4 +1,4 @@
-# Zafar
+# StudyMW
 
 A study library for Malawian secondary students: MANEB MSCE/JCE past papers,
 mocks, textbooks, summary notes and marking keys.
@@ -156,7 +156,7 @@ form back to the real backend — a real sign-in is never intercepted.
 
 ## Installed on a phone
 
-`manifest.webmanifest` makes ZAFAR installable: `display: standalone`, the teal
+`manifest.webmanifest` makes StudyMW installable: `display: standalone`, the teal
 theme colour in the status bar, and the same open-book mark the bar draws. Each
 page's `<head>` also carries the iOS metas and `apple-touch-icon`, and
 `viewport-fit=cover` — without it `env(safe-area-inset-*)` reports zero and the
@@ -166,7 +166,7 @@ There is no service worker, so some browsers no longer offer their "Install app"
 prompt; the icon and the standalone window still work from **Add to Home
 Screen**, and the app itself is unaffected — it opens and fetches like any page.
 
-**ZAFAR keeps nothing on the phone. It is a download site: it works online,
+**StudyMW keeps nothing on the phone. It is a download site: it works online,
 only.**
 
 There is no service worker, no cache, no stored page, no stored list. Every
@@ -187,7 +187,7 @@ What is left, and why:
 
 - **`shell.js` retires any copy left behind.** Phones that installed an older
   version still have that worker and its stored pages. On every page load the
-  app unregisters the registration whose script URL is ZAFAR's — matched by
+  app unregisters the registration whose script URL is StudyMW's — matched by
   script URL, so another app's worker on a shared origin is untouched — and
   deletes the `zafar-*` caches that went with it.
 - **The browser retires it too.** `sw.js` no longer exists, so an update check
@@ -203,7 +203,7 @@ If a phone is stuck on an old copy and will not open the app at all, only the
 browser can clear it: Chrome on Android → Settings → Site settings → All sites →
 the site → **Clear & reset**; Safari on iPhone → Settings → Safari → Advanced →
 **Website Data** → find the site → Delete; Firefox → the site's padlock → Site
-settings → **Clear data**. Close every ZAFAR tab first — an open tab can put the
+settings → **Clear data**. Close every StudyMW tab first — an open tab can put the
 old copy back.
 
 Every page load does that clean-up, so demo mode gets it too — which matters,

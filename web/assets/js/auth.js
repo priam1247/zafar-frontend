@@ -1,5 +1,5 @@
 /* ============================================================
-   Zafar — authentication screen
+   StudyMW — authentication screen
    One module drives login.html, register.html and verify.html: the markup
    is built here so the three pages can't drift apart.
 
@@ -16,9 +16,11 @@ var ZafarAuth = (function () {
   /* ---------------- strings ---------------- */
   var T = {
     en: {
-      headline: "Welcome to ZAFAR.",
-      subtitle: "Twelve years of <b>MSCE &amp; JCE past papers</b>, books, notes and " +
-        "<b>marking keys</b> &mdash; free for every Malawian student.",
+      // The hero is a promise, not a greeting: what the student gets, and on
+      // what. Short sentences, everyday words.
+      headline: "Pass MSCE &amp; JCE with real past papers.",
+      subtitle: "Download past papers, marking keys, books and notes. Free, every day.",
+      chips: ["MSCE", "JCE", "Marking keys", "Notes"],
 
       signin: "Sign in", create: "Create account",
       switchCreate: 'Don\u2019t have an account? <button type="button" class="link-btn" data-goto="create">Create one</button>',
@@ -34,7 +36,7 @@ var ZafarAuth = (function () {
       continueBtn: "Sign in", createBtn: "Create account",
       signingIn: "Signing in\u2026", creatingAccount: "Creating account\u2026",
 
-      footer: "12+ years archived&nbsp;&nbsp;&middot;&nbsp;&nbsp;Daily downloads&nbsp;&nbsp;&middot;&nbsp;&nbsp;Free",
+      footer: "PAPERS &middot; MARKING KEYS &middot; BOOKS &middot; NOTES &middot; FREE",
 
       errName: "Enter your full name.",
       errEmail: "Enter a valid email address.",
@@ -122,18 +124,22 @@ var ZafarAuth = (function () {
 
   /* ---------------- markup ---------------- */
 
-  // Floating past-paper cards over a shelf of books — the library, drawn.
+  // A shelf of books: spines of different widths and heights, thin gaps, and
+  // one leaning. Pure CSS, so it costs no bytes — which matters on a Malawian
+  // data bundle — and it is hidden on short screens where the form needs the
+  // room more.
   function libraryHTML() {
-    var heights = [56, 76, 44, 88, 62, 94, 50, 72, 82, 42, 90, 60, 78, 48, 84, 66, 58, 74];
-    var spines = "";
-    for (var i = 0; i < heights.length; i++) {
-      var cls = i % 6 === 2 ? " a" : i % 3 === 0 ? " w" : "";
-      spines += '<i class="' + cls + '" style="height:' + heights[i] + '%"></i>';
+    var spines = [
+      [9, 62], [7, 48], [11, 74], [6, 40], [8, 56], [10, 84],
+      [7, 52], [9, 68], [6, 44], [11, 78], [8, 58], [7, 46],
+    ];
+    var html = "";
+    for (var i = 0; i < spines.length; i++) {
+      var cls = (i % 5 === 2 ? " a" : i % 4 === 0 ? " w" : "") + (i === 3 ? " lean" : "");
+      html += '<i class="' + cls + '" style="width:' + spines[i][0] + "px;height:" +
+        spines[i][1] + '%"></i>';
     }
-    return '<div class="lib" aria-hidden="true">' +
-      '<span class="doc d3"></span><span class="doc d1"></span><span class="doc d2"></span>' +
-      '<div class="shelf">' + spines + "</div>" +
-    "</div>";
+    return '<div class="lib" aria-hidden="true"><div class="spines">' + html + "</div></div>";
   }
 
   function fieldMarkup(o) {
@@ -166,14 +172,15 @@ var ZafarAuth = (function () {
     return (
       '<div class="auth">' +
 
-        '<header class="mast has-head" id="mast">' +
+        '<header class="mast" id="mast">' +
           '<div class="mast-top">' +
             '<a class="wordmark" href="login.html">' +
-              '<span class="glyph">' + icon("book", 16) + "</span>ZAFAR" +
+              '<span class="glyph">' + icon("book", 14) + "</span>STUDYMW" +
             "</a>" +
           "</div>" +
           '<p class="mast-head" id="txt-headline"></p>' +
           '<p class="mast-lede" id="txt-subtitle"></p>' +
+          '<ul class="mast-chips" id="txt-chips" aria-label="What is inside"></ul>' +
           libraryHTML() +
         "</header>" +
 
@@ -297,18 +304,6 @@ var ZafarAuth = (function () {
 
   function showPanel(name) {
     panels.forEach(function (p) { el("panel-" + p).hidden = p !== name; });
-    syncGreeting();
-  }
-
-  // The welcome exists only on the screen people land on — never on a
-  // screen they reached mid-flow, and never on the create-account form.
-  function syncGreeting() {
-    var mast = el("mast");
-    var head = el("txt-headline");
-    if (!mast || !head) return;
-    var show = !el("panel-auth").hidden && mode === "signin";
-    mast.classList.toggle("has-head", show);
-    head.hidden = !show;
   }
 
   function showBanner(id, message, isError) {
@@ -360,6 +355,9 @@ var ZafarAuth = (function () {
 
     el("txt-headline").innerHTML = t.headline;
     el("txt-subtitle").innerHTML = t.subtitle;
+    el("txt-chips").innerHTML = t.chips.map(function (chip) {
+      return "<li>" + Zafar.escapeHTML(chip) + "</li>";
+    }).join("");
 
     el("txt-pageTitle").textContent = isCreate ? t.create : t.signin;
     el("switchLine").innerHTML = isCreate ? t.switchSignin : t.switchCreate;
@@ -428,8 +426,6 @@ var ZafarAuth = (function () {
     el("txt-successTitle").textContent = t.successTitle;
     el("txt-successSubtitle").textContent = t.successSubtitle;
     el("txt-backToSignin").textContent = t.backToSignin;
-
-    syncGreeting();
   }
 
   function setMode(next) {

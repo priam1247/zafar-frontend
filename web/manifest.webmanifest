@@ -1,6 +1,6 @@
 {
-  "name": "ZAFAR — Malawian exam papers",
-  "short_name": "ZAFAR",
+  "name": "StudyMW — Malawian exam papers",
+  "short_name": "StudyMW",
   "description": "MSCE and JCE past papers, marking keys, notes and textbooks — free for every Malawian student.",
   "id": "./",
   "start_url": "dashboard.html",
