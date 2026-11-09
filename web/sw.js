@@ -19,7 +19,7 @@
    everything else deleted on activate.
    ============================================================ */
 
-var VERSION = "2026-11-08.1";
+var VERSION = "2026-11-09.1";
 
 var SHELL_CACHE = "zafar-shell-" + VERSION;
 var DOCS_CACHE = "zafar-docs-" + VERSION;
@@ -102,25 +102,41 @@ self.addEventListener("fetch", function (event) {
   var request = event.request;
   if (request.method !== "GET") return;
 
-  var url = new URL(request.url);
+  var url;
+  try {
+    url = new URL(request.url);
+  } catch (error) {
+    return; // let the browser handle anything it cannot parse either
+  }
 
   if (url.origin !== self.location.origin) {
     // The catalogue is the only API answer worth keeping. Quota, tokens and
     // downloads are never touched.
     if (url.pathname.indexOf("/drive/papers") === 0) {
-      event.respondWith(catalogueFirst(request));
+      event.respondWith(safe(catalogueFirst(request), request));
     }
     return;
   }
 
   // A page load: serve the stored copy, refresh it in the background.
   if (request.mode === "navigate") {
-    event.respondWith(pageFirst(request));
+    event.respondWith(safe(pageFirst(request), request));
     return;
   }
 
-  event.respondWith(assetFirst(request));
+  event.respondWith(safe(assetFirst(request), request));
 });
+
+/* The worker must never be the reason a page cannot open. If a strategy
+   throws — storage refused, a half-written entry, a browser quirk nobody
+   predicted — the request goes to the network instead of failing with it.
+   A page that loads slowly is a problem; a page that loads not at all is an
+   outage, and this is the difference. */
+function safe(strategy, request) {
+  return Promise.resolve(strategy).catch(function () {
+    return fetch(request);
+  });
+}
 
 /* ------------------------------------------------------------
    Strategies
@@ -135,11 +151,14 @@ function pathKey(url) {
 // Cache first: the stylesheet and the font do not change between deploys any
 // more than the HTML does. VERSION retires them all at once.
 function assetFirst(request) {
+  if (typeof caches === "undefined") return fetch(request); // no storage: the network is all there is
   return caches.open(SHELL_CACHE).then(function (cache) {
     return cache.match(request).then(function (hit) {
       if (hit) return hit;
       return fetch(request).then(function (response) {
-        if (response && response.ok) cache.put(request, response.clone());
+        if (response && response.ok) {
+          cache.put(request, response.clone()).catch(function () {});
+        }
         return response;
       });
     });
@@ -149,6 +168,7 @@ function assetFirst(request) {
 // Stale-while-revalidate. A cached page paints immediately on a slow
 // connection; the next visit gets whatever shipped in between.
 function pageFirst(request) {
+  if (typeof caches === "undefined") return fetch(request); // no storage: the network is all there is
   var url = new URL(request.url);
   var key = pathKey(url);
 
@@ -158,7 +178,9 @@ function pageFirst(request) {
 
       fetch(request)
         .then(function (response) {
-          if (response && response.ok) return cache.put(key, response.clone());
+          if (response && response.ok) {
+            return cache.put(key, response.clone()).catch(function () {});
+          }
         })
         .catch(function () {
           // Offline: the stored copy is already being served.
@@ -172,6 +194,7 @@ function pageFirst(request) {
 // Network first for the catalogue: fresh lists matter more than instant ones,
 // and the stored answer is only for when the network says nothing at all.
 function catalogueFirst(request) {
+  if (typeof caches === "undefined") return fetch(request); // no storage: the network is all there is
   var url = new URL(request.url);
   var key = url.origin + url.pathname + url.search;
 
@@ -179,9 +202,12 @@ function catalogueFirst(request) {
     return fetch(request)
       .then(function (response) {
         if (response && response.ok) {
-          cache.put(key, response.clone()).then(function () {
-            return trim(cache);
-          });
+          cache
+            .put(key, response.clone())
+            .then(function () {
+              return trim(cache);
+            })
+            .catch(function () {});
         }
         return response;
       })

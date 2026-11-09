@@ -122,7 +122,7 @@ a { color: inherit; }
   z-index: 30;
   /* The top inset only exists on a notched phone in standalone mode, where
      viewport-fit=cover lets the page run under the status bar. Zero elsewhere. */
-  padding: calc(12px + env(safe-area-inset-top)) 18px 18px;
+  padding: calc(12px + env(safe-area-inset-top)) 18px 15px;
   background: var(--brand);
   color: var(--on);
 }
@@ -190,10 +190,10 @@ a { color: inherit; }
 
 .app-head {
   display: flex;
-  align-items: flex-end;
+  align-items: flex-start;
   justify-content: space-between;
   gap: 12px;
-  margin-top: 18px;
+  margin-top: 14px;
 }
 
 .app-head-text { min-width: 0; }
@@ -207,7 +207,7 @@ a { color: inherit; }
 }
 
 .app-title {
-  margin: 5px 0 0;
+  margin: 4px 0 0;
   font-size: 27px;
   font-weight: 640;
   line-height: 1.05;
@@ -216,7 +216,7 @@ a { color: inherit; }
 }
 
 .app-desc {
-  margin: 9px 0 0;
+  margin: 7px 0 0;
   max-width: 38ch;
   font-size: 13px;
   line-height: 1.42;
@@ -225,7 +225,7 @@ a { color: inherit; }
 }
 
 .app-meta {
-  margin-top: 11px;
+  margin-top: 9px;
   display: flex;
   align-items: center;
   gap: 8px;
@@ -236,8 +236,11 @@ a { color: inherit; }
    visible while the catalogue scrolls. */
 .quota {
   flex: none;
-  align-self: flex-end;
-  margin-bottom: 4px;
+  /* Level with the title. The head is top-aligned now, so the chip fills the
+     corner that used to sit empty instead of sinking to the last line of the
+     description. */
+  align-self: flex-start;
+  margin-top: 18px;
   display: inline-flex;
   align-items: center;
   gap: 6px;
@@ -1120,7 +1123,7 @@ a { color: inherit; }
    ============================================================ */
 
 @media (max-width: 380px) {
-  .app-bar { padding: calc(12px + env(safe-area-inset-top)) 15px 17px; }
+  .app-bar { padding: calc(12px + env(safe-area-inset-top)) 15px 14px; }
   .sheet { padding: 16px 13px calc(var(--bar) + 18px + env(safe-area-inset-bottom)); }
   .cat-chips { margin: 0 -13px; padding: 0 13px 2px; }
   .app-title { font-size: 24px; }
