@@ -476,12 +476,9 @@ var ZafarList = (function () {
       renderCatChips();
       syncURL();
 
-      if (!navigator.onLine) {
-        show("offline");
-        shell.count.textContent = t("list.offline");
-        return;
-      }
-
+      // Offline is no longer decided here. The service worker may still be
+      // holding the last answer for this view, and a cached list is worth more
+      // than a warning — the catch below reports "no answer at all".
       show("loading");
       shell.count.textContent = t("list.loading");
 
@@ -514,9 +511,11 @@ var ZafarList = (function () {
           }
           docs = docs.slice().sort(SORTS[state.sort] || SORTS["name-asc"]);
 
-          shell.count.textContent = cfg.favoritesOnly
+          var label = cfg.favoritesOnly
             ? t("list.savedCount", docs.length)
             : t("list.results", docs.length);
+          if (!navigator.onLine) label = t("list.offlineResults", docs.length);
+          shell.count.textContent = label;
 
           if (!docs.length) {
             var p = el.empty.querySelector("p");
@@ -545,6 +544,12 @@ var ZafarList = (function () {
           show("grid");
         })
         .catch(function (err) {
+          // Nothing from the network and nothing stored for this view.
+          if (!navigator.onLine) {
+            shell.count.textContent = t("list.offline");
+            show("offline");
+            return;
+          }
           shell.count.textContent = "—";
           show("error");
           shell.showToast((err && err.message) || t("list.couldntLoad", cfg.itemLabel), "alert");
@@ -562,7 +567,11 @@ var ZafarList = (function () {
     });
 
     window.addEventListener("offline", function () {
-      show("offline");
+      // A list already on screen is still readable, so keep it and mark it
+      // rather than replacing a usable page with a warning.
+      var shown = el.grid.querySelectorAll(".item").length;
+      if (shown) shell.count.textContent = t("list.offlineResults", shown);
+      else show("offline");
       shell.showToast(t("list.offlineTitle"), "offline");
     });
     window.addEventListener("online", function () {

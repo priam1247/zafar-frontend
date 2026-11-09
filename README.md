@@ -20,7 +20,12 @@ web/                     static frontend (no build step, no framework)
   assets/css/auth.css    the authentication screen — self-contained, so the
                          app stylesheet can be re-skinned without touching it
   assets/fonts/…         Instrument Sans, 29 KB variable (the only webfont)
-  assets/img/hero.jpg    brand photograph — no longer used by the auth screen
+  assets/img/icon.svg    the open-book mark, scalable, for the browser tab
+  assets/img/icon-*.png  the same mark rasterised for a home screen: 192, 512,
+                         a 512 maskable, and a 180 apple-touch icon
+  manifest.webmanifest   name, colours and icons for "Add to Home Screen"
+  sw.js                  service worker — the shell and the last catalogue
+                         answer, kept on the device
   assets/js/config.js    API client, token storage, favorites, formatting
   assets/js/i18n.js      the English string table for the signed-in app
   assets/js/shell.js     top bar + bottom tabs + toasts
@@ -122,6 +127,36 @@ It also stands down the moment a real session exists. **Logging out ends the
 demo** (cookie and demo token both cleared), and `login.html?switch=1` hands the
 form back to the real backend — a real sign-in is never intercepted.
 
+## Installed on a phone
+
+`manifest.webmanifest` makes ZAFAR installable: `display: standalone`, the teal
+theme colour in the status bar, and the same open-book mark the bar draws. Each
+page's `<head>` also carries the iOS metas and `apple-touch-icon`, and
+`viewport-fit=cover` — without it `env(safe-area-inset-*)` reports zero and the
+notch and home indicator would sit on top of the bar and the tabs.
+
+`sw.js` keeps two things on the device, and nothing else:
+
+| Route | Strategy | Why |
+| --- | --- | --- |
+| pages (`dashboard.html`, …) | stored copy, refreshed in the background | opens instantly, and opens with no signal |
+| css, js, font, icons | cache first | they only change when the version does |
+| `GET /drive/papers` | network first, stored copy as fallback | a fresh list beats an instant one; the copy is for when nothing answers |
+| `/auth/*`, downloads, anything but GET | untouched | an allowance or a token served from last week is a lie |
+
+A list served from that copy says **offline** next to its count rather than
+letting a stored list pass for a live one, and losing signal mid-page leaves
+the list on screen instead of replacing it with a warning. Signing out deletes
+the stored catalogue — the app itself stays installed, which is the point.
+
+**Bump `VERSION` in `sw.js` on every deploy that changes `web/`.** The old
+cache is retired by name on activate; a forgotten bump means returning visitors
+keep yesterday's shell.
+
+The demo deliberately skips registration: `server.js` rewrites each page as it
+serves it, and a stored copy would be the wrong copy. `?sw=1` forces the worker
+on, `?sw=0` unregisters it and deletes its caches.
+
 ## Backend
 
 `API_BASE_URL` in `web/assets/js/config.js` points at the deployed FastAPI
@@ -140,9 +175,10 @@ backend. Endpoints used:
 
 Override the backend per-session with `?api=https://…` on any page.
 
-There is no demo mode — the app always talks to the real backend. When it
-can't be reached, each page shows a clear error or offline state instead of
-fake data, so what you see is always what's actually published.
+The deployed app has no demo mode — it always talks to the real backend, and
+`server.js` is the only thing that ever fakes an answer. When the backend can't
+be reached, each page shows a clear error or offline state instead of inventing
+data, so what you see is what's actually published.
 
 ## Downloads
 
@@ -163,8 +199,10 @@ a same-origin blob so the filename survives.
   shared bucket instead of promising the new one. Flipping it over is
   `QUOTA_SECTION` in `config.js` plus three strings in `i18n.js`.
 
-- `assets/img/hero.jpg` (1.5 MB) is no longer used by any page. It is kept for
-  a future landing page; nothing loads it today.
+- **Offline covers what you have already seen.** The worker stores one
+  catalogue answer per exact view (section plus any filter), up to forty of
+  them, so a search never run online has nothing to fall back on — that view
+  shows the offline state, honestly. Downloads always need a connection.
 
 - `/auth/forgot-password` and `/auth/reset-password` don't exist server-side
   yet. The sign-in screen has both panels built and wired to validation, but
