@@ -1,5 +1,10 @@
 # Backend changes to apply (zafar-backend)
 
+> **Status, re-read at `c9140f2` (PRs #5 and #6):** §1, §2, §3, §5, §6, §7, §8,
+> §9, §10, §11, §12 and §13 have landed — see the note at the end for what that
+> unblocks, and for the two follow-ups this re-read found.
+
+
 Read from `priam1247/zafar-backend` @ `708bf30`. These are the changes to make on
 the **backend** so the shipped frontend works as designed — the mirror of
 `docs/backend-alignment.md`, which lists what the frontend would otherwise have
@@ -282,3 +287,71 @@ English-text matching would all disappear.
 4. §5 — refresh endpoint permission.
 5. §8 + §9 — error codes and remaining-attempts.
 6. §10–§13 — token claims, consistency, rate limiting, domain policy.
+
+---
+
+## Re-read at `c9140f2` — what landed, and two follow-ups
+
+Landed:
+
+| Item | Where |
+| --- | --- |
+| Unsigned-URL fallback deleted; raises instead | `auth.py::make_signed_download_url` |
+| Settings validated at boot, all missing ones named | `config.py` |
+| CORS from `ALLOWED_ORIGINS`; worker origin from `env.ALLOWED_ORIGIN` | `main.py`, `worker.js` |
+| Worker: `OPTIONS`, `Vary: Origin`, CORS on every response | `worker.js` |
+| `/drive/refresh` **removed**; download self-heals with `force_refresh` | `routers/drive.py` |
+| `GET /drive/categories?section=` → sorted folder names | `routers/drive.py` |
+| `X-Error-Code` on every HTTPException; `Retry-After` on 429 | `main.py` |
+| `X-Attempts-Remaining` on verify/reset 400s | `routers/auth.py` |
+| Token claims: `sub`, `uid`, `name`, `email` | `auth.py` |
+| `409` for an existing account; `^\d{6}$` on reset codes | `routers/auth.py`, `schemas.py` |
+| `Cache-Control: no-store` on `/auth/*`, `/drive/*` | `main.py` |
+| Process-local rate limiting | `rate_limit.py` |
+| Gmail-only rule kept and documented | `schemas.py` |
+
+### Follow-up 1 — expose the new headers to the browser (P0, one line)
+
+`main.py` has no `expose_headers` on `CORSMiddleware`. Custom response headers
+are invisible to JavaScript unless they are exposed, so `X-Error-Code`,
+`X-Attempts-Remaining` and `Retry-After` can be set all day and the frontend will
+still read `null` for every one of them — the UI would keep text-matching the
+English `detail`, which is exactly what §8 set out to end.
+
+```python
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=settings.allowed_origins,
+    allow_credentials=False,
+    allow_methods=["GET", "POST", "PATCH", "OPTIONS"],
+    allow_headers=["Authorization", "Content-Type"],
+    expose_headers=["X-Error-Code", "X-Attempts-Remaining", "Retry-After"],
+)
+```
+
+### Follow-up 2 — the rate limiter is probably keyed on the proxy's IP (P1)
+
+`rate_limit.py::client_ip()` returns `request.client.host`. `app.py` starts
+uvicorn with the defaults, which trust forwarded headers **only from
+`127.0.0.1`**. Behind Koyeb's proxy the peer is not `127.0.0.1`, so every
+request looks like it comes from one machine — and a limit of 120/minute for
+`/drive/papers` becomes a shared ceiling for the whole world, not per student.
+
+Two ways to fix, both in the backend:
+
+- `uvicorn.run(..., proxy_headers=True, forwarded_allow_ips="*")` in `app.py`
+  (safe on Koyeb, which terminates TLS for you), or
+- read the first `X-Forwarded-For` entry in `client_ip()`, falling back to
+  `request.client.host`.
+
+Either way, confirm on the deployed service that two phones show different
+bucket keys.
+
+### What the frontend can now drop
+
+- the hardcoded category chips → `GET /drive/categories?section=`
+- the 404-refresh-and-retry on download → the backend self-heals
+- the `/drive/refresh` call (the endpoint no longer exists)
+- English-text matching for "not verified" → `X-Error-Code`, **once follow-up 1
+  is deployed**
+- the invented display name → the `name` claim on the token (or `/auth/me`)
