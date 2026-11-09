@@ -213,7 +213,8 @@ a { color: inherit; }
 .sheet {
   flex: 1;
   min-width: 0;
-  padding: 18px 16px 26px;
+  /* Room for the fixed tabs so the last card can still be scrolled clear. */
+  padding: 18px 16px calc(var(--bar) + 20px + env(safe-area-inset-bottom));
   border-radius: 24px 24px 0 0;
   background: var(--sheet);
 }
@@ -444,7 +445,10 @@ a { color: inherit; }
 
 .grid {
   display: grid;
-  grid-template-columns: 1fr;
+  /* minmax(0, …) instead of 1fr: a 1fr track floors at the item's min-content
+     width, and a long single-line title can push the whole track — and the
+     cards — past the sheet's right edge. */
+  grid-template-columns: minmax(0, 1fr);
   gap: 10px;
 }
 
@@ -452,6 +456,7 @@ a { color: inherit; }
   display: flex;
   flex-direction: column;
   gap: 13px;
+  min-width: 0;
   padding: 14px;
   border: 1px solid var(--line);
   border-radius: 18px;
@@ -482,6 +487,7 @@ a { color: inherit; }
 
 .item-title {
   margin: 0;
+  min-width: 0;
   font-size: 14.5px;
   font-weight: 620;
   line-height: 1.28;
@@ -736,9 +742,16 @@ a { color: inherit; }
    ============================================================ */
 
 .tabbar {
-  position: sticky;
+  /* Fixed, not sticky: as the last child of a flex column that grows with the
+     catalogue, sticky left its normal position below the fold and the tabs
+     vanished on long pages. */
+  position: fixed;
+  left: 50%;
   bottom: 0;
+  transform: translateX(-50%);
   z-index: 40;
+  width: 100%;
+  max-width: var(--shell);
   display: grid;
   grid-template-columns: repeat(5, 1fr);
   gap: 2px;
@@ -1017,7 +1030,7 @@ a { color: inherit; }
 
 @media (max-width: 380px) {
   .app-bar { padding: 12px 15px 17px; }
-  .sheet { padding: 16px 13px 24px; }
+  .sheet { padding: 16px 13px calc(var(--bar) + 18px + env(safe-area-inset-bottom)); }
   .cat-chips { margin: 0 -13px; padding: 0 13px 2px; }
   .app-title { font-size: 24px; }
   .item-title { font-size: 14px; }

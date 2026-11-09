@@ -10,6 +10,10 @@
    reviewed without an account (or a network). It exists only in this file
    — nothing is added to web/, and the deployed site is unaffected.
 
+   The demo stands down the moment a real session exists: log out, or open
+   login.html?switch=1, and the cookie and the demo token are both cleared
+   so the real form talks to the real backend.
+
    The deployed site is static, so this file is not part of it.
    ============================================================ */
 
@@ -40,11 +44,66 @@ const TYPES = {
    ------------------------------------------------------------ */
 const DEMO_SCRIPT = `<script>
 (function () {
-  // A token the client only ever uses as a storage namespace — the fake
-  // API below never checks it.
-  var payload = btoa(JSON.stringify({ sub: "student@zafar.mw" })).replace(/=+$/, "");
-  try { localStorage.setItem("zafar_token", "demo." + payload + ".demo"); } catch (e) {}
+  // ---- limits, mirrored from the backend ----------------------------------
+  // 10 papers a day, 3 books a day. Notes and marking keys draw on the
+  // paper allowance server-side, so they decrement the same bucket here.
+  var LIMITS = { papers: 10, books: 3 };
+  var BUCKET = { books: "books" };
+  function bucketFor(section) { return BUCKET[section] || "papers"; }
 
+  var TOKEN_KEY = "zafar_token";
+  var QUOTA_KEY = "zafar_demo_quota";
+  var DEMO_TOKEN = "demo." + btoa(JSON.stringify({ sub: "student@zafar.mw" })).replace(/=+$/, "") + ".demo";
+
+  function today() { return new Date().toISOString().slice(0, 10); }
+  function isDemoToken(t) { return !!t && t.indexOf("demo.") === 0; }
+
+  function readToken() {
+    try { return localStorage.getItem(TOKEN_KEY) || sessionStorage.getItem(TOKEN_KEY); }
+    catch (e) { return null; }
+  }
+
+  // ---- allowance lives in localStorage, so it survives navigation ---------
+  function readQuota() {
+    var q = null;
+    try { q = JSON.parse(localStorage.getItem(QUOTA_KEY) || "null"); } catch (e) {}
+    if (!q || q.day !== today()) {
+      q = { day: today(), papers_left: LIMITS.papers, books_left: LIMITS.books };
+      writeQuota(q);
+    }
+    return q;
+  }
+  function writeQuota(q) {
+    try { localStorage.setItem(QUOTA_KEY, JSON.stringify(q)); } catch (e) {}
+  }
+
+  // ---- ending the demo ---------------------------------------------------
+  function clearDemo() {
+    document.cookie = "zafar_demo=; Max-Age=0; path=/";
+    try {
+      if (isDemoToken(readToken())) {
+        localStorage.removeItem(TOKEN_KEY);
+        sessionStorage.removeItem(TOKEN_KEY);
+      }
+    } catch (e) {}
+  }
+
+  var params = new URLSearchParams(location.search);
+  if (params.get("switch") === "1") {
+    // Documented escape hatch: "show me the real form".
+    clearDemo();
+  } else if (!readToken() || isDemoToken(readToken())) {
+    // Never overwrite a real session that is already stored.
+    try { localStorage.setItem(TOKEN_KEY, DEMO_TOKEN); } catch (e) {}
+  }
+
+  // Logging out has to end the demo — otherwise the cookie reseeds a demo
+  // token on the way to login.html and the session comes back by itself.
+  document.addEventListener("click", function (e) {
+    if (e.target && e.target.closest && e.target.closest("[data-logout]")) clearDemo();
+  }, true);
+
+  // ---- sample catalogue --------------------------------------------------
   var DOCS = {
     papers: [
       { id: "p1", name: "MSCE Mathematics 2023 Paper 1.pdf", category: "MSCE Maneb", size_bytes: 1184000 },
@@ -69,45 +128,64 @@ const DEMO_SCRIPT = `<script>
     ]
   };
 
-  function json(data) {
+  function reply(status, data) {
     return Promise.resolve({
-      ok: true,
-      status: 200,
+      ok: status >= 200 && status < 300,
+      status: status,
       json: function () { return Promise.resolve(data); }
     });
   }
 
-  var quota = { papers_left: 8, books_left: 9 };
   var realFetch = window.fetch.bind(window);
 
   window.fetch = function (input, init) {
     var url = String(input && input.url ? input.url : input);
+
+    // Assets, blobs, and anything asked for while a *real* session is stored
+    // must never be intercepted — signing in for real has to stay real.
     if (url.indexOf(location.origin) === 0 || url.indexOf("data:") === 0 || url.indexOf("blob:") === 0) {
-      return realFetch(input, init); // assets and the blob we hand back
+      return realFetch(input, init);
     }
-    if (url.indexOf("/health") !== -1) return json({ ok: true });
-    if (url.indexOf("/auth/quota") !== -1) return json(quota);
+    if (!isDemoToken(readToken())) return realFetch(input, init);
+
+    if (url.indexOf("/health") !== -1) return reply(200, { ok: true });
+    if (url.indexOf("/auth/quota") !== -1) return reply(200, readQuota());
+
     if (url.indexOf("/drive/download/") !== -1) {
-      quota.papers_left = Math.max(0, quota.papers_left - 1);
-      return json({
+      var section = new URL(url, location.href).searchParams.get("section") || "papers";
+      var bucket = bucketFor(section);
+      var key = bucket + "_left";
+      var quota = readQuota();
+      if (quota[key] <= 0) {
+        // Same shape and status the backend uses, so the client's 429 path
+        // ("Daily download limit reached") is exercised for real.
+        return reply(429, { detail: "Daily download limit reached" });
+      }
+      quota[key] = quota[key] - 1;
+      writeQuota(quota);
+      return reply(200, {
         url: URL.createObjectURL(new Blob(["%PDF-1.4 demo"], { type: "application/pdf" })),
         download_id: "demo-" + Date.now(),
         quota: quota
       });
     }
-    if (url.indexOf("/drive/confirm/") !== -1) return json({ ok: true });
+
+    if (url.indexOf("/drive/confirm/") !== -1) return reply(200, { ok: true });
+
     if (url.indexOf("/drive/papers") !== -1) {
       var q = new URL(url, location.href).searchParams;
-      var section = q.get("section") || "papers";
+      var wanted = q.get("section") || "papers";
       var category = q.get("category") || "";
       var term = (q.get("q") || "").toLowerCase();
-      var rows = (DOCS[section] || []).filter(function (d) {
+      return reply(200, (DOCS[wanted] || []).filter(function (d) {
         if (category && d.category !== category) return false;
         return !term || d.name.toLowerCase().indexOf(term) !== -1;
-      });
-      return json(rows);
+      }));
     }
-    return json({});
+
+    // Anything else (register, verify, resend, password reset) is a real
+    // call: let it through rather than answering it with a fake success.
+    return realFetch(input, init);
   };
 })();
 </script>`;

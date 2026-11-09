@@ -90,8 +90,16 @@ http://localhost:4173/?demo=1
 sets a cookie and injects a stand-in for the backend — a fake session plus a
 sample catalogue — so every screen can be walked without credentials or a
 network. It lives entirely inside `server.js`: nothing is added to `web/`, and
-the deployed site never sees it. Sign in normally by appending
-`login.html?switch=1`, or drop the cookie to talk to the real API again.
+the deployed site never sees it.
+
+The stand-in mirrors the real rules rather than simplifying them: 10 papers and
+3 books a day, with notes and marking keys drawing on the paper allowance; the
+allowance persists in `localStorage` across page loads and resets daily; a
+spent allowance answers `429`, so the client's limit path is exercised for real.
+
+It also stands down the moment a real session exists. **Logging out ends the
+demo** (cookie and demo token both cleared), and `login.html?switch=1` hands the
+form back to the real backend — a real sign-in is never intercepted.
 
 ## Backend
 
