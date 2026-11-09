@@ -1,0 +1,13 @@
+{
+  "name": "zafar-frontend",
+  "version": "1.0.0",
+  "private": true,
+  "description": "ZAFAR static app. No build step — this file exists so the tests can run.",
+  "scripts": {
+    "start": "node server.js",
+    "test": "node --test"
+  },
+  "devDependencies": {
+    "jsdom": "^24.1.3"
+  }
+}

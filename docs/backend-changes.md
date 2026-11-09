@@ -293,7 +293,9 @@ and `X-Error-Code`, and — since `c2717d9` — `expose_headers` plus
 `forwarded_allow_ips`, so the header is readable from the app and the rate
 limiter finally sees each student instead of the whole site behind one IP.
 
-Two small things left, both narrow:
+Both follow-ups landed in `7e9d64d` (the section is now required, and the
+cross-section test is in the suite: **54 passed**). Nothing in this section is
+outstanding.
 
 ### 15.1 Make `section` required on `POST /drive/download` — **landed** (`916db86`)
 
@@ -316,7 +318,7 @@ FastAPI then answers `422` for a missing parameter, which is honest, and no
 correct client notices. `/drive/papers` and `/drive/categories` can keep their
 default; they are reads.
 
-### 15.2 A test that a section cannot be crossed (P2)
+### 15.2 A test that a section cannot be crossed — **landed** (`7e9d64d`)
 
 `tests/test_quota_and_downloads.py` covers independence and unknown file ids,
 but not the case the UI hit: a note's id requested under `?section=papers`.

@@ -241,6 +241,11 @@ a { color: inherit; }
    visible while the catalogue scrolls. */
 .quota {
   flex: none;
+  /* The chip now names its section ("No marking keys left"), which is longer
+     than a bare count. Cap it at half the bar so a 320px screen keeps the
+     title readable, and let the text ellipsis rather than push. */
+  min-width: 0;
+  max-width: 52%;
   /* Level with the title: the head is bottom-aligned, so chip and title end
      together instead of the chip floating over empty teal. */
   display: inline-flex;
@@ -256,7 +261,8 @@ a { color: inherit; }
   letter-spacing: .005em;
   white-space: nowrap;
 }
-.quota svg { color: var(--ink); }
+.quota [data-quota-text] { overflow: hidden; text-overflow: ellipsis; }
+.quota svg { flex: none; color: var(--ink); }
 .quota.is-warn { background: var(--warn-wash); color: var(--warn); }
 .quota.is-warn svg { color: var(--warn); }
 
@@ -1154,10 +1160,6 @@ a { color: inherit; }
   }
   .app-title { font-size: 24px; }
   .item-title { font-size: 14px; }
-  .stats { gap: 6px; }
-  .stat { padding: 10px 9px; }
-  .stat-value { font-size: 17px; }
-  .stat-foot { font-size: 10px; }
 }
 
 /* ============================================================

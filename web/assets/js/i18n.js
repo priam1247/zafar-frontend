@@ -11,33 +11,33 @@ var ZafarI18n = (function () {
     nav: {
       library: "Library", pastPapers: "Past Papers",
       books: "Books", notes: "Notes", markingKeys: "Marking Keys",
-      yours: "Yours", favorites: "Favorites", support: "Support", help: "Help & FAQ",
+favorites: "Favorites", support: "Support", help: "Help & FAQ",
       studyLibrary: "Study library", logOut: "Log out",
     },
     pages: {
       papers:    { title: "Past Papers", crumb: "Library", itemLabel: "paper",
-                   desc: "MSCE and JCE papers, mocks and more.",
                    searchPlaceholder: "Search past papers by subject or year…" },
       books:     { title: "Books", crumb: "Library", itemLabel: "book",
-                   desc: "Textbooks for senior and junior secondary.",
                    searchPlaceholder: "Search textbooks by title or form…" },
       notes:     { title: "Notes", crumb: "Library", itemLabel: "note",
-                   desc: "Condensed notes, with a daily limit of their own.",
                    searchPlaceholder: "Search notes by subject…" },
       keys:      { title: "Marking Keys", crumb: "Library", itemLabel: "marking key",
-                   desc: "Official marking schemes, with a daily limit of their own.",
                    searchPlaceholder: "Search marking keys by subject or year…" },
       favorites: { title: "Favorites", crumb: "Yours", itemLabel: "favorite",
-                   desc: "Everything you've saved, in one list.",
                    searchPlaceholder: "Search your favorites…" },
-      help:      { title: "Help & FAQ", crumb: "Support",
-                   desc: "Limits, downloads and account answers." },
+      help:      { title: "Help & FAQ", crumb: "Support" },
     },
     list: {
       allCategories: "All categories",
+      oneAtATime: "One file at a time. The first one is still coming.",
+      // The server sends Retry-After; the page says the wait in everyday words.
+      tooManyRequests: function (wait) {
+        return wait
+          ? "Too many requests just now. Try again in " + wait + "."
+          : "Too many requests just now. Try again in a moment.";
+      },
       sortNameAsc: "Name A–Z", sortNameDesc: "Name Z–A",
       sortSizeDesc: "Largest first", sortSizeAsc: "Smallest first",
-      checkingLimit: "Checking today's limit…",
       downloadsLeft: function (left, cap) { return left + " of " + cap + " left"; },
       // Four independent allowances — papers, books, notes, marking keys — so
       // the notice names the one that ran out and says what is still there in
@@ -100,7 +100,6 @@ var ZafarI18n = (function () {
         "documents — including saved ones. Try again in a moment.",
       sortLabel: "Sort",
       clearAll: "Clear all",
-      clearCategory: "Clear category filter",
       clearSearch: "Clear search",
       couldntLoad: function (item) { return "Couldn't load " + item + "s"; },
       loadError: "Something went wrong reaching the library.",

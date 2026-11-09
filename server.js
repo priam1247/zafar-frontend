@@ -46,10 +46,10 @@ const TYPES = {
 const DEMO_SCRIPT = `<script>
 (function () {
   // ---- limits, exactly as the backend keeps them --------------------------
-  // One paper allowance of 10 a day that notes and marking keys also spend,
-  // one book allowance of 3, and both refill at midnight UTC. The demo has to
-  // mirror this: a demo that is more generous than production teaches the
-  // wrong thing.
+  // Four independent buckets, one per section: papers 10, books 3, notes 3,
+  // marking keys 10. Each is spent only by its own section, and each refills
+  // at midnight UTC. The demo has to mirror this: a demo that is more generous
+  // than production teaches the wrong thing.
   var LIMITS = { papers: 10, books: 3, notes: 3, "marking-keys": 10 };
   // Section key -> the field prefix its numbers live under, exactly as the
   // server does it: "marking-keys" the section, "marking_keys" the fields.
@@ -208,6 +208,18 @@ const DEMO_SCRIPT = `<script>
     }
 
     if (url.indexOf("/drive/confirm/") !== -1) return reply(200, { ok: true });
+
+    if (url.indexOf("/drive/categories") !== -1) {
+      // The folders are the library's, not the page's: the real server reads
+      // them from Drive, so the demo reads them from its own catalogue.
+      var wantedCat = new URL(url, location.href).searchParams.get("section") || "papers";
+      var names = [];
+      (DOCS[wantedCat] || []).forEach(function (d) {
+        if (d.category && names.indexOf(d.category) === -1) names.push(d.category);
+      });
+      names.sort(function (a, b) { return a.localeCompare(b); });
+      return reply(200, names);
+    }
 
     if (url.indexOf("/drive/papers") !== -1) {
       var q = new URL(url, location.href).searchParams;

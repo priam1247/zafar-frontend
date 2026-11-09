@@ -38,6 +38,8 @@ var ZafarAuth = (function () {
 
       errName: "Enter your full name.",
       errEmail: "Enter a valid email address.",
+      errGmail: "Use a Gmail address. That is where we send your code.",
+      errAccountExists: "That email already has an account. Sign in below.",
       errPassword: "At least 6 characters.",
       errConfirm: "Passwords don't match.",
       verifiedBanner: "Email verified \u2014 sign in to continue.",
@@ -71,7 +73,8 @@ var ZafarAuth = (function () {
       successSubtitle: "You can now sign in with your new password.",
       backToSignin: "Back to sign in",
 
-      offline: "Could not reach the server. Check your connection."
+      offline: "Could not reach the server. Check your connection.",
+      serverProblem: "Something went wrong on our side. Try again in a minute."
     }
   };
 
@@ -79,7 +82,23 @@ var ZafarAuth = (function () {
   var lang = "en";
   var resendTimer = null;
   var resendSeconds = 30;
+  // The address on the verify / reset screen. Kept in sessionStorage as well as
+  // in memory: a phone that reloads the tab — or the in-app browser that drops
+  // the page when the student opens Gmail — would otherwise land back on the
+  // sign-in form with the six-digit code and no screen to type it into.
+  var EMAIL_KEY = "zafar_pending_email";
   var currentEmail = "";
+  function setPendingEmail(email) {
+    currentEmail = email || "";
+    try {
+      if (currentEmail) sessionStorage.setItem(EMAIL_KEY, currentEmail);
+      else sessionStorage.removeItem(EMAIL_KEY);
+    } catch (e) {}
+  }
+  function pendingEmail() {
+    if (currentEmail) return currentEmail;
+    try { return sessionStorage.getItem(EMAIL_KEY) || ""; } catch (e) { return ""; }
+  }
 
   var el = function (id) { return document.getElementById(id); };
 
@@ -300,7 +319,12 @@ var ZafarAuth = (function () {
   }
   function friendlyError(err) {
     if (!err) return T[lang].offline;
+    if (err.timeout) return err.message;
     if (err instanceof TypeError || err.message === "Failed to fetch") return T[lang].offline;
+    // A 5xx (or a gateway in front of the API) can carry internal detail; the
+    // student gets a plain sentence instead.
+    if (typeof err.status === "number" && err.status >= 500) return T[lang].serverProblem;
+    if (!err.status) return T[lang].offline;
     return err.message;
   }
   function setError(fieldId, on) { el(fieldId).classList.toggle("has-error", on); }
@@ -308,6 +332,9 @@ var ZafarAuth = (function () {
     form.querySelectorAll(".field, .otp-row").forEach(function (f) { f.classList.remove("has-error"); });
   }
   function isValidEmail(v) { return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v); }
+  // The backend only accepts @gmail.com (that is where the code is sent from),
+  // so say so in the form instead of after a round trip.
+  function isGmail(v) { return /@gmail\.com$/i.test(v); }
 
   /* ---------------- render ---------------- */
   function refreshReveal(btn) {
@@ -461,7 +488,7 @@ var ZafarAuth = (function () {
   }
 
   function goToVerify(email, silentResend) {
-    currentEmail = email;
+    setPendingEmail(email);
     el("verify-email-target").textContent = email;
     clearOtp();
     showBanner("verifyBanner", "");
@@ -516,6 +543,11 @@ var ZafarAuth = (function () {
       var ok = true;
       if (isCreate && el("fullName").value.trim().length < 2) { setError("field-name", true); ok = false; }
       if (!isValidEmail(el("email").value.trim())) { setError("field-email", true); ok = false; }
+      else if (isCreate && !isGmail(el("email").value.trim())) {
+        setError("field-email", true);
+        showBanner("authBanner", t.errGmail, true);
+        ok = false;
+      }
       if (el("password").value.length < 6) { setError("field-password", true); ok = false; }
       if (isCreate && el("confirmPassword").value !== el("password").value) { setError("field-confirm", true); ok = false; }
       if (!ok) return;
@@ -551,6 +583,17 @@ var ZafarAuth = (function () {
           })
           .catch(function (err) {
             busy(false, t.createBtn);
+            // The only 409 this form can produce is "that address is already
+            // registered". Send them to sign-in with the address still in the
+            // box: if the account exists but was never verified, signing in
+            // leads straight to the code screen and a fresh code.
+            if (err && err.status === 409) {
+              setMode("signin");
+              el("email").value = email;
+              showBanner("authBanner", t.errAccountExists, false);
+              el("password").focus();
+              return;
+            }
             showBanner("authBanner", friendlyError(err), true);
           });
       }
@@ -582,7 +625,7 @@ var ZafarAuth = (function () {
         .then(function () {
           forgotBtn.disabled = false;
           forgotBtn.classList.remove("loading");
-          currentEmail = email; // read by wireReset() below
+          setPendingEmail(email); // read by wireReset() below
           clearErrors(el("resetForm"));
           showBanner("resetBanner", "");
           el("resetForm").reset();
@@ -606,7 +649,7 @@ var ZafarAuth = (function () {
     el("resendLink").addEventListener("click", function () {
       if (resendSeconds > 0) return;
       showBanner("verifyBanner", "");
-      Zafar.postJSON("/auth/resend", { email: currentEmail })
+      Zafar.postJSON("/auth/resend", { email: pendingEmail() })
         .then(function () {
           showBanner("verifyBanner", T[lang].resendSent, false);
           startResendCountdown();
@@ -632,7 +675,7 @@ var ZafarAuth = (function () {
       btn.classList.add("loading");
       el("txt-verifyBtn").textContent = t.verifying;
 
-      Zafar.postJSON("/auth/verify", { email: currentEmail, code: code })
+      Zafar.postJSON("/auth/verify", { email: pendingEmail(), code: code })
         .then(function () {
           clearInterval(resendTimer);
           location.href = "login.html?verified=1";
@@ -667,7 +710,7 @@ var ZafarAuth = (function () {
       el("txt-resetBtn").textContent = t.resetting;
 
       Zafar.postJSON("/auth/reset-password", {
-        email: currentEmail,
+        email: pendingEmail(),
         code: code,
         new_password: el("newPassword").value
       })
@@ -721,7 +764,7 @@ var ZafarAuth = (function () {
   /* ---------------- init ---------------- */
   function init() {
     // Wake a sleeping free-tier backend while the person is still typing.
-    try { fetch(API_BASE_URL + "/health", { mode: "cors" }).catch(function () {}); } catch (e) {}
+    Zafar.warmUp();
 
     var root = document.getElementById("auth");
     root.innerHTML = screenHTML();
@@ -739,7 +782,7 @@ var ZafarAuth = (function () {
     setMode(page === "register.html" ? "create" : "signin");
 
     if (page === "verify.html") {
-      var email = params.get("email") || "";
+      var email = params.get("email") || pendingEmail();
       if (!email) {
         location.replace("register.html");
         return;

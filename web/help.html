@@ -28,7 +28,7 @@
     document.addEventListener("DOMContentLoaded", function () {
       var t = ZafarI18n.t;
       var p = t("pages.help");
-      var shell = ZafarShell.init({ active: "help", title: p.title, crumb: p.crumb, desc: p.desc });
+      var shell = ZafarShell.init({ active: "help", title: p.title, crumb: p.crumb });
       if (!shell) return;
 
       var QA = t("help.qa");

@@ -89,8 +89,11 @@ var ZafarShell = (function () {
             '<h1 class="app-title">' + title + "</h1>" +
           "</div>" +
           // Filled by the list page when the section has a daily allowance.
-          '<span class="quota" data-quota hidden>' + svg("download", 13, 2) +
-            '<span data-quota-text></span></span>' +
+          // A live region: the chip appears, counts down and turns into "No
+          // papers left" without anyone touching it, so a screen reader has to
+          // be told, or the change is invisible to the person it matters most to.
+          '<span class="quota" data-quota role="status" aria-live="polite" aria-atomic="true" hidden>' +
+            svg("download", 13, 2) + '<span data-quota-text></span></span>' +
         "</div>" +
       "</header>" +
       // The running count lives on the sheet, not in the teal bar: the bar says
