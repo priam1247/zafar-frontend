@@ -147,9 +147,6 @@ var ZafarList = (function () {
     // so a signal drop can tell whether there is a list worth keeping.
     var current = "loading";
     var renderedCount = 0;
-    var requested = [];      // catalogue URLs this view asked for
-    var staleServed = false; // the worker answered at least one of them from its copy
-    var loadStartedAt = 0;   // when this view's requests went out
 
     var el = {
       grid: root.querySelector("[data-grid]"),
@@ -614,12 +611,8 @@ var ZafarList = (function () {
       renderCatChips();
       syncURL();
 
-      // Fresh view: nothing yet claimed to be stale, and nothing rendered.
-      // The clock matters: a fallback notification from before this load must
-      // not relabel the new one.
-      staleServed = false;
+      // Fresh view: nothing rendered yet.
       renderedCount = 0;
-      loadStartedAt = Date.now();
       show("loading");
       shell.count.textContent = t("list.loading");
 
@@ -628,20 +621,17 @@ var ZafarList = (function () {
       // its own: one section the worker has never seen must not hide the
       // documents the others can still show.
       var sections = cfg.sections || [cfg.section];
-      var urls = [];
       var requests = sections.map(function (section) {
         var query = new URLSearchParams();
         query.set("section", section);
         if (state.category) query.set("category", state.category);
         if (state.q) query.set("q", state.q);
         var path = "/drive/papers?" + query.toString();
-        urls.push(API_BASE_URL + path);
         return Zafar.authGet(path).then(
           function (rows) { return { rows: rows || [] }; },
           function (error) { return { error: error }; }
         );
       });
-      requested = urls;
 
       Promise.all(requests)
         .then(function (results) {
@@ -684,11 +674,6 @@ var ZafarList = (function () {
           var label = cfg.favoritesOnly
             ? t("list.savedCount", docs.length)
             : t("list.results", docs.length);
-          // A list the worker answered from its copy is a copy, whether or not
-          // the radio is on — a captive portal leaves it on and the network
-          // useless, and the worker says so on the wire (see the message
-          // listener below).
-          if (!navigator.onLine || staleServed) label = t("list.offlineResults", docs.length);
           shell.count.textContent = label;
 
           if (!docs.length) {
@@ -733,30 +718,6 @@ var ZafarList = (function () {
         });
     }
 
-    // The worker tells the page when it answered a catalogue request from its
-    // stored copy, so the count can say so even with the radio on. ZAFAR no
-    // longer installs a worker — this stays for the transition, while a phone
-    // may still hold one that answers from its copy until it updates and
-    // retires itself.
-    if (navigator.serviceWorker && navigator.serviceWorker.addEventListener) {
-      navigator.serviceWorker.addEventListener("message", function (event) {
-        var data = event.data;
-        if (!data || data.type !== "zafar-catalogue-cached") return;
-
-        // Only a fallback newer than the load on screen may relabel it. A late
-        // notification from the previous load — a reload, a change of sort —
-        // would otherwise mark a live list as a copy.
-        if (typeof data.servedAt === "number" && data.servedAt < loadStartedAt) return;
-        if (requested.indexOf(data.url) === -1) return;
-
-        staleServed = true;
-        // Empty is a result too: a stored "nothing here" is still a copy.
-        if (current === "grid" || current === "empty") {
-          shell.count.textContent = t("list.offlineResults", renderedCount);
-        }
-      });
-    }
-
     root.querySelector("[data-retry]").addEventListener("click", load);
     el.search.addEventListener("input", debounce(function () {
       state.q = (el.search.value || "").trim();
@@ -768,14 +729,11 @@ var ZafarList = (function () {
     });
 
     window.addEventListener("offline", function () {
-      // Only mark a list that is actually on screen — el.grid keeps its old
-      // cards while an empty or error panel is up, and those must not be
-      // counted as results.
-      if (current === "grid" && renderedCount) {
-        shell.count.textContent = t("list.offlineResults", renderedCount);
-      } else {
-        show("offline");
-      }
+      // There is no stored copy any more: if a list is on screen it stays
+      // readable, but it is the last answer the server gave — nothing else can
+      // be fetched. With nothing rendered, say plainly that the phone is offline
+      // rather than leaving an empty page.
+      if (!(current === "grid" && renderedCount)) show("offline");
       shell.showToast(t("list.offlineTitle"), "offline");
     });
     window.addEventListener("online", function () {
