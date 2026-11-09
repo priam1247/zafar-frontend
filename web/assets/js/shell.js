@@ -112,27 +112,26 @@ var ZafarShell = (function () {
     toastTimer = setTimeout(function () { el.classList.remove("show"); }, 2600);
   }
 
-  /* ---------- Installable / offline ----------
-     The service worker keeps the shell and the last catalogue on the device,
-     so the app opens when the connection does not. It is skipped in the demo:
-     server.js rewrites each page as it serves it, and a stored copy would be
-     the wrong copy. ?sw=1 forces it on, ?sw=0 removes it and its caches. */
-  function registerWorker() {
+  /* ---------- Nothing is stored on the phone ----------
+     ZAFAR used to install a service worker that kept the app's pages and the
+     last catalogue answer, so it opened without a connection. It is gone. This
+     is a download site: a stored list carried no download links, so it could
+     only ever show filenames the phone had no way to fetch. What is left below
+     is the clean-up, for phones still carrying a copy from an older version. */
+  function retireStoredCopy() {
     try {
-      registerWorkerNow();
+      retireNow();
     } catch (error) {
-      // An install is a bonus. It is never worth a broken page.
+      // Housekeeping is never worth a broken page.
     }
   }
 
   // Unregister this app's worker and drop its caches.
   //
-  // The app no longer registers one — ZAFAR keeps nothing on the phone, and
-  // works only while it can reach the network. What remains here is the
-  // clean-up: a phone that installed an older version still has its worker and
-  // its stored pages, and this takes them away on the next load. The worker
-  // file itself (web/sw.js) does the same from the other side, for browsers
-  // that never run this script.
+  // No worker is deployed any more, so a browser that goes looking for one gets
+  // a 404 and retires the registration by itself. This does the same from the
+  // page side, immediately, and takes the stored pages with it — the caches
+  // would otherwise sit on the phone using space for ever.
   function clearWorker() {
     if (!("serviceWorker" in navigator)) return;
 
@@ -159,7 +158,7 @@ var ZafarShell = (function () {
     }
   }
 
-  function registerWorkerNow() {
+  function retireNow() {
     if (!("serviceWorker" in navigator)) return;
 
     // After load, and never on the path to the first painting.
@@ -189,15 +188,12 @@ var ZafarShell = (function () {
     });
 
     Zafar.updateFavCountPill();
-    registerWorker();
+    retireStoredCopy();
 
     root.querySelector("[data-logout]").addEventListener("click", function () {
+      // The token is the only thing held here, and it goes with the click. There
+      // is no stored catalogue to clear: nothing is cached.
       Zafar.clearToken();
-      // A shared phone should not keep the last account's catalogue in its
-      // cache. The shell itself stays installed — that is just the app.
-      if (navigator.serviceWorker && navigator.serviceWorker.controller) {
-        navigator.serviceWorker.controller.postMessage({ type: "clear-catalogue" });
-      }
     });
 
     // The bar is sticky, so a long page still needs its landmark announced.

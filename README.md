@@ -24,9 +24,6 @@ web/                     static frontend (no build step, no framework)
   assets/img/icon-*.png  the same mark rasterised for a home screen: 192, 512,
                          a 512 maskable, and a 180 apple-touch icon
   manifest.webmanifest   name, colours and icons for "Add to Home Screen"
-  sw.js                  the uninstaller — retires the worker older versions
-                         installed; caches nothing
-  reset.html             standalone recovery page, never cached
   assets/js/config.js    API client, token storage, favorites, formatting
   assets/js/i18n.js      the English string table for the signed-in app
   assets/js/shell.js     top bar + bottom tabs + toasts
@@ -148,53 +145,49 @@ page's `<head>` also carries the iOS metas and `apple-touch-icon`, and
 `viewport-fit=cover` — without it `env(safe-area-inset-*)` reports zero and the
 notch and home indicator would sit on top of the bar and the tabs.
 
-**ZAFAR keeps nothing on the phone.** There is no service worker, no cache,
-no stored copy of any page, and no offline list. Every request goes to the
-network.
+There is no service worker, so some browsers no longer offer their "Install app"
+prompt; the icon and the standalone window still work from **Add to Home
+Screen**, and the app itself is unaffected — it opens and fetches like any page.
 
-That is a decision, made after the alternative took the site down. Offline
-reading stored the last catalogue answer per view and served the app's own pages
-from the device; when a stored page was the *first* answer for a navigation, one
-entry the browser would not render was every page failing, with no page inside
-the app left to repair it from. It is also worth being honest about what the
-feature bought: a stored list carries **no download URLs** — the download is a
-`POST /drive/download/{id}` that spends the allowance, and the file link is a
-signed URL that lives five minutes — so an offline phone could see a list of
-filenames and download none of them. A list you cannot act on is not worth a
-class of failure that can brick the app.
+**ZAFAR keeps nothing on the phone. It is a download site: it works online,
+only.**
 
-What remains, and why:
+There is no service worker, no cache, no stored page, no stored list. Every
+request goes to the network, and every document is served by the server.
 
-- **`web/sw.js` is an uninstaller.** Phones that installed an older version
-  still have its worker and its stored pages. The browser checks a
-  registration's script on the next visit, so this version reaches them, deletes
-  the `zafar-*` caches, and unregisters itself. It has no fetch handler and no
-  cache of its own. It can be deleted once the installed base has had a few
-  weeks to update.
-- **`shell.js` retires the worker from the page side**, on load, for browsers
-  that never run the new script. Matching is by script URL, so another app's
-  worker on a shared origin is left alone.
-- **`web/_headers` serves `/sw.js` and every page with `Cache-Control:
-  no-cache`.** Without it a phone can keep a stale script, and a fix arrives
-  days late.
-- **`reset.html` is the way back** for a phone still stuck on an old copy. It is
-  standalone — no stylesheet, no script file, nothing an older version could
-  have stored — unregisters only the registration whose script URL is ZAFAR's,
-  deletes only `zafar-*` caches, and then checks the browser again before it
-  claims success. If another tab put the worker back, it says so instead of
-  reporting a reset that did not happen.
+This is not a temporary state or a setting — the offline feature was built,
+shipped, and removed. It stored the last catalogue answer per view and served
+the app's own pages from the device; when a stored page became the first answer
+for a navigation, one entry the browser would not render was **every page
+failing**, with nothing inside the app left to repair it from. And what the
+feature bought was thin: a stored list carries **no download URLs** — the
+download is a `POST /drive/download/{id}` that spends the allowance, and the
+file link is a signed URL that lives five minutes — so an offline phone could
+see filenames and download none of them. A list you cannot act on is not worth
+the ability to brick the app.
 
-**It is not a guarantee, and the README used to pretend otherwise.** A worker
-that answers every navigation can answer `reset.html` too — that is precisely
-the failure it exists to repair. When even the reset page will not load, only
-the browser can clear the site, and the page carries those steps (Chrome on
-Android: Settings → Site settings → All sites → the site → Clear & reset;
-Safari on iPhone: Settings → Safari → Advanced → Website Data → Delete). Close
-every ZAFAR tab before and after; an open tab can put the old copy back.
+What is left, and why:
 
-There is no `?sw=1` any more — nothing to force on. Demo mode and `?sw=0` still
-clear any leftover worker and its caches, because `server.js` rewrites each page
-as it serves it and a stored page would be the wrong page.
+- **`shell.js` retires any copy left behind.** Phones that installed an older
+  version still have that worker and its stored pages. On every page load the
+  app unregisters the registration whose script URL is ZAFAR's — matched by
+  script URL, so another app's worker on a shared origin is untouched — and
+  deletes the `zafar-*` caches that went with it.
+- **The browser retires it too.** `sw.js` no longer exists, so an update check
+  finds a 404 and drops the registration on its own. Two independent paths, so
+  no phone keeps a stored copy.
+- **`web/_headers` serves every page with `Cache-Control: no-cache`.**
+
+If a phone is stuck on an old copy and will not open the app at all, only the
+browser can clear it: Chrome on Android → Settings → Site settings → All sites →
+the site → **Clear & reset**; Safari on iPhone → Settings → Safari → Advanced →
+**Website Data** → find the site → Delete; Firefox → the site's padlock → Site
+settings → **Clear data**. Close every ZAFAR tab first — an open tab can put the
+old copy back.
+
+Every page load does that clean-up, so demo mode gets it too — which matters,
+because `server.js` rewrites each page as it serves it, and a stored page would
+be the wrong page.
 
 ## Backend
 

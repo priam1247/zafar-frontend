@@ -1,10 +1,4 @@
-# Cloudflare serves these as-is. A phone must never keep a stale copy of the
-# worker — the fix has to arrive on the next visit, not days later.
-/sw.js
-  Cache-Control: no-cache
-
-/reset.html
-  Cache-Control: no-cache
-
+# Cloudflare serves these as-is. Pages are never cached: a phone must see the
+# current app on the next visit, not one from last week.
 /*.html
   Cache-Control: no-cache
