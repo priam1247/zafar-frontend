@@ -79,7 +79,7 @@ var ZafarShell = (function () {
             '<span class="glyph">' + svg("logo", 15, 2) + "</span>ZAFAR" +
           "</a>" +
           '<div class="bar-actions">' +
-            '<a class="bar-btn" href="help.html" aria-label="Help">' + svg("help", 17) + "</a>" +
+            '<a class="bar-btn bar-btn-wide" href="help.html">' + svg("help", 16) + "<span>Help</span></a>" +
             '<a class="bar-btn" href="login.html" data-logout aria-label="Log out">' + svg("logout", 17) + "</a>" +
           "</div>" +
         "</div>" +

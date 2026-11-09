@@ -39,6 +39,11 @@ var ZafarI18n = (function () {
       sortSizeDesc: "Largest first", sortSizeAsc: "Smallest first",
       checkingLimit: "Checking today's limit…",
       downloadsLeft: function (left, cap) { return left + " of " + cap + " left"; },
+      limitNoticeTitle: "You've used today's downloads",
+      limitNoticeBody: "ZAFAR is free for everyone, so each account gets a set number of downloads " +
+        "a day. Tap the heart on anything you need to save it to Favorites, then come back tomorrow — " +
+        "your downloads reset at midnight.",
+      openFavorites: "Open Favorites",
       downloadsLeftLabel: function (left, cap) { return left + " of " + cap + " downloads left today"; },
       sharedBucket: ", shared with notes and marking keys",
       limitReached: "No downloads left",
@@ -77,7 +82,9 @@ var ZafarI18n = (function () {
     },
     help: {
       heroTitle: "How can we help?",
-      heroBody: "Short answers to the questions students ask most. Still stuck? Reach the admin on WhatsApp and include the email on your account.",
+      heroBody: "ZAFAR is free for every Malawian student, and the daily limits are what keep it that " +
+        "way. Short answers to the questions students ask most — still stuck, message the admin on " +
+        "WhatsApp and include the email on your account.",
       backToPapers: "Back to papers",
       paperLimitLabel: "Papers, notes & keys", paperLimitFoot: "one shared allowance",
       bookLimitLabel: "Books", bookLimitFoot: "their own allowance",
@@ -94,11 +101,12 @@ var ZafarI18n = (function () {
       contactCta: "Open WhatsApp",
       qa: [
         { id: "limits", q: "Why is there a daily download limit?",
-          a: "<p>Every account gets 10 downloads a day from the paper allowance and 3 from the book " +
-             "allowance. Notes and marking keys are charged against the paper allowance &mdash; they share " +
-             "it, so a note or a marking key spends the same ten as a past paper.</p>" +
-             "<p>Both allowances refill at midnight UTC. The chip in the header shows what is left, and it " +
-             "is the same number on the papers, notes and marking key pages.</p>" },
+          a: "<p>ZAFAR is free for every Malawian student. To keep it free, and fair, every account " +
+             "gets the same number of downloads each day: 10 papers and 3 books. Notes and marking keys " +
+             "use the same 10 as your papers, so one allowance covers all three.</p>" +
+             "<p>If you reach the limit, tap the heart on what you need to save it to Favorites, then come " +
+             "back tomorrow. Today's allowance starts again at midnight UTC, and the chip in the header " +
+             "always shows what is left.</p>" },
         { id: "download", q: "A download didn't start — what now?",
           a: "<p>Downloads are prepared on demand: the app asks the server for a short-lived signed link, then " +
              "fetches the file and hands it to your browser. If that link expires before the file finishes, just " +

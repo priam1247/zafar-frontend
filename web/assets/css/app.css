@@ -173,6 +173,19 @@ a { color: inherit; }
 }
 .bar-btn:hover { color: var(--on); border-color: var(--on-30); }
 
+/* Help carries its word, not just a glyph — one less thing to guess at. */
+.bar-btn-wide {
+  width: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 13px 0 11px;
+  font-size: 12.5px;
+  font-weight: 600;
+  letter-spacing: .01em;
+  color: var(--on-72);
+}
+
 .app-head {
   display: flex;
   align-items: flex-end;
@@ -271,6 +284,54 @@ a { color: inherit; }
   display: flex;
   flex-direction: column;
   gap: 14px;
+}
+
+/* ============================================================
+   Limit notice — shown only when the allowance is spent
+   ============================================================ */
+
+.notice {
+  display: flex;
+  gap: 11px;
+  padding: 13px 14px;
+  border: 1px solid rgba(178, 106, 20, .30);
+  border-radius: 16px;
+  background: var(--warn-wash);
+}
+
+.notice-glyph {
+  width: 26px;
+  height: 26px;
+  flex: none;
+  display: grid;
+  place-items: center;
+  border-radius: 8px;
+  background: rgba(178, 106, 20, .14);
+  color: var(--warn);
+}
+
+.notice-title {
+  margin: 0;
+  font-size: 13.5px;
+  font-weight: 660;
+  letter-spacing: -.012em;
+  color: var(--brand);
+}
+
+.notice-text p {
+  margin: 4px 0 0;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--brand);
+}
+
+.notice-cta {
+  margin-top: 10px;
+  height: 32px;
+  padding: 0 13px;
+  font-size: 11.5px;
+  border-color: rgba(178, 106, 20, .38);
+  color: var(--brand);
 }
 
 /* ============================================================
