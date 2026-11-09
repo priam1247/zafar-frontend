@@ -1,5 +1,5 @@
 /* ============================================================
-   Zafar — signed-in app
+   StudyMW — signed-in app
    The same system as auth.css: two colours, one font, no shadows.
      Teal #006D7C — every piece of text, every border, the CTA (5.9:1)
      Mint #CFEBE1 — fills and highlight chips, teal text on mint (4.8:1)
@@ -140,10 +140,12 @@ a { color: inherit; }
 .wordmark {
   display: inline-flex;
   align-items: center;
-  gap: 9px;
-  font-size: 12.5px;
+  gap: 8px;
+  font-size: 12px;
   font-weight: 700;
-  letter-spacing: .24em;
+  /* "STUDYMW" is two letters longer than the old name: less tracking keeps the
+     Help and Log out buttons on the same line at 360px. */
+  letter-spacing: .13em;
   text-decoration: none;
   color: var(--on);
 }

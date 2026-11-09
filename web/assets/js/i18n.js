@@ -1,5 +1,5 @@
 /* ============================================================
-   Zafar — UI strings
+   StudyMW — UI strings
    The app is English-only. This module is a plain string table
    looked up by dot path, e.g. ZafarI18n.t("nav.pastPapers").
    A function value is called with any extra args: t("list.results", 3).
@@ -131,7 +131,7 @@ favorites: "Favorites", support: "Support", help: "Help & FAQ",
     },
     help: {
       heroTitle: "How can we help?",
-      heroBody: "ZAFAR is free for every Malawian student, and the daily limits are what keep it that " +
+      heroBody: "StudyMW is free for every Malawian student, and the daily limits are what keep it that " +
         "way. Short answers to the questions students ask most — still stuck, message the admin on " +
         "WhatsApp and include the email on your account.",
       backToPapers: "Back to papers",
@@ -162,7 +162,7 @@ favorites: "Favorites", support: "Support", help: "Help & FAQ",
           // No figures in here: the table above this answer is filled from the
           // server, so a number repeated in prose would be a second source of
           // truth that goes stale the day an allowance is retuned.
-          a: "<p>ZAFAR is free for every Malawian student. To keep it free, every account gets a " +
+          a: "<p>StudyMW is free for every Malawian student. To keep it free, every account gets a " +
              "few downloads each day, counted <b>separately for each section</b> — the " +
              "<b>Daily downloads</b> table above shows the numbers. Downloading a paper never uses " +
              "up a book, and a note never uses up a paper.</p>" +
@@ -178,10 +178,10 @@ favorites: "Favorites", support: "Support", help: "Help & FAQ",
              "never see each other's list. Clearing your browser storage clears them.</p>" },
         { id: "password", q: "I forgot my password.",
           a: "<p>Self-service reset is coming — the sign-in screen already has the flow, but the server side " +
-             "isn't live yet. In the meantime, message the ZAFAR admin from the email address on your account " +
+             "isn't live yet. In the meantime, message the StudyMW admin from the email address on your account " +
              "and a new password will be set for you.</p>" },
         { id: "missing", q: "A paper or subject is missing.",
-          a: "<p>The library mirrors what's been published to the Zafar Drive folders. If a subject or year isn't " +
+          a: "<p>The library mirrors what's been published to the StudyMW Drive folders. If a subject or year isn't " +
              "there yet, it hasn't been uploaded — send the request through and it usually appears within a few days.</p>" },
       ],
     },

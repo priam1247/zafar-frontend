@@ -480,7 +480,56 @@ test("a backend that ignores offset is read once, not in a loop", async () => {
   dom.window.close();
 });
 
-/* ---------- 9. the headers that cost nothing are actually served ---------- */
+/* ---------- 9. the hero ---------- */
+
+test("the hero says what StudyMW is, on every auth page", async () => {
+  const dom = await openPage("/login.html", { fetch: () => reply({}) });
+  await wait(300);
+  const d = dom.window.document;
+
+  assert.equal(d.querySelector(".wordmark").textContent.trim(), "STUDYMW");
+  assert.equal(
+    d.querySelector("#txt-headline").textContent,
+    "Pass MSCE & JCE with real past papers."
+  );
+  assert.equal(
+    d.querySelector("#txt-subtitle").textContent,
+    "Download past papers, marking keys, books and notes. Free, every day."
+  );
+  assert.deepEqual(
+    [...d.querySelectorAll(".mast-chips li")].map((li) => li.textContent),
+    ["MSCE", "JCE", "Marking keys", "Notes"]
+  );
+  assert.equal(d.querySelector("#txt-footer").textContent, "PAPERS · MARKING KEYS · BOOKS · NOTES · FREE");
+  assert.ok(d.querySelectorAll(".spines i").length > 0, "the illustration is book spines");
+  assert.equal(d.querySelectorAll(".doc").length, 0, "the floating bar-chart cards are gone");
+  dom.window.close();
+
+  // It is a promise, not a greeting: it belongs on the create form too.
+  const reg = await openPage("/register.html", { fetch: () => reply({}) });
+  await wait(300);
+  const head = reg.window.document.querySelector("#txt-headline");
+  assert.match(head.textContent, /Pass MSCE/);
+  assert.equal(head.hidden, false);
+  reg.window.close();
+});
+
+test("the hero's subtext stays legible", () => {
+  const css = read(path.join(WEB, "assets/css/auth.css"));
+  const blocks = [...css.matchAll(/\.mast-lede\s*\{([^}]*)\}/g)].map((m) => m[1]);
+  assert.ok(blocks.length, "the subtext has a rule");
+  for (const block of blocks) {
+    const size = /font-size:\s*([\d.]+)px/.exec(block);
+    if (size) assert.ok(Number(size[1]) >= 15, "subtext is " + size[1] + "px, below the 15px floor");
+    const alpha = /rgba\([^)]*,\s*([\d.]+)\s*\)/.exec(block);
+    if (alpha) assert.ok(Number(alpha[1]) >= 0.85, "subtext opacity " + alpha[1] + " on teal is too low");
+  }
+  // The hero must stay a quarter of the screen, not a third of it.
+  const mast = css.split(".mast {")[1].split("}")[0];
+  assert.match(mast, /min-height:\s*25(vh|svh)/, "the hero is sized to a quarter of the viewport");
+});
+
+/* ---------- 10. the headers that cost nothing are actually served ---------- */
 
 test("_headers closes the obvious doors", () => {
   const headers = read(path.join(WEB, "_headers"));

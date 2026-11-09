@@ -1,8 +1,8 @@
 /* ============================================================
-   Zafar — shared config + API client
+   StudyMW — shared config + API client
    ============================================================ */
 
-// Base URL of the deployed Zafar backend (zafar-backend FastAPI app).
+// Base URL of the deployed backend (the zafar-backend FastAPI app).
 // A local page may point at another backend with ?api=http://..., which is
 // how the app is developed against a laptop server. Anywhere else the
 // parameter is ignored: honouring it on the live site would let a link such
@@ -56,7 +56,7 @@ var SUPPORT_WHATSAPP = "";
   var target = null;
   try { target = new URL(override); } catch (e) { target = null; }
   if (!local || !target || (target.protocol !== "http:" && target.protocol !== "https:")) {
-    console.warn("Zafar: ?api= is only honoured on a local page — ignoring it.");
+    console.warn("StudyMW: ?api= is only honoured on a local page — ignoring it.");
     return;
   }
   API_BASE_URL = target.origin + target.pathname.replace(/\/+$/, "");

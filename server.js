@@ -1,5 +1,5 @@
 /* ============================================================
-   Zafar — zero-dependency static server for local development.
+   StudyMW — zero-dependency static server for local development.
    Serves web/ so the pages can be opened at their real paths.
 
      node server.js            -> http://localhost:4173
@@ -302,6 +302,6 @@ const server = http.createServer((req, res) => {
 });
 
 server.listen(PORT, "0.0.0.0", () => {
-  console.log("Zafar running on http://localhost:" + PORT);
+  console.log("StudyMW running on http://localhost:" + PORT);
   console.log("Demo session: http://localhost:" + PORT + "/?demo=1");
 });
