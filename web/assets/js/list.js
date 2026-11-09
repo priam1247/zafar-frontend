@@ -28,6 +28,16 @@ var ZafarList = (function () {
     var t = ZafarI18n.t;
     var activeCat = (new URLSearchParams(location.search).get("category")) || "";
     return (
+      '<div class="notice" data-notice hidden>' +
+        '<span class="notice-glyph">' + svg("alert", 17) + "</span>" +
+        '<div class="notice-text">' +
+          '<h2 class="notice-title">' + t("list.limitNoticeTitle") + "</h2>" +
+          "<p>" + t("list.limitNoticeBody") + "</p>" +
+          '<a class="btn btn-ghost btn-sm notice-cta" href="favorites.html">' +
+            t("list.openFavorites") + "</a>" +
+        "</div>" +
+      "</div>" +
+
       '<div class="toolbar">' +
         '<label class="search">' + svg("search", 18) +
           '<input type="search" data-search placeholder="' +
@@ -137,6 +147,7 @@ var ZafarList = (function () {
       offline: root.querySelector("[data-offline]"),
       chips: root.querySelector("[data-chips]"),
       catChips: root.querySelector("[data-cat-chips]"),
+      notice: root.querySelector("[data-notice]"),
       search: root.querySelector("[data-search]"),
       sort: root.querySelector("[data-sort]"),
       limit: shell.quota || null,
@@ -217,6 +228,9 @@ var ZafarList = (function () {
     function renderLimit() {
       if (!el.limit) return;
 
+      // The explanation appears exactly when it is true.
+      if (el.notice) el.notice.hidden = left !== 0;
+
       // Nothing reported for this bucket: say nothing rather than imply an
       // allowance we cannot measure.
       if (left === null) {
@@ -238,6 +252,12 @@ var ZafarList = (function () {
         "aria-label",
         (allowed ? t("list.downloadsLeftLabel", left, cap) : t("list.limitReached")) + shared
       );
+    }
+
+    function revealNotice() {
+      if (!el.notice) return;
+      el.notice.hidden = false;
+      if (el.notice.scrollIntoView) el.notice.scrollIntoView({ block: "nearest" });
     }
 
     if (cfg.quotaKey && el.limit) {
@@ -295,6 +315,7 @@ var ZafarList = (function () {
       if (btn.dataset.pending === "true") return;
       if (!navigator.onLine) return shell.showToast(t("list.noInternet"), "offline");
       if (cfg.quotaKey && left !== null && left <= 0) {
+        revealNotice();
         return shell.showToast(t("list.limitReached"), "alert");
       }
 
@@ -378,8 +399,14 @@ var ZafarList = (function () {
         })
         .catch(function (err) {
           restore();
-          if (err && err.status === 429) shell.showToast(t("list.limitReached"), "alert");
-          else shell.showToast((err && err.message) || t("list.downloadStartFailed"), "alert");
+          if (err && err.status === 429) {
+            left = 0;
+            renderLimit();
+            revealNotice();
+            shell.showToast(t("list.limitReached"), "alert");
+          } else {
+            shell.showToast((err && err.message) || t("list.downloadStartFailed"), "alert");
+          }
         });
     });
 

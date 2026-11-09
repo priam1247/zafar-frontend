@@ -65,7 +65,8 @@ teal bar carries the wordmark, the page title, the day's download allowance and
 a running count; the white sheet carries the catalogue; five tabs pinned to the
 bottom hold the sections (Past Papers, Books, Notes, Marking Keys, Favorites).
 There is no sidebar and no drawer — categories are chips that scroll sideways
-on the list pages, and Help / Log out sit as two round buttons in the bar.
+on the list pages, and Help sits in the bar with its word on it next to an
+icon-only Log out.
 
 Glyphs are near-black ink (`--ink`) on the light surfaces — files, hearts,
 search, tabs — while teal is kept for text, headers and the filled download
@@ -79,6 +80,11 @@ the *same* number as Past Papers rather than advertising an allowance of their
 own — the chip's accessible label says so, and the page description reads
 "counted against your papers". Where the server reports no count, the chip
 stays hidden instead of quoting a policy the backend does not keep.
+
+When the allowance runs out, a plain-English notice appears above the
+catalogue — and again if a download is refused — saying that ZAFAR is free, why
+the limits exist, and that saving to Favorites and coming back tomorrow is the
+way through, with a button straight to that tab.
 
 Cards keep the same discipline as the auth screen: one hairline, no shadow, a
 mint tile for the file mark, the title, a category chip, then size and a single
