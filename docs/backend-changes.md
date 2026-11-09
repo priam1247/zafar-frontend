@@ -282,3 +282,82 @@ English-text matching would all disappear.
 4. §5 — refresh endpoint permission.
 5. §8 + §9 — error codes and remaining-attempts.
 6. §10–§13 — token claims, consistency, rate limiting, domain policy.
+
+---
+
+## 15. Follow-ups after the per-section quota round (checked against `5fc16f9`)
+
+Everything the frontend needed for per-section allowances is in place: the four
+buckets in `QuotaOut`, `SECTION_QUOTA_CATEGORY`, the `429` with `Retry-After`
+and `X-Error-Code`, and — since `c2717d9` — `expose_headers` plus
+`forwarded_allow_ips`, so the header is readable from the app and the rate
+limiter finally sees each student instead of the whole site behind one IP.
+
+Two small things left, both narrow:
+
+### 15.1 Make `section` required on `POST /drive/download` (P2)
+
+`routers/drive.py` declares `section: str = "papers"`. A client that forgets
+the parameter is therefore charged to papers rather than told it made a
+mistake — the exact shape of the bug the frontend just fixed in Favorites. The
+route already 404s when the file is not in the named section, so removing the
+default only changes what happens to a *broken* caller:
+
+```python
+# routers/drive.py
+section: str,                      # was: section: str = "papers"
+```
+
+FastAPI then answers `422` for a missing parameter, which is honest, and no
+correct client notices. `/drive/papers` and `/drive/categories` can keep their
+default; they are reads.
+
+### 15.2 A test that a section cannot be crossed (P2)
+
+`tests/test_quota_and_downloads.py` covers independence and unknown file ids,
+but not the case the UI hit: a note's id requested under `?section=papers`.
+It should 404, not charge papers — worth pinning so nobody "helpfully" falls
+back to papers later:
+
+The shared `fake_drive_tree` fixture answers every folder with the same two
+files, so this case needs one that knows which folder it was asked about:
+
+```python
+def test_a_note_cannot_be_downloaded_as_a_paper(client, monkeypatch, verified_user_token):
+    """The route looks the id up in the named section, so a wrong section is a
+    404 — never a charge to the wrong bucket."""
+    import routers.drive as drive_router
+
+    papers = [{"id": "file-1", "name": "Paper One.pdf", "mimeType": "application/pdf",
+               "size": "1000", "category": "MSCE Maneb"}]
+    notes = [{"id": "note-1", "name": "Note One.pdf", "mimeType": "application/pdf",
+              "size": "1000", "category": "Form 1"}]
+
+    monkeypatch.setattr(drive_router, "_section_folder_id", lambda section: section)
+    monkeypatch.setattr(
+        drive_router,
+        "list_files_recursive",
+        lambda folder_id, max_depth=6, force_refresh=False: notes if folder_id == "notes" else papers,
+    )
+
+    headers = {"Authorization": f"Bearer {verified_user_token}"}
+    assert client.post("/drive/download/note-1?section=papers", headers=headers).status_code == 404
+
+    # Nothing was spent against papers by the refused request.
+    resp = client.post("/drive/download/file-1?section=papers", headers=headers)
+    assert resp.status_code == 200
+    assert resp.json()["quota"]["papers_downloaded_today"] == 1
+```
+
+Both changes were tried against `5fc16f9` before writing them down: with `section`
+required and this test added, the suite is **53 passed**.
+
+### 15.3 Left alone on purpose
+
+- Legacy `DownloadLog` rows written before `f30f39a` carry `category="paper"`
+  for notes and marking keys. A backfill would need the file id resolved in
+  each folder again; the skew disappears at 00:00 UTC, so it is not worth it.
+- The download route could resolve the section from the file id instead of
+  trusting the query (belt and braces for favourite items that were moved
+  between folders). It costs up to three extra warm tree scans per download;
+  the frontend already sends the right section, so this stays a suggestion.

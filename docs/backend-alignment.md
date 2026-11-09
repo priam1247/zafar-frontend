@@ -205,6 +205,12 @@ rolls over; nothing in the UI claims otherwise.
 - `404 File not found in this section` happens when the Drive tree cache (6 h
   TTL) predates an upload. `POST /drive/refresh` exists and is open to any
   signed-in user — call it once and retry, instead of failing the download.
+- **The section is checked, not just used.** `get_download_url` looks the file
+  id up in that section's Drive folder and 404s if it is not there, so a
+  request that names the wrong section can never be charged to the wrong
+  bucket — it fails instead. That is why Favorites has to send each card's own
+  section: with the old page-level `papers` a saved note came back 404, and the
+  phone showed a plain download failure.
 - `POST /drive/confirm/{download_id}` after the bytes arrive is correct and
   idempotent; it is what stops a good download from expiring out of the count.
   Keep it, and keep it **after** the blob resolves, never before.
