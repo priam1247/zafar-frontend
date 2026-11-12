@@ -76,6 +76,24 @@ There is no sidebar and no drawer — categories are chips that scroll sideways
 on the list pages, and Help sits in the bar with its word on it next to an
 icon-only Log out.
 
+**Two ways in.** The sign-in card has the email and password form, and under it
+a *Continue with Google* button — hidden entirely until a Google client ID is
+configured (`GOOGLE_CLIENT_ID` in `config.js`), because a button that cannot
+work is worse than no button. When it is switched on, Google's own script draws
+the button, and the only thing that leaves the page is the ID token Google
+issued: `POST /auth/google` verifies it and answers with the same JWT the email
+form gets, so nothing downstream knows the difference. The button stays out of
+the create-account side (that flow proves the address with a code) and out of
+the code screen. The backend half is written out in
+`docs/backend-prompt-google-signin.md`.
+
+The fields themselves are white on the cream card with a line at rest that
+clears 3:1 against that white (WCAG's floor for a control's own edge), ink for
+what is typed (18.6:1) and a placeholder at 5.2:1 with `opacity: 1`, so it is
+not faded twice. A 3 px ring marks focus, since `:focus-visible` never fires on
+a phone. That is the whole difference between a field and a disabled box in
+daylight.
+
 **Past Papers holds two shelves.** A Primary / Secondary switch sits above the
 search box — inside the page, not in the tab bar, because Primary is a level of
 the same subject, not a sixth section. Secondary asks the server for
@@ -308,6 +326,7 @@ backend. Endpoints used:
 | --- | --- | --- |
 | POST | `/auth/register` | create an account — `{email, password, name}` |
 | POST | `/auth/login` | issue a JWT (form-encoded: `email`, `password`) |
+| POST | `/auth/google` | exchange a Google ID token for the same JWT — see `docs/backend-prompt-google-signin.md` |
 | POST | `/auth/verify` | confirm the 6-digit email code — `{email, code}` |
 | POST | `/auth/resend` | send a fresh verification code — `{email}` |
 | POST | `/auth/forgot-password` | email a reset code — `{email}` |
@@ -318,6 +337,11 @@ backend. Endpoints used:
 | POST | `/drive/download/{id}` | spend quota, return a short-lived signed URL |
 | POST | `/drive/confirm/{download_id}` | confirm the bytes actually arrived |
 | GET | `/health` | warm-up ping, used by `Zafar.warmUp()` |
+
+`GOOGLE_CLIENT_ID` in the same file is the switch for **Continue with Google**:
+empty means no button anywhere, a real client ID (it ends in
+`.apps.googleusercontent.com`) means the button appears on the sign-in card.
+The backend needs the same ID, and the route above.
 
 A **local** page may point at another backend with `?api=http://localhost:8000`.
 On the live site the parameter is ignored: honouring it there would let a link

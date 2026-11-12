@@ -36,7 +36,11 @@
 
   --paper: #FAF5E9;
   --sheet: #FFFDF8;
-  --field: rgba(var(--brand-rgb), .06);
+  /* What is typed is ink, not brand teal: a password at 16px reads more
+     clearly in near-black than in a coloured tint, and it matches the list
+     pages. */
+  --ink: #101413;
+  --field: #FFFFFF;
 
   --line: rgba(var(--brand-rgb), .15);
   --line-2: rgba(var(--brand-rgb), .30);
@@ -259,6 +263,56 @@ img { display: block; }
 }
 .link-btn:hover { text-decoration-thickness: 2px; opacity: .8; }
 
+/* ---------- Google ---------- */
+
+/* Rendered only when a client ID is configured: an empty slot would be a
+   promise nobody can keep, so the whole zone stays hidden until it can work. */
+.google-zone { margin-top: 18px; }
+
+.google-zone[hidden] { display: none; }
+
+.or-rule {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 0 0 14px;
+  color: var(--t-60);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+}
+
+.or-rule::before,
+.or-rule::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: var(--line-2);
+}
+
+/* The button itself is an iframe drawn by Google, which keeps its own
+   branding rules; this only reserves the space and centres it. */
+.google-btn {
+  display: flex;
+  justify-content: center;
+  min-height: 44px;
+}
+
+.google-btn > div { width: 100% !important; }
+
+.google-zone.is-busy .google-btn { opacity: .55; pointer-events: none; }
+
+.google-note {
+  margin: 10px 2px 0;
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--warn);
+  text-align: left;
+}
+
+.google-note[hidden] { display: none; }
+
 /* ---------- Notice ---------- */
 
 .banner {
@@ -294,29 +348,38 @@ img { display: block; }
   left: 16px;
   top: 50%;
   transform: translateY(-50%);
-  color: var(--t-45);
+  color: var(--t-70);
   pointer-events: none;
   transition: color .16s var(--ease);
 }
 .control:focus-within .ic { color: var(--brand); }
 
+/* A field has to look like a place to type. It is white against the cream
+   sheet, carries a line at rest that clears 3:1 against that white (WCAG's
+   floor for a control's own edge), and the text inside is ink at 18.6:1: the old
+   version was a 6% teal wash with no border, which on a phone in daylight read
+   as a disabled box. */
 .input {
   width: 100%;
   height: 54px;
   padding: 0 52px 0 47px;
-  border: 1.5px solid transparent;
+  border: 1.5px solid rgba(var(--brand-rgb), .70);
   border-radius: 999px;
   background: var(--field);
-  color: var(--brand);
+  color: var(--ink);
   font: inherit;
   font-size: 16px; /* 16px stops iOS zooming the page on focus */
-  transition: background .16s var(--ease), border-color .16s var(--ease);
+  font-weight: 500;
+  transition: border-color .16s var(--ease), box-shadow .16s var(--ease), background .16s var(--ease);
 }
-.input::placeholder { color: var(--t-45); }
+.input::placeholder { color: rgba(16, 20, 19, .62); opacity: 1; }
+.input:hover { border-color: rgba(var(--brand-rgb), .85); }
 .input:focus {
   outline: none;
-  background: #fff;
   border-color: var(--brand);
+  /* The ring is the focus state on a touch screen too, where :focus-visible
+     never fires and there is no hover to lean on. */
+  box-shadow: 0 0 0 3px rgba(var(--brand-rgb), .18);
 }
 
 .toggle-show {
@@ -337,7 +400,7 @@ img { display: block; }
 }
 .toggle-show:hover, .toggle-show.shown { color: var(--brand); }
 
-.field.has-error .input { border-color: var(--brand); background: #fff; }
+.field.has-error .input { border-color: var(--warn); box-shadow: 0 0 0 3px rgba(178, 106, 20, .14); }
 
 .error-msg {
   display: none;

@@ -898,6 +898,147 @@ test("the manifest and robots.txt agree with what is on disk", () => {
   assert.match(headers, /\/assets\/img\/\*\n\s+Cache-Control: public/);
 });
 
+/* ---------- 8e. the sign-in card: fields you can see, and Google ---------- */
+
+test("the email and password fields read as fields, not as disabled boxes", () => {
+  const css = read(path.join(WEB, "assets/css/auth.css"));
+  const rule = (selector) => {
+    const at = css.indexOf(selector + " {");
+    assert.ok(at !== -1, "auth.css has no " + selector + " rule");
+    return css.slice(at, css.indexOf("}", at));
+  };
+
+  const hex = (value) => {
+    assert.match(value, /^#[0-9A-Fa-f]{6}$/, "not a colour: " + value);
+    return [1, 3, 5].map((i) => parseInt(value.slice(i, i + 2), 16));
+  };
+  const over = (fg, alpha, bg) => fg.map((c, i) => c * alpha + bg[i] * (1 - alpha));
+  const luminance = (rgb) =>
+    rgb
+      .map((c) => c / 255)
+      .map((c) => (c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4)))
+      .reduce((sum, c, i) => sum + c * [0.2126, 0.7152, 0.0722][i], 0);
+  const contrast = (a, b) => {
+    const [hi, lo] = [luminance(a), luminance(b)].sort((x, y) => y - x);
+    return (hi + 0.05) / (lo + 0.05);
+  };
+
+  const field = hex(/--field:\s*(#[0-9A-Fa-f]{6})/.exec(css)[1]);
+  const ink = hex(/--ink:\s*(#[0-9A-Fa-f]{6})/.exec(css)[1]);
+  const brand = hex(/--brand:\s*(#[0-9A-Fa-f]{6})/.exec(css)[1]);
+  assert.deepEqual(field, [255, 255, 255], "the field is white, not a teal wash");
+
+  const input = rule(".input");
+  // What is typed: ink on white, eighteen to one.
+  assert.match(input, /color:\s*var\(--ink\)/);
+  assert.ok(contrast(ink, field) > 12, "typed text is only " + contrast(ink, field).toFixed(1) + ":1");
+  // 16 px keeps iOS from zooming the whole page when the field is focused.
+  assert.match(input, /font-size:\s*16px/);
+
+  // The line around the field, against the field it surrounds: WCAG asks 3:1 of
+  // a control's own edge, and the point of this round is that it is visible.
+  const borderAlpha = Number(/\.(\d+)\)/.exec(rule(".input"))[1]) / 100;
+  const border = over(brand, borderAlpha, field);
+  assert.ok(
+    contrast(border, field) >= 3,
+    "the resting border is " + contrast(border, field).toFixed(2) + ":1 against the field, needs 3:1"
+  );
+
+  // The placeholder, still readable rather than a rumour.
+  const ph = rule(".input::placeholder");
+  const phAlpha = Number(/\.(\d+)\)/.exec(ph)[1]) / 100;
+  const phColour = over(over([16, 20, 19], 1, field), phAlpha, field);
+  assert.ok(contrast(phColour, field) >= 4.5, "the placeholder is only " + contrast(phColour, field).toFixed(1) + ":1");
+  assert.match(ph, /opacity:\s*1/, "the placeholder must not be faded twice");
+
+  // Focus is visible on a phone, where :focus-visible never fires.
+  assert.match(rule(".input:focus"), /box-shadow:\s*0 0 0 3px rgba\(var\(--brand-rgb\), \.18\)/);
+  // An error changes the colour, not just the thickness.
+  assert.match(rule(".field.has-error .input"), /border-color:\s*var\(--warn\)/);
+});
+
+test("Google sign-in is wired but stays invisible until it can work", async () => {
+  const calls = [];
+  const dom = await openPage("/login.html", {
+    fetch: (input, init) => {
+      const url = String(input && input.url ? input.url : input);
+      calls.push([url, init && init.body]);
+      // A backend that has not been given the client ID yet: the route is not
+      // there at all.
+      if (/\/auth\/google/.test(url)) return reply({ detail: "Not Found" }, 404);
+      return reply({});
+    },
+  });
+  await wait(300);
+  const w = dom.window;
+  const d = w.document;
+
+  // Unconfigured (GOOGLE_CLIENT_ID is empty in config.js): no slot, and no
+  // request to accounts.google.com. A button that cannot work is worse than
+  // no button.
+  assert.equal(w.GOOGLE_CLIENT_ID, "", "the shipped client ID must be empty");
+  assert.ok(d.getElementById("googleZone"), "the slot exists in the markup");
+  assert.equal(d.getElementById("googleZone").hidden, true, "and it is hidden");
+  assert.equal(
+    calls.filter(([url]) => /accounts\.google\.com/.test(url)).length,
+    0,
+    "an unconfigured page must not call Google"
+  );
+  assert.ok(
+    [...d.querySelectorAll("script[src]")].every((s) => !/accounts\.google\.com/.test(s.src)),
+    "and must not load Google's script"
+  );
+  // The wording is there for when it is switched on.
+  assert.equal(d.getElementById("txt-or").textContent, "or");
+
+  // What counts as a real client ID.
+  assert.equal(w.ZafarAuth.googleEnabled(""), false);
+  assert.equal(w.ZafarAuth.googleEnabled("123-abc.apps.googleusercontent.com"), true);
+  assert.equal(w.ZafarAuth.googleEnabled("PENDING"), false, "a half-pasted ID is not a client ID");
+
+  // The sign-in call itself: the ID token is the only thing that goes up, and a
+  // backend without the route is reported in plain words, not as a dead button.
+  const before = calls.length;
+  w.ZafarAuth.signInWithGoogle("id-token-from-google");
+  await wait(300);
+  const sent = calls.slice(before).map(([url, body]) => [url, body]);
+  assert.equal(sent.length, 1, "one request: " + JSON.stringify(sent));
+  assert.match(sent[0][0], /\/auth\/google$/);
+  assert.deepEqual(JSON.parse(sent[0][1]), { credential: "id-token-from-google" });
+
+  const note = d.getElementById("googleNote");
+  assert.equal(note.hidden, false, "a refusal has to be said out loud");
+  assert.match(note.textContent, /switched on yet/i);
+  // And it points at the door that works.
+  assert.match(note.textContent, /email and password/i);
+  dom.window.close();
+});
+
+test("a Google refusal never repeats the server's own words", async () => {
+  const dom = await openPage("/login.html", {
+    fetch: (input) => {
+      const url = String(input && input.url ? input.url : input);
+      if (/\/auth\/google/.test(url)) {
+        return reply({ detail: "google_id_token audience mismatch: 123-abc" }, 401, {
+          "X-Error-Code": "google_invalid_token",
+        });
+      }
+      return reply({});
+    },
+  });
+  await wait(300);
+  const d = dom.window.document;
+
+  dom.window.ZafarAuth.signInWithGoogle("bad-token");
+  await wait(300);
+
+  const note = d.getElementById("googleNote");
+  assert.equal(note.hidden, false);
+  assert.doesNotMatch(note.textContent, /audience|mismatch|123-abc|token/i);
+  assert.match(note.textContent, /couldn\u2019t confirm|couldn't confirm/i);
+  dom.window.close();
+});
+
 /* ---------- 9. the hero ---------- */
 
 test("the hero says what StudyMW is, on every auth page", async () => {
