@@ -16,6 +16,11 @@ favorites: "Favorites", support: "Support", help: "Help & FAQ",
     },
     pages: {
       papers:    { title: "Past Papers", crumb: "Library", itemLabel: "paper",
+                   // One section, two shelves. Both spend the papers allowance.
+                   levels: [
+                     { key: "papers", label: "Secondary" },
+                     { key: "primary", label: "Primary" },
+                   ],
                    searchPlaceholder: "Search past papers by subject or year…" },
       books:     { title: "Books", crumb: "Library", itemLabel: "book",
                    searchPlaceholder: "Search textbooks by title or form…" },
@@ -29,6 +34,10 @@ favorites: "Favorites", support: "Support", help: "Help & FAQ",
     },
     list: {
       allCategories: "All categories",
+      chooseLevel: "Choose a level",
+      loadMore: "Load more",
+      loadingMore: "Loading…",
+      loadMoreFailed: "Couldn't load more just now. Try again.",
       oneAtATime: "One file at a time. The first one is still coming.",
       // The server sends Retry-After; the page says the wait in everyday words.
       tooManyRequests: function (wait) {

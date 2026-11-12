@@ -412,11 +412,27 @@ const QUOTA = {
   marking_keys_left: 10, marking_keys_limit: 10,
 };
 
-test("a section larger than one page is read to the end and cached whole", async () => {
+test("the first page is 50, and the next page waits until the end is reached", async () => {
   const all = catalogue(250);
   const seen = [];
+  const watchers = [];
   const dom = await openPage("/notes.html", {
     storage: { zafar_token: token("student") },
+    // jsdom has no layout, so no scrolling to speak of: stand in for the
+    // observer and fire it by hand, which is the only thing the page uses it
+    // for anyway.
+    beforeParse(win) {
+      win.IntersectionObserver = class {
+        constructor(callback) {
+          this.callback = callback;
+          this.targets = [];
+          watchers.push(this);
+        }
+        observe(el) { this.targets.push(el); }
+        unobserve(el) { this.targets = this.targets.filter((t) => t !== el); }
+        disconnect() { this.targets = []; }
+      };
+    },
     fetch: (input) => {
       const url = String(input && input.url ? input.url : input);
       seen.push(url);
@@ -426,7 +442,7 @@ test("a section larger than one page is read to the end and cached whole", async
       if (/\/drive\/papers/.test(u.pathname)) {
         const limit = Number(u.searchParams.get("limit"));
         const offset = Number(u.searchParams.get("offset")) || 0;
-        assert.ok(limit > 0, "the page should ask for a bounded page");
+        assert.equal(limit, 50, "the page should ask for 50, the backend's default: " + url);
         return reply(all.slice(offset, offset + limit));
       }
       return reply({});
@@ -435,21 +451,54 @@ test("a section larger than one page is read to the end and cached whole", async
   await wait(900);
 
   const d = dom.window.document;
-  const listCalls = seen.filter((u) => /\/drive\/papers/.test(u));
-  assert.equal(listCalls.length, 2, "one page of 200 and one of 50: " + listCalls.join(", "));
-  assert.ok(listCalls.some((u) => /offset=200/.test(u)), "the second page must be asked for");
-  assert.equal(d.querySelector("[data-count]").textContent, "250 results");
-  assert.equal(d.querySelectorAll(".item").length, 250);
+  const papers = () => seen.filter((u) => /\/drive\/papers/.test(u));
 
-  // The same question again is answered from the cache, whole.
+  // One request on load. Not two, not twenty-five.
+  assert.equal(papers().length, 1, "one page on load: " + papers().join(", "));
+  assert.match(papers()[0], /offset=0/);
+  assert.equal(d.querySelectorAll(".item").length, 50);
+  assert.equal(d.querySelector("[data-count]").textContent, "50 results");
+
+  assert.equal(d.querySelector("[data-switch]"), null, "no levels: this is not Past Papers");
+
+  const more = d.querySelector("[data-more]");
+  const moreBtn = d.querySelector("[data-more-btn]");
+  assert.equal(more.hidden, false, "the rest of the list is behind a button");
+  assert.equal(moreBtn.textContent, "Load more");
+
+  // Time passing is not a reason to fetch anything.
+  await wait(300);
+  assert.equal(papers().length, 1, "nothing else is fetched until the list is read");
+
+  // Reaching the end of the list is.
+  assert.ok(watchers.length, "the page watches for the end of the list");
+  watchers[0].callback([{ target: d.querySelector("[data-sentinel]"), isIntersecting: true }]);
+  await wait(300);
+  assert.equal(papers().length, 2);
+  assert.match(papers()[1], /offset=50/);
+  assert.equal(d.querySelectorAll(".item").length, 100);
+
+  // The button does the same for a browser without the observer.
+  moreBtn.dispatchEvent(new dom.window.Event("click", { bubbles: true }));
+  await wait(300);
+  assert.equal(papers().length, 3);
+  assert.match(papers()[2], /offset=100/);
+  assert.equal(d.querySelectorAll(".item").length, 150);
+
+  // A new question starts at the first page, and the old rows go with it.
   const input = d.querySelector("[data-search]");
+  input.value = "Document 1";
+  input.dispatchEvent(new dom.window.Event("input", { bubbles: true }));
+  await wait(600);
+  const last = papers()[papers().length - 1];
+  assert.match(last, /offset=0/, "a new question starts at the first page");
+  assert.match(last, /q=Document/);
+
+  // The same question again is answered from the cache.
+  const before = papers().length;
   input.dispatchEvent(new dom.window.Event("input", { bubbles: true }));
   await wait(500);
-  assert.equal(
-    seen.filter((u) => /\/drive\/papers/.test(u)).length,
-    listCalls.length,
-    "a repeated question should not hit the server"
-  );
+  assert.equal(papers().length, before, "a repeated question should not hit the server");
   dom.window.close();
 });
 
@@ -473,10 +522,85 @@ test("a backend that ignores offset is read once, not in a loop", async () => {
   await wait(900);
 
   const d = dom.window.document;
-  const listCalls = seen.filter((u) => /\/drive\/papers/.test(u));
-  assert.ok(listCalls.length <= 2, "it must stop when a page brings nothing new: " + listCalls.length);
+  const papers = () => seen.filter((u) => /\/drive\/papers/.test(u));
+  const expected = d.querySelectorAll(".item").length;
+  assert.equal(expected, 200, "what came back is shown");
+
+  // Asking again brings the same rows. Nothing new means the end of the list,
+  // so the button goes away rather than asking for a page that cannot arrive.
+  const moreBtn = d.querySelector("[data-more-btn]");
+  assert.equal(d.querySelector("[data-more]").hidden, false);
+  moreBtn.dispatchEvent(new dom.window.Event("click", { bubbles: true }));
+  await wait(400);
+
+  assert.equal(papers().length, 2, "it asks once more, then stops: " + papers().join(", "));
   assert.equal(d.querySelectorAll(".item").length, 200, "no duplicates from the repeated page");
   assert.equal(d.querySelector("[data-count]").textContent, "200 results");
+  assert.equal(d.querySelector("[data-more]").hidden, true, "there is nothing more to load");
+  dom.window.close();
+});
+
+/* ---------- 9b. Primary is a shelf inside Past Papers ---------- */
+
+test("Primary swaps the shelf, not the allowance", async () => {
+  const seen = [];
+  const row = (section) => ({
+    id: section + "-1",
+    name: (section === "primary" ? "PSLC" : "MSCE") + " Mathematics 2023.pdf",
+    category: section === "primary" ? "PSLC Maneb" : "MSCE Maneb",
+    size_bytes: 1000,
+  });
+  const dom = await openPage("/dashboard.html", {
+    storage: { zafar_token: token("student") },
+    fetch: (input) => {
+      const url = String(input && input.url ? input.url : input);
+      seen.push(url);
+      const u = new URL(url, origin + "/");
+      if (/\/auth\/quota/.test(u.pathname)) return reply(QUOTA);
+      if (/\/drive\/categories/.test(u.pathname)) {
+        return reply(
+          u.searchParams.get("section") === "primary"
+            ? ["PSLC Maneb", "Primary Mock"]
+            : ["MSCE Maneb", "Mock"]
+        );
+      }
+      if (/\/drive\/papers/.test(u.pathname)) return reply([row(u.searchParams.get("section"))]);
+      return reply({});
+    },
+  });
+  await wait(900);
+
+  const d = dom.window.document;
+  const papers = () => seen.filter((u) => /\/drive\/papers/.test(u));
+  const levels = () => [...d.querySelectorAll("[data-switch] [data-level]")];
+
+  // It is a switch on the page, not a sixth tab at the bottom.
+  assert.deepEqual(levels().map((b) => b.textContent), ["Secondary", "Primary"]);
+  const tabs = [...d.querySelectorAll(".tabbar .tab")].map((a) => a.textContent.trim());
+  assert.ok(!tabs.some((label) => /primary/i.test(label)), "no sixth tab: " + tabs.join(" | "));
+  assert.equal(levels()[0].getAttribute("aria-pressed"), "true", "Secondary first");
+  assert.match(papers()[0], /section=papers/);
+  assert.match(papers()[0], /limit=50/);
+  const papersLeft = d.querySelector("[data-quota-text]").textContent;
+  assert.match(papersLeft, /10 of 10/);
+
+  levels()[1].dispatchEvent(new dom.window.MouseEvent("click", { bubbles: true }));
+  await wait(700);
+
+  const primaryCall = papers()[papers().length - 1];
+  assert.match(primaryCall, /section=primary/);
+  assert.match(primaryCall, /limit=50/);
+  assert.match(primaryCall, /offset=0/, "a new shelf starts at the first page");
+  assert.equal(levels()[1].getAttribute("aria-pressed"), "true");
+  assert.equal(d.querySelector("[data-count]").textContent, "1 result");
+  assert.match(d.querySelector(".item-title").textContent, /PSLC/);
+  // The folders follow the shelf: a Secondary category would filter Primary to nothing.
+  assert.match(d.querySelector("[data-cat-chips]").textContent, /PSLC Maneb/);
+  // One bucket for both: the papers numbers, and no second quota request.
+  assert.equal(d.querySelector("[data-quota-text]").textContent, papersLeft);
+  assert.equal(seen.filter((u) => /\/auth\/quota/.test(u)).length, 1, "no second allowance");
+  // And the download knows which shelf the file came from.
+  assert.equal(d.querySelector("[data-download]").dataset.section, "primary");
   dom.window.close();
 });
 

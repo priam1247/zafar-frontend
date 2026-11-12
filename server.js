@@ -53,7 +53,10 @@ const DEMO_SCRIPT = `<script>
   var LIMITS = { papers: 10, books: 3, notes: 3, "marking-keys": 10 };
   // Section key -> the field prefix its numbers live under, exactly as the
   // server does it: "marking-keys" the section, "marking_keys" the fields.
-  var BUCKET = { papers: "papers", books: "books", notes: "notes", "marking-keys": "marking_keys" };
+  // Primary is a shelf inside Past Papers and spends the papers allowance, so
+  // it maps to "papers" too: one bucket, two sections. Only the four fields
+  // named in LIMITS exist.
+  var BUCKET = { papers: "papers", primary: "papers", books: "books", notes: "notes", "marking-keys": "marking_keys" };
   var QUOTA_VERSION = 3;
 
   var TOKEN_KEY = "zafar_token";
@@ -71,7 +74,7 @@ const DEMO_SCRIPT = `<script>
   // ---- allowance lives in localStorage, so it survives navigation ---------
   function freshQuota() {
     var q = { v: QUOTA_VERSION, day: utcDay() };
-    Object.keys(BUCKET).forEach(function (section) {
+    Object.keys(LIMITS).forEach(function (section) {
       var field = BUCKET[section];
       q[field + "_left"] = LIMITS[section];
       q[field + "_limit"] = LIMITS[section];
@@ -134,6 +137,11 @@ const DEMO_SCRIPT = `<script>
       { id: "p5", name: "JCE Physical Science 2022 Paper 2.pdf", category: "JCE Maneb", size_bytes: 688000 },
       { id: "p6", name: "MSCE Physics Mock 2024 Paper 1.pdf", category: "Mock", size_bytes: 803000 },
       { id: "p7", name: "MSCE Geography 2019 Paper 2.pdf", category: "Other Past Papers", size_bytes: 654000 }
+    ],
+    primary: [
+      { id: "e1", name: "PSLC Mathematics 2023.pdf", category: "PSLC Maneb", size_bytes: 690000 },
+      { id: "e2", name: "PSLC English 2022.pdf", category: "PSLC Maneb", size_bytes: 574000 },
+      { id: "e3", name: "Standard 6 Mathematics Mock 2024.pdf", category: "Primary Mock", size_bytes: 402000 }
     ],
     books: [
       { id: "b1", name: "Senior Mathematics 3 Learner's Book.pdf", category: "Senior", size_bytes: 8420000 },
