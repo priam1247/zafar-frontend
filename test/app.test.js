@@ -718,6 +718,186 @@ test("Favorites says how many are saved, and reads the Primary shelf too", async
   dom.window.close();
 });
 
+/* ---------- 8d. the mark: files, sizes, and what a crawler reads ---------- */
+
+const SITE = "https://studymw.netlibrary.dpdns.org";
+const PAGES = [
+  ["index.html", "/"],
+  ["login.html", "/login.html"],
+  ["register.html", "/register.html"],
+  ["verify.html", "/verify.html"],
+  ["help.html", "/help.html"],
+  ["dashboard.html", "/dashboard.html"],
+  ["books.html", "/books.html"],
+  ["notes.html", "/notes.html"],
+  ["marking-keys.html", "/marking-keys.html"],
+  ["favorites.html", "/favorites.html"],
+];
+
+function pngSize(file) {
+  const buf = fs.readFileSync(file);
+  assert.equal(buf.slice(1, 4).toString("ascii"), "PNG", file + " is not a PNG");
+  return { width: buf.readUInt32BE(16), height: buf.readUInt32BE(20) };
+}
+
+function icoSizes(file) {
+  const buf = fs.readFileSync(file);
+  assert.equal(buf.readUInt16LE(0), 0, file + " is not an ICO");
+  assert.equal(buf.readUInt16LE(2), 1, file + " is not an ICO");
+  const count = buf.readUInt16LE(4);
+  const sizes = [];
+  for (let i = 0; i < count; i++) {
+    const width = buf.readUInt8(6 + 16 * i) || 256;
+    sizes.push(width);
+  }
+  return sizes;
+}
+
+function headOf(page) {
+  const html = read(path.join(WEB, page));
+  return html.slice(html.indexOf("<head>"), html.indexOf("</head>"));
+}
+
+test("the mark exists at every size the pages promise", () => {
+  // Google will only use a favicon it can fetch, and it prefers squares that are
+  // a multiple of 48. These are the sizes the <link> tags claim, so they must be
+  // the sizes on disk — a 512 renamed to 48x48 is worse than nothing.
+  const promised = {
+    "assets/img/icon-16.png": 16,
+    "assets/img/icon-48.png": 48,
+    "assets/img/icon-96.png": 96,
+    "assets/img/icon-144.png": 144,
+    "assets/img/icon-192.png": 192,
+    "assets/img/icon-512.png": 512,
+    "assets/img/icon-maskable-192.png": 192,
+    "assets/img/icon-maskable-512.png": 512,
+  };
+  for (const [rel, side] of Object.entries(promised)) {
+    const size = pngSize(path.join(WEB, rel));
+    assert.deepEqual(size, { width: side, height: side }, rel);
+  }
+
+  // iOS draws its own corners, so the touch icon is full bleed and square.
+  assert.deepEqual(pngSize(path.join(WEB, "assets/img/apple-touch-icon.png")), {
+    width: 180,
+    height: 180,
+  });
+
+  // The tab icon carries three frames in one file, for browsers and for crawlers
+  // that only ever ask for /favicon.ico.
+  assert.deepEqual(icoSizes(path.join(WEB, "favicon.ico")), [16, 32, 48]);
+
+  // The share card is the one size the og: meta tags promise.
+  assert.deepEqual(pngSize(path.join(WEB, "assets/img/og-1200x630.png")), {
+    width: 1200,
+    height: 630,
+  });
+
+  // Both SVGs are real XML, draw from a viewBox, and are the same mark.
+  for (const rel of ["assets/img/icon.svg", "assets/img/safari-pinned-tab.svg"]) {
+    const svg = read(path.join(WEB, rel));
+    assert.match(svg, /^<svg[^>]+viewBox="0 0 (100|512) (100|512)"/, rel + " has no viewBox");
+    assert.match(svg, /<path /, rel + " has no shape");
+    assert.doesNotMatch(svg, /undefined|NaN/, rel + " has a broken number in it");
+  }
+});
+
+test("every page advertises the same mark, and search engines can name the site", () => {
+  const blocks = new Set();
+
+  for (const [page, pathname] of PAGES) {
+    const head = headOf(page);
+
+    // The icon block is identical everywhere: one mark, one set of promises.
+    const links = head
+      .split("\n")
+      .filter((line) => /^<link rel="(icon|apple-touch-icon|mask-icon|manifest)"/.test(line));
+    blocks.add(links.join("\n"));
+    assert.ok(links.length >= 9, page + " has only " + links.length + " icon links");
+
+    // Every local file it names is on disk.
+    for (const line of links) {
+      const href = /href="([^"]+)"/.exec(line)[1];
+      if (href.startsWith("http")) continue;
+      assert.ok(fs.existsSync(path.join(WEB, href)), page + " points at a missing " + href);
+    }
+
+    // One canonical address per page, on the deployed host, whatever the URL bar
+    // or a preview deployment says.
+    assert.match(head, new RegExp('<link rel="canonical" href="' + SITE + pathname + '">'));
+
+    const title = /<title>(.*?)<\/title>/.exec(read(path.join(WEB, page)))[1];
+    const ogTitle = /<meta property="og:title" content="([^"]*)">/.exec(head)[1];
+    assert.equal(
+      ogTitle.replace(/&amp;/g, "&"),
+      title.replace(/&amp;/g, "&"),
+      page + ": og:title is not the page title"
+    );
+    assert.ok(
+      head.includes('<meta property="og:image" content="' + SITE + '/assets/img/og-1200x630.png">'),
+      page + " has no absolute og:image"
+    );
+    assert.match(head, /<meta name="twitter:card" content="summary_large_image">/);
+    assert.match(head, /<meta name="theme-color" content="#006D7C">/);
+
+    // The structured data a search engine reads to name the site and draw the
+    // mark: the url and the logo are absolute, and the logo is a file we ship.
+    const json = /<script type="application\/ld\+json">\s*([\s\S]*?)\s*<\/script>/.exec(head)[1];
+    const data = JSON.parse(json);
+    assert.equal(data["@type"], "WebSite");
+    assert.equal(data.name, "StudyMW");
+    assert.equal(data.url, SITE + "/");
+    assert.equal(data.publisher["@type"], "EducationalOrganization");
+    assert.equal(data.publisher.logo.url, SITE + "/assets/img/icon-512.png");
+    const logoPath = path.join(WEB, data.publisher.logo.url.replace(SITE + "/", ""));
+    assert.deepEqual(pngSize(logoPath), { width: 512, height: 512 }, "the logo a crawler is promised");
+  }
+
+  assert.equal(blocks.size, 1, "the icon block drifted between pages");
+});
+
+test("the manifest and robots.txt agree with what is on disk", () => {
+  const manifest = JSON.parse(read(path.join(WEB, "manifest.webmanifest")));
+  assert.equal(manifest.name, "StudyMW — Malawian exam papers");
+  assert.equal(manifest.short_name, "StudyMW");
+  assert.equal(manifest.start_url, "dashboard.html");
+  assert.equal(manifest.display, "standalone");
+  // The theme colour is the tile itself; a launcher that tints its chrome from
+  // the manifest must find the same teal the page uses.
+  assert.equal(manifest.theme_color, "#006D7C");
+  assert.equal(manifest.background_color, "#FAF5E9");
+
+  const sizes = manifest.icons.map((icon) => icon.sizes);
+  for (const wanted of ["48x48", "96x96", "144x144", "192x192", "512x512"]) {
+    assert.ok(sizes.includes(wanted), "the manifest is missing " + wanted);
+  }
+  const maskable = manifest.icons.filter((icon) => icon.purpose === "maskable");
+  assert.deepEqual(maskable.map((i) => i.sizes), ["192x192", "512x512"],
+    "Android needs both maskable sizes: it crops to a shape of its own choosing");
+  for (const icon of manifest.icons) {
+    assert.ok(fs.existsSync(path.join(WEB, icon.src)), "the manifest points at a missing " + icon.src);
+    if (icon.type === "image/png") {
+      const side = Number(icon.sizes.split("x")[0]);
+      assert.deepEqual(pngSize(path.join(WEB, icon.src)), { width: side, height: side }, icon.src);
+    }
+  }
+
+  const robots = read(path.join(WEB, "robots.txt"));
+  assert.match(robots, /^User-agent: \*$/m);
+  assert.match(robots, /^Allow: \/$/m);
+  // The icons must stay fetchable or the mark cannot appear beside a result.
+  assert.doesNotMatch(robots, /Disallow: \/assets/);
+  assert.doesNotMatch(robots, /Disallow: \/favicon\.ico/);
+  // The signed-in pages are not: a crawler would only ever see the sign-in screen.
+  for (const page of ["dashboard.html", "books.html", "notes.html", "marking-keys.html", "favorites.html"]) {
+    assert.match(robots, new RegExp("^Disallow: /" + page + "$", "m"));
+  }
+
+  const headers = read(path.join(WEB, "_headers"));
+  assert.match(headers, /\/favicon\.ico\n\s+Cache-Control: public/);
+  assert.match(headers, /\/assets\/img\/\*\n\s+Cache-Control: public/);
+});
+
 /* ---------- 9. the hero ---------- */
 
 test("the hero says what StudyMW is, on every auth page", async () => {

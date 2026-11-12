@@ -16,6 +16,10 @@ web/                     static frontend (no build step, no framework)
   marking-keys.html      marking keys
   favorites.html         saved documents, across every section
   help.html              FAQ
+  favicon.ico            the tab icon, three sizes in one file
+  robots.txt             what a crawler may read: the icons, not the shelves
+  assets/img/icon-*.png  the mark at every size a browser or a search engine
+                         asks for (drawn by tools/make-icons.py)
   assets/css/app.css     the signed-in app — same system as auth.css
   assets/css/auth.css    the authentication screen — self-contained, so the
                          app stylesheet can be re-skinned without touching it
@@ -158,6 +162,47 @@ pill CTA. List view collapses the same card to one row. States (empty, error,
 offline) and the skeleton loader are shared, so every section fails the same
 way and loads the same way.
 
+## The mark, and how it appears in search
+
+One mark: an open book with its pages fanning out on both sides, cream on the
+teal tile. It is drawn from curves in `tools/make-icons.py`, which writes every
+file in `web/assets/img/` **and** `icon.svg` from the same numbers, so the SVG a
+browser scales and the PNG a crawler downloads cannot drift apart. Every page
+links the same block of them:
+
+| File | Who uses it |
+| --- | --- |
+| `favicon.ico` (16, 32, 48 in one file) | a browser tab, and anything that still asks for `/favicon.ico` without reading the page |
+| `icon-16.png` | the tab strip; a simplified drawing — at 16 px the fanned edges turn into grey mud, so that size keeps only the pages and the spine |
+| `icon-48/96/144/192.png` | Google's results, Chrome's tab and bookmark icons, Windows shortcuts. The sizes are multiples of 48 on purpose: that is the shape Google asks for |
+| `icon.svg` | anything modern enough to scale it, down to a 16 px tab |
+| `apple-touch-icon.png` | the iOS home screen; square and full bleed, because iOS draws its own corners |
+| `icon-maskable-192/512.png` | Android's launcher, which crops to a shape of its choosing; the mark stays inside the safe circle |
+| `og-1200x630.png` | the card that appears when a link is pasted into WhatsApp, X or Facebook |
+| `safari-pinned-tab.svg` | Safari's pinned tab, painted in the brand teal |
+
+Three things make the mark appear **beside a search result** rather than only in
+the tab:
+
+1. The sizes above are real files at the sizes they claim — a test reads each
+   PNG's header and fails if a 512 has been renamed to `48x48`.
+2. `robots.txt` keeps `/assets/` and `/favicon.ico` open. Google will not show a
+   favicon it is not allowed to fetch, which is why the five signed-in pages are
+   the only things it closes.
+3. Every page carries a canonical address on `https://studymw.netlibrary.dpdns.org`
+   and a `WebSite` block in JSON-LD (`name`, `url`, and the logo as an absolute
+   URL), so the site can be named as **StudyMW** rather than guessed from a
+   URL. The `og:` and `twitter:` tags use the same title and description as the
+   page itself.
+
+Two things no amount of markup can rush: Google recrawls a favicon on its own
+schedule (days, sometimes weeks), and it re-reads a name only after the domain
+is indexed. Nothing here has to be deployed twice for that to happen.
+
+To change the mark, edit the curves in `tools/make-icons.py`, run
+`python3 tools/make-icons.py` (needs `pip install pillow`), and commit what it
+writes. The site itself still has no build step and no dependencies.
+
 ## Running locally
 
 ```bash
@@ -249,6 +294,12 @@ because `server.js` rewrites each page as it serves it, and a stored page would
 be the wrong page.
 
 ## Backend
+
+The site is served at **`https://studymw.netlibrary.dpdns.org`** — the origin
+written into every page's canonical link, its share card and its JSON-LD, and
+the one the backend's `ALLOWED_ORIGINS` and the download worker accept. If the
+domain ever changes, those are the files to change: `grep -rn
+studymw.netlibrary web/ README.md`, plus the backend's environment.
 
 `API_BASE_URL` in `web/assets/js/config.js` points at the deployed FastAPI
 backend. Endpoints used:

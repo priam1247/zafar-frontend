@@ -38,6 +38,8 @@ const TYPES = {
   ".webp": "image/webp",
   ".avif": "image/avif",
   ".ico": "image/x-icon",
+  // robots.txt is read by crawlers; text/plain is what they expect to see.
+  ".txt": "text/plain; charset=utf-8",
 };
 
 /* ------------------------------------------------------------

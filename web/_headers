@@ -11,3 +11,12 @@
   X-Frame-Options: DENY
   Referrer-Policy: strict-origin-when-cross-origin
   Content-Security-Policy: frame-ancestors 'none'; object-src 'none'; base-uri 'self'
+
+# The icons are static and their names are stable. A day of caching keeps the
+# tab strip and the install prompt quick without freezing a changed mark for
+# weeks; the PNGs and the SVG share one age so they never disagree.
+/favicon.ico
+  Cache-Control: public, max-age=86400
+
+/assets/img/*
+  Cache-Control: public, max-age=86400
