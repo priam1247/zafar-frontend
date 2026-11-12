@@ -1,0 +1,16 @@
+# StudyMW — https://studymw.netlibrary.dpdns.org
+#
+# The five catalogue pages only exist after signing in: a crawler that fetched
+# one would be redirected to the sign-in screen, which is the same page again
+# under a different address. So they are closed, and the pages a visitor can
+# actually read are open.
+#
+# /assets/ must stay open in every case. A search engine will not show a
+# favicon it is not allowed to fetch, and that is the whole point of the icons.
+User-agent: *
+Allow: /
+Disallow: /dashboard.html
+Disallow: /books.html
+Disallow: /notes.html
+Disallow: /marking-keys.html
+Disallow: /favorites.html
