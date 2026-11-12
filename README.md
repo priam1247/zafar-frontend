@@ -95,6 +95,20 @@ throws the offsets and the rows away and starts at `offset=0` again. Answers
 are kept for one minute per exact view (`section|category|q`), so starring a
 favourite or repeating a search costs no request.
 
+**The count is the library's, not the page's.** Fifty cards on screen must not
+mean "50 results", so the size of the whole answer arrives beside the page in an
+`X-Total-Count` header (`authGetMeta` in `config.js` reads it): the catalogue
+shows *1,240 results* from the first page, and the number does not move as pages
+arrive. It is the count **after** the section, category and `q` filters and
+**before** the page is cut out of the answer, so it also follows a search. The
+same header lets the page know it has reached the end without spending a request
+on an empty page. Until a backend sends it, the count grows with the pages and
+is written `50+` — a floor, never a claim that the list ends at fifty. Favorites
+counts its own saved list, which lives on the phone, so `12 saved` is exact with
+no page needed; with a search or a category on it counts what it has read and
+says `12+ saved`. The backend change this needs is written out in
+`docs/backend-prompt-results-total.md`.
+
 Glyphs are near-black ink (`--ink`) on the light surfaces — files, hearts,
 search, tabs — while teal is kept for text, headers and the filled download
 button. Each page carries a one-line description under its title.
@@ -248,7 +262,7 @@ backend. Endpoints used:
 | POST | `/auth/forgot-password` | email a reset code — `{email}` |
 | POST | `/auth/reset-password` | set a new password — `{email, code, new_password}` |
 | GET | `/auth/quota` | today's remaining downloads, per section |
-| GET | `/drive/papers` | catalogue, filtered by `section`, `category`, `q`; read 50 at a time with `limit` + `offset`, on demand |
+| GET | `/drive/papers` | catalogue, filtered by `section`, `category`, `q`; read 50 at a time with `limit` + `offset`, on demand; the size of the whole answer in `X-Total-Count` |
 | GET | `/drive/categories` | the folder names inside a `section` |
 | POST | `/drive/download/{id}` | spend quota, return a short-lived signed URL |
 | POST | `/drive/confirm/{download_id}` | confirm the bytes actually arrived |

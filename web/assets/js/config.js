@@ -326,6 +326,27 @@ var Zafar = {
       });
   },
 
+  // Same as authGet, but keeps one number from the response headers. A
+  // catalogue answer is one page of a longer list, and the count of the whole
+  // list arrives beside it: `{ data, total }`, where `total` is null when the
+  // server does not send it (or the browser is not allowed to read it).
+  authGetMeta: function (path) {
+    var self = this;
+    return this._fetch(API_BASE_URL + path, {
+      headers: { Authorization: "Bearer " + this.getToken() },
+    })
+      .then(function (res) {
+        if (res.status === 401) return self._unauthorized();
+        return self._json(res).then(function (data) {
+          var raw = res.headers && typeof res.headers.get === "function"
+            ? res.headers.get("X-Total-Count")
+            : null;
+          var total = raw === null || raw === "" ? null : Number(raw);
+          return { data: data, total: isFinite(total) && total >= 0 ? total : null };
+        });
+      });
+  },
+
   authPostJSON: function (path, body) {
     var self = this;
     return this._fetch(API_BASE_URL + path, {

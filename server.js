@@ -157,10 +157,41 @@ const DEMO_SCRIPT = `<script>
     ]
   };
 
-  function reply(status, data) {
+  // The real library runs to thousands of documents, and a demo of seven can
+  // never show what the count and the Load more button are for. So the Past
+  // Papers shelf is topped up to a believable size: the hand-written ones
+  // above stay, the rest are generated names in the same shape.
+  (function fillPastPapers() {
+    var subjects = ["Mathematics", "Biology", "English", "Chichewa", "Physics",
+      "Chemistry", "Geography", "History", "Agriculture", "Life Science"];
+    var categories = ["MSCE Maneb", "JCE Maneb", "Mock", "Other Past Papers"];
+    var years = [2024, 2023, 2022, 2021, 2020, 2019, 2018, 2017];
+    var i = 0;
+    while (DOCS.papers.length < 1187) {
+      var category = categories[i % categories.length];
+      DOCS.papers.push({
+        id: "pp" + i,
+        name: category.split(" ")[0] + " " + subjects[i % subjects.length] + " " +
+          years[(i * 3) % years.length] + " Paper " + (1 + (i % 2)) + ".pdf",
+        category: category,
+        size_bytes: 400000 + ((i * 7919) % 900000)
+      });
+      i += 1;
+    }
+  })();
+
+  function reply(status, data, headers) {
+    var map = headers || {};
     return Promise.resolve({
       ok: status >= 200 && status < 300,
       status: status,
+      headers: {
+        get: function (name) {
+          var key = String(name).toLowerCase();
+          for (var k in map) if (k.toLowerCase() === key) return map[k];
+          return null;
+        }
+      },
       json: function () { return Promise.resolve(data); }
     });
   }
@@ -242,8 +273,11 @@ const DEMO_SCRIPT = `<script>
       // the page's paging shows up here rather than only in production.
       var limit = Number(q.get("limit"));
       var offset = Math.max(0, Number(q.get("offset")) || 0);
+      // The count is of the whole answer, before the page is cut out of it:
+      // that is the number the page shows, so it must not be the page size.
+      var total = matches.length;
       if (isFinite(limit) && limit > 0) matches = matches.slice(offset, offset + limit);
-      return reply(200, matches);
+      return reply(200, matches, { "X-Total-Count": String(total) });
     }
 
     // Anything else (register, verify, resend, password reset) is a real
