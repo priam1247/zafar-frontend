@@ -957,86 +957,163 @@ test("the email and password fields read as fields, not as disabled boxes", () =
   assert.match(rule(".field.has-error .input"), /border-color:\s*var\(--warn\)/);
 });
 
-test("Google sign-in is wired but stays invisible until it can work", async () => {
+test("Google is offered where it can work, and nowhere else", async () => {
+  // The script tag is recorded but never loaded: the test has no business
+  // talking to accounts.google.com, and a load that never resolves leaves the
+  // zone exactly as the page left it.
+  const requested = [];
+  const blockGoogleScripts = (win) => {
+    const realAppend = win.Node.prototype.appendChild;
+    win.Node.prototype.appendChild = function (node) {
+      if (node && node.tagName === "SCRIPT" && /accounts\.google\.com/.test(node.src || "")) {
+        requested.push(node.src);
+        return node;
+      }
+      return realAppend.call(this, node);
+    };
+  };
+
+  // The sign-in side: a real client ID is configured, so the block is there.
   const calls = [];
-  const dom = await openPage("/login.html", {
+  const login = await openPage("/login.html", {
+    beforeParse: blockGoogleScripts,
     fetch: (input, init) => {
       const url = String(input && input.url ? input.url : input);
       calls.push([url, init && init.body]);
-      // A backend that has not been given the client ID yet: the route is not
-      // there at all.
-      if (/\/auth\/google/.test(url)) return reply({ detail: "Not Found" }, 404);
-      return reply({});
-    },
-  });
-  await wait(300);
-  const w = dom.window;
-  const d = w.document;
-
-  // Unconfigured (GOOGLE_CLIENT_ID is empty in config.js): no slot, and no
-  // request to accounts.google.com. A button that cannot work is worse than
-  // no button.
-  assert.equal(w.GOOGLE_CLIENT_ID, "", "the shipped client ID must be empty");
-  assert.ok(d.getElementById("googleZone"), "the slot exists in the markup");
-  assert.equal(d.getElementById("googleZone").hidden, true, "and it is hidden");
-  assert.equal(
-    calls.filter(([url]) => /accounts\.google\.com/.test(url)).length,
-    0,
-    "an unconfigured page must not call Google"
-  );
-  assert.ok(
-    [...d.querySelectorAll("script[src]")].every((s) => !/accounts\.google\.com/.test(s.src)),
-    "and must not load Google's script"
-  );
-  // The wording is there for when it is switched on.
-  assert.equal(d.getElementById("txt-or").textContent, "or");
-
-  // What counts as a real client ID.
-  assert.equal(w.ZafarAuth.googleEnabled(""), false);
-  assert.equal(w.ZafarAuth.googleEnabled("123-abc.apps.googleusercontent.com"), true);
-  assert.equal(w.ZafarAuth.googleEnabled("PENDING"), false, "a half-pasted ID is not a client ID");
-
-  // The sign-in call itself: the ID token is the only thing that goes up, and a
-  // backend without the route is reported in plain words, not as a dead button.
-  const before = calls.length;
-  w.ZafarAuth.signInWithGoogle("id-token-from-google");
-  await wait(300);
-  const sent = calls.slice(before).map(([url, body]) => [url, body]);
-  assert.equal(sent.length, 1, "one request: " + JSON.stringify(sent));
-  assert.match(sent[0][0], /\/auth\/google$/);
-  assert.deepEqual(JSON.parse(sent[0][1]), { credential: "id-token-from-google" });
-
-  const note = d.getElementById("googleNote");
-  assert.equal(note.hidden, false, "a refusal has to be said out loud");
-  assert.match(note.textContent, /switched on yet/i);
-  // And it points at the door that works.
-  assert.match(note.textContent, /email and password/i);
-  dom.window.close();
-});
-
-test("a Google refusal never repeats the server's own words", async () => {
-  const dom = await openPage("/login.html", {
-    fetch: (input) => {
-      const url = String(input && input.url ? input.url : input);
+      // The API as it stands until GOOGLE_CLIENT_ID is set on that deployment.
       if (/\/auth\/google/.test(url)) {
-        return reply({ detail: "google_id_token audience mismatch: 123-abc" }, 401, {
-          "X-Error-Code": "google_invalid_token",
+        return reply({ detail: "Google sign-in is not configured" }, 503, {
+          "X-Error-Code": "google_not_configured",
         });
       }
       return reply({});
     },
   });
   await wait(300);
-  const d = dom.window.document;
+  const lw = login.window;
+  const ld = lw.document;
 
-  dom.window.ZafarAuth.signInWithGoogle("bad-token");
+  assert.match(lw.GOOGLE_CLIENT_ID, /\.apps\.googleusercontent\.com$/);
+  assert.equal(ld.getElementById("googleZone").hidden, false, "the block is visible on sign-in");
+  assert.equal(ld.getElementById("txt-or").textContent, "or");
+  assert.deepEqual(requested, ["https://accounts.google.com/gsi/client"], "Google's script, once");
+
+  // What counts as a client ID.
+  const gate = lw.ZafarAuth.googleEnabled;
+  assert.equal(gate("511934392016-abc.apps.googleusercontent.com"), true);
+  assert.equal(gate("  511934392016-abc.apps.googleusercontent.com\n"), true, "a pasted newline is forgiven");
+  assert.equal(gate(""), false);
+  assert.equal(gate("PENDING"), false, "a half-pasted value is not a client ID");
+  assert.equal(gate(undefined), false);
+
+  // The sign-in call: the ID token is the only thing that goes up, and a
+  // deployment without the route is reported in plain words, not as a dead
+  // button.
+  const before = calls.length;
+  lw.ZafarAuth.signInWithGoogle("id-token-from-google");
+  await wait(400);
+  const sent = calls.slice(before);
+  assert.equal(sent.length, 1, "one request: " + JSON.stringify(sent));
+  assert.match(sent[0][0], /\/auth\/google$/);
+  assert.deepEqual(JSON.parse(sent[0][1]), { credential: "id-token-from-google" });
+
+  const note = ld.getElementById("googleNote");
+  assert.equal(note.hidden, false, "a refusal has to be said out loud");
+  assert.match(note.textContent, /switched on yet/i);
+  assert.match(note.textContent, /email and password/i, "and it points at the door that works");
+  assert.equal(ld.getElementById("googleZone").classList.contains("is-busy"), false, "and the button is usable again");
+  login.window.close();
+
+  // The create side proves the address with a code instead, so the block is
+  // absent there — and nothing is fetched from Google to draw a button that
+  // will not be shown.
+  const register = await openPage("/register.html", {
+    beforeParse: blockGoogleScripts,
+    fetch: () => reply({}),
+  });
   await wait(300);
+  assert.equal(register.window.document.getElementById("googleZone").hidden, true, "no Google on create-account");
+  assert.deepEqual(requested.slice(1), [], "and no script was fetched for it");
+  register.window.close();
+});
 
-  const note = d.getElementById("googleNote");
-  assert.equal(note.hidden, false);
-  assert.doesNotMatch(note.textContent, /audience|mismatch|123-abc|token/i);
-  assert.match(note.textContent, /couldn\u2019t confirm|couldn't confirm/i);
-  dom.window.close();
+test("each Google refusal says something a student can act on", async () => {
+  const cases = [
+    {
+      name: "an address Google verified but the site cannot use",
+      status: 403,
+      code: "google_email_unsupported",
+      detail: "Only verified Gmail addresses are supported",
+      expect: /gmail/i,
+      forbid: /unsupported|verified Gmail addresses/i,
+    },
+    {
+      name: "the account could not be created",
+      status: 503,
+      code: "google_account_unavailable",
+      detail: "Google sign-in could not create the account. Please try again.",
+      expect: /try again in a moment/i,
+      forbid: /create the account/i,
+    },
+    {
+      name: "a token Google will not stand behind",
+      status: 401,
+      code: "google_invalid_token",
+      detail: "google_id_token audience mismatch: 123-abc",
+      expect: /couldn\u2019t confirm|couldn't confirm/i,
+      forbid: /audience|mismatch|123-abc|token/i,
+    },
+  ];
+
+  for (const c of cases) {
+    const dom = await openPage("/login.html", {
+      beforeParse: (win) => {
+        const realAppend = win.Node.prototype.appendChild;
+        win.Node.prototype.appendChild = function (node) {
+          if (node && node.tagName === "SCRIPT" && /accounts\.google\.com/.test(node.src || "")) return node;
+          return realAppend.call(this, node);
+        };
+      },
+      fetch: (input) => {
+        const url = String(input && input.url ? input.url : input);
+        if (/\/auth\/google/.test(url)) {
+          return reply({ detail: c.detail }, c.status, { "X-Error-Code": c.code });
+        }
+        return reply({});
+      },
+    });
+    await wait(300);
+    const d = dom.window.document;
+    dom.window.ZafarAuth.signInWithGoogle("id-token");
+    await wait(400);
+
+    const note = d.getElementById("googleNote");
+    assert.equal(note.hidden, false, c.name + ": the refusal is silent");
+    assert.match(note.textContent, c.expect, c.name + ": " + note.textContent);
+    assert.doesNotMatch(note.textContent, c.forbid, c.name + ": repeats the server: " + note.textContent);
+    dom.window.close();
+  }
+});
+
+test("no OAuth client secret is in the repository", () => {
+  // The client ID in config.js is public by design; the secret is not used by
+  // an ID-token flow at all, so its only possible role here is as a leak.
+  const walk = (dir) =>
+    fs.readdirSync(dir, { withFileTypes: true }).flatMap((e) => {
+      const full = path.join(dir, e.name);
+      if (e.name === "node_modules" || e.name === ".git") return [];
+      return e.isDirectory() ? walk(full) : [full];
+    });
+
+  const suspicious = walk(WEB).filter((f) => /client_secret/i.test(path.basename(f)));
+  assert.deepEqual(suspicious, [], "a client-secret file is in web/");
+  const withSecret = walk(WEB).filter((f) => /\.(json|js|html|md|txt)$/.test(f) && /GOCSPX-/.test(read(f)));
+  assert.deepEqual(withSecret, [], "something in web/ carries a GOCSPX- secret");
+
+  // And the ignore rules that keep one out if it is ever dropped in.
+  const ignore = read(path.join(ROOT, ".gitignore"));
+  assert.match(ignore, /client_secret\*\.json/);
+  assert.match(ignore, /^\s*\.env$/m);
 });
 
 /* ---------- 9. the hero ---------- */

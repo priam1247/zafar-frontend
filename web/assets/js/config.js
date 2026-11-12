@@ -43,22 +43,25 @@ var QUOTA_FIELD = {
 // Display order for "what is still available" in the spent-allowance notice.
 var QUOTA_SECTIONS = ["papers", "books", "notes", "marking-keys"];
 
-// Google sign-in. Paste the OAuth "Web application" client ID from the Google
-// Cloud console here and a "Continue with Google" button appears at the bottom
-// of the sign-in card; leave it empty and the card has no Google button at all.
-// A button that cannot work is worse than no button, so nothing is drawn until
-// this is a real client ID (it always ends in .apps.googleusercontent.com).
+// Google sign-in. This is the OAuth "Web application" client ID; it is public
+// by design (it is in this file, in the page, for anyone to read). The client
+// SECRET is not used by this flow and must never appear in this repository —
+// the browser sends Google's signed ID token and the backend verifies it with
+// Google's keys, so there is nothing for a secret to do here.
 //
-// Switching it on needs four things, in this order:
-//   1. Google Cloud console -> APIs & Services -> Credentials -> Create OAuth
-//      client ID -> Web application. Authorised JavaScript origin:
-//      https://studymw.netlibrary.dpdns.org (and http://localhost:4173 while
-//      developing). The console shows the client ID.
-//   2. Paste it below.
-//   3. Give the same value to the backend as GOOGLE_CLIENT_ID, and make sure it
-//      serves POST /auth/google — see docs/backend-prompt-google-signin.md.
-//   4. Deploy. The button appears on the next page load.
-var GOOGLE_CLIENT_ID = "";
+// Empty means no button at all: a button that cannot work is worse than no
+// button. A value that is not a real client ID (they always end in
+// .apps.googleusercontent.com) is treated as empty for the same reason.
+//
+// What this ID needs on the other side:
+//   1. Google Cloud console -> APIs & Services -> Credentials -> this OAuth
+//      client -> Authorised JavaScript origins must list
+//      https://studymw.netlibrary.dpdns.org and http://localhost:4173.
+//   2. The API deployment must set GOOGLE_CLIENT_ID to the same value and serve
+//      POST /auth/google — it answers 503 google_not_configured until it does,
+//      which the card reports in plain words and then steps aside.
+// If the client is ever replaced, change it in both places in the same deploy.
+var GOOGLE_CLIENT_ID = "511934392016-ehg3o0pfejjr9qhavvhj1uoo3aoq7knm.apps.googleusercontent.com";
 
 // The admin's WhatsApp number in international format — digits only,
 // country code included, no "+" (e.g. "265991234567"). Leave empty to
