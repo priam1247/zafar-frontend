@@ -33,6 +33,10 @@ var ZafarAuth = (function () {
       show: "Show password", hide: "Hide password",
 
       stay: "Remember me", forgot: "Forgot password?",
+      or: "or",
+      googleOff: "Google sign-in isn\u2019t switched on yet. Use your email and password.",
+      googleRefused: "Google couldn\u2019t confirm that account. Try again, or use your email.",
+      googleOffline: "No connection, so Google sign-in can\u2019t finish. Try again when you have data.",
       continueBtn: "Sign in", createBtn: "Create account",
       signingIn: "Signing in\u2026", creatingAccount: "Creating account\u2026",
 
@@ -218,6 +222,14 @@ var ZafarAuth = (function () {
                   '<span class="spinner"></span><span class="submit-label"></span>' +
                 "</button>" +
               "</form>" +
+              // The second way in, under the first, where people look for it.
+              // Hidden unless a Google client ID is configured: see
+              // GOOGLE_CLIENT_ID in config.js.
+              '<div class="google-zone" id="googleZone" hidden>' +
+                '<div class="or-rule"><span id="txt-or"></span></div>' +
+                '<div class="google-btn" id="googleBtn"></div>' +
+                '<p class="google-note" id="googleNote" role="status" hidden></p>' +
+              "</div>" +
             "</div>" +
 
             /* ---------- forgot ---------- */
@@ -345,6 +357,117 @@ var ZafarAuth = (function () {
     return /not verified/i.test(err.message || "");
   }
 
+  /* ---------------- Google ---------------- */
+
+  // A client ID is a real one or nothing: the console's web IDs always end in
+  // .apps.googleusercontent.com. A half-pasted string would render a button
+  // that fails behind an iframe nobody can debug, so it is treated as absent.
+  function googleEnabled(id) {
+    return typeof id === "string" && /\.apps\.googleusercontent\.com$/.test(id);
+  }
+
+  function googleOn() {
+    return googleEnabled(window.GOOGLE_CLIENT_ID);
+  }
+
+  function googleNote(text) {
+    var note = el("googleNote");
+    if (!note) return;
+    note.textContent = text || "";
+    note.hidden = !text;
+  }
+
+  // The sign-in half: the ID token Google hands us is the only thing that goes
+  // up. The backend verifies it with Google's keys and answers with the same
+  // JWT /auth/login returns, so the rest of the app cannot tell the two apart.
+  function signInWithGoogle(credential, remember) {
+    var t = T[lang];
+    if (!credential) return;
+    var zone = el("googleZone");
+    if (zone) zone.classList.add("is-busy");
+    googleNote(t.signingIn);
+
+    return Zafar.postJSON("/auth/google", { credential: credential }).then(
+      function (data) {
+        if (!data || !data.access_token) {
+          if (zone) zone.classList.remove("is-busy");
+          googleNote(t.googleRefused);
+          return;
+        }
+        Zafar.setToken(data.access_token, remember !== false);
+        location.href = "dashboard.html";
+      },
+      function (err) {
+        if (zone) zone.classList.remove("is-busy");
+        var code = err && err.code;
+        if (err && (err.status === 404 || err.status === 501 || code === "google_not_configured")) {
+          // The button is wired but the backend has not been given the client
+          // ID, or does not serve the route at all. Say so plainly and point at
+          // the way in that works.
+          googleNote(t.googleOff);
+        } else if (err && (err.status === 401 || err.status === 403)) {
+          googleNote(t.googleRefused);
+        } else if (!navigator.onLine) {
+          googleNote(t.googleOffline);
+        } else {
+          googleNote(friendlyError(err));
+        }
+      }
+    );
+  }
+
+  // Google's script is fetched only when there is a client ID to use it with:
+  // on an unconfigured site, signing in never talks to accounts.google.com.
+  var googleScript = "idle";
+
+  function loadGoogle() {
+    if (!googleOn() || googleScript !== "idle") return;
+    googleScript = "loading";
+    var script = document.createElement("script");
+    script.src = "https://accounts.google.com/gsi/client";
+    script.async = true;
+    script.defer = true;
+    script.onload = function () {
+      googleScript = "ready";
+      renderGoogleButton();
+    };
+    script.onerror = function () {
+      googleScript = "failed";
+      // No button and no cry for help: the email form is right above.
+      el("googleZone").hidden = true;
+    };
+    document.head.appendChild(script);
+  }
+
+  function renderGoogleButton() {
+    var zone = el("googleZone");
+    var slot = el("googleBtn");
+    if (!zone || zone.hidden || !slot) return;
+    var api = window.google && window.google.accounts && window.google.accounts.id;
+    if (!api) return;
+    api.initialize({
+      client_id: window.GOOGLE_CLIENT_ID,
+      ux_mode: "popup",
+      auto_select: false,
+      cancel_on_tap_outside: true,
+      callback: function (response) {
+        signInWithGoogle(response && response.credential, el("staySignedIn").checked);
+      }
+    });
+    // 320 is the widest the button renders; the card is narrower on a small
+    // phone, so ask only for what fits.
+    var width = Math.max(240, Math.min(360, Math.round((slot.clientWidth || 320))));
+    api.renderButton(slot, {
+      type: "standard",
+      theme: "outline",
+      size: "large",
+      shape: "pill",
+      text: "continue_with",
+      logo_alignment: "left",
+      width: String(width)
+    });
+  }
+
   /* ---------------- render ---------------- */
   function refreshReveal(btn) {
     var input = el(btn.dataset.target);
@@ -383,6 +506,22 @@ var ZafarAuth = (function () {
     el("forgotLink").style.visibility = isCreate ? "hidden" : "visible";
 
     el("submitBtn").querySelector(".submit-label").textContent = isCreate ? t.createBtn : t.continueBtn;
+
+    // Google is a second way into the same door, so it appears on the sign-in
+    // side only — the create flow proves the address with a code. It stays out
+    // of the card entirely when no client ID is configured.
+    var zone = el("googleZone");
+    if (zone) {
+      // Two conditions and a page check: the sign-in side, a real client ID,
+      // and a page that actually shows the sign-in form (not the code screen).
+      var here = (location.pathname.split("/").pop() || "login.html");
+      var signInPage = here === "login.html" || here === "register.html";
+      var showGoogle = !isCreate && signInPage && googleOn();
+      zone.hidden = !showGoogle;
+      el("txt-or").textContent = t.or;
+      if (showGoogle) loadGoogle();
+      else googleNote("");
+    }
     el("txt-footer").innerHTML = t.footer;
 
     el("err-name").textContent = t.errName;
@@ -815,7 +954,14 @@ var ZafarAuth = (function () {
     }
   }
 
-  return { init: init, T: T };
+  return {
+    init: init,
+    T: T,
+    // The same two functions the button uses, so the behaviour can be driven
+    // in a test without accounts.google.com in the room.
+    signInWithGoogle: signInWithGoogle,
+    googleEnabled: googleEnabled
+  };
 })();
 
 document.addEventListener("DOMContentLoaded", ZafarAuth.init);
