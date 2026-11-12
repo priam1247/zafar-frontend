@@ -76,16 +76,29 @@ There is no sidebar and no drawer — categories are chips that scroll sideways
 on the list pages, and Help sits in the bar with its word on it next to an
 icon-only Log out.
 
-**Two ways in.** The sign-in card has the email and password form, and under it
-a *Continue with Google* button — hidden entirely until a Google client ID is
-configured (`GOOGLE_CLIENT_ID` in `config.js`), because a button that cannot
-work is worse than no button. When it is switched on, Google's own script draws
-the button, and the only thing that leaves the page is the ID token Google
-issued: `POST /auth/google` verifies it and answers with the same JWT the email
-form gets, so nothing downstream knows the difference. The button stays out of
-the create-account side (that flow proves the address with a code) and out of
-the code screen. The backend half is written out in
-`docs/backend-prompt-google-signin.md`.
+**Two ways in.** The sign-in card has the email and password form, and under an
+`or` rule a *Continue with Google* button. Google's own script draws it — the
+branding is theirs to keep — and the only thing that leaves the page is the ID
+token Google issued: `POST /auth/google` verifies it against the client ID and
+answers with the same JWT the email form gets, so nothing downstream knows the
+difference. The button stays out of the create-account side (that flow proves
+the address with a code) and off the code screen.
+
+It is drawn only when `GOOGLE_CLIENT_ID` in `config.js` is a real client ID, and
+it never fails silently: the backend's machine code in `X-Error-Code` picks the
+sentence, so a student is told *which* thing is wrong — `google_not_configured`
+("isn't switched on yet" — and go and use the form above), `google_email_unsupported`
+("StudyMW works with Gmail addresses"), `google_account_unavailable` ("try again
+in a moment") or `google_invalid_token` ("couldn't confirm that account"). The
+backend's own wording never reaches the screen; it is written for an operator.
+
+**The client secret is not part of this.** An ID-token flow has nothing for one
+to do: Google signs the token, the backend checks the signature against Google's
+published keys. Only the public client ID is in this repository, and a secret
+that ever turns up in it — or in a chat, a screenshot, a support thread — should
+be reset in the Google Cloud console rather than pasted anywhere. `.gitignore`
+keeps `client_secret*.json` out, and a test fails if a `GOCSPX-` string is
+dropped into `web/`.
 
 The fields themselves are white on the cream card with a line at rest that
 clears 3:1 against that white (WCAG's floor for a control's own edge), ink for
@@ -340,8 +353,11 @@ backend. Endpoints used:
 
 `GOOGLE_CLIENT_ID` in the same file is the switch for **Continue with Google**:
 empty means no button anywhere, a real client ID (it ends in
-`.apps.googleusercontent.com`) means the button appears on the sign-in card.
-The backend needs the same ID, and the route above.
+`.apps.googleusercontent.com`) means the button appears on the sign-in card. The
+backend needs the same value in its own `GOOGLE_CLIENT_ID`; until that
+deployment has it, the route answers 503 `google_not_configured` and the card
+says so instead of pretending. The contract the API implements is recorded in
+`docs/backend-prompt-google-signin.md`.
 
 A **local** page may point at another backend with `?api=http://localhost:8000`.
 On the live site the parameter is ignored: honouring it there would let a link

@@ -10,6 +10,7 @@
      POST /auth/resend           {email}
      POST /auth/forgot-password  {email}
      POST /auth/reset-password   {email, code, new_password}
+     POST /auth/google           {credential}           -> {access_token}
    ============================================================ */
 
 var ZafarAuth = (function () {
@@ -37,6 +38,8 @@ var ZafarAuth = (function () {
       googleOff: "Google sign-in isn\u2019t switched on yet. Use your email and password.",
       googleRefused: "Google couldn\u2019t confirm that account. Try again, or use your email.",
       googleOffline: "No connection, so Google sign-in can\u2019t finish. Try again when you have data.",
+      googleGmail: "StudyMW works with Gmail addresses. Sign in with your @gmail.com Google account.",
+      googleUnavailable: "Google signed you in, but StudyMW couldn\u2019t finish setting up the account. Try again in a moment.",
       continueBtn: "Sign in", createBtn: "Create account",
       signingIn: "Signing in\u2026", creatingAccount: "Creating account\u2026",
 
@@ -363,18 +366,24 @@ var ZafarAuth = (function () {
   // .apps.googleusercontent.com. A half-pasted string would render a button
   // that fails behind an iframe nobody can debug, so it is treated as absent.
   function googleEnabled(id) {
-    return typeof id === "string" && /\.apps\.googleusercontent\.com$/.test(id);
+    if (typeof id !== "string") return false;
+    // A client ID pasted from the console often carries a trailing newline;
+    // trim before judging it, and never send Google a value with whitespace in.
+    return /\.apps\.googleusercontent\.com$/.test(id.trim());
   }
 
   function googleOn() {
     return googleEnabled(window.GOOGLE_CLIENT_ID);
   }
 
-  function googleNote(text) {
+  function googleNote(text, kind) {
     var note = el("googleNote");
     if (!note) return;
     note.textContent = text || "";
     note.hidden = !text;
+    // Amber means "this needs your attention"; the quiet grey is for "still
+    // working on it", which is not a problem yet.
+    note.classList.toggle("is-info", kind === "info");
   }
 
   // The sign-in half: the ID token Google hands us is the only thing that goes
@@ -385,7 +394,7 @@ var ZafarAuth = (function () {
     if (!credential) return;
     var zone = el("googleZone");
     if (zone) zone.classList.add("is-busy");
-    googleNote(t.signingIn);
+    googleNote(t.signingIn, "info");
 
     return Zafar.postJSON("/auth/google", { credential: credential }).then(
       function (data) {
@@ -399,17 +408,27 @@ var ZafarAuth = (function () {
       },
       function (err) {
         if (zone) zone.classList.remove("is-busy");
-        var code = err && err.code;
-        if (err && (err.status === 404 || err.status === 501 || code === "google_not_configured")) {
-          // The button is wired but the backend has not been given the client
-          // ID, or does not serve the route at all. Say so plainly and point at
-          // the way in that works.
+        // The machine code is the contract; the status is only a hint for a
+        // backend too old to send one. The backend's own sentence never goes
+        // on screen here — it is written for an operator, not a student.
+        var code = (err && err.code) || "";
+        if (code === "google_not_configured" || (!code && err && (err.status === 404 || err.status === 501))) {
+          // Wired on this side, not yet on that one. Say so, and point at the
+          // way in that works.
           googleNote(t.googleOff);
-        } else if (err && (err.status === 401 || err.status === 403)) {
+        } else if (code === "google_email_unsupported") {
+          // The account is real but the address is not a Gmail one, and codes
+          // for registration are only ever sent to Gmail.
+          googleNote(t.googleGmail);
+        } else if (code === "google_account_unavailable") {
+          googleNote(t.googleUnavailable);
+        } else if (code === "google_invalid_token" || (!code && err && (err.status === 401 || err.status === 403))) {
           googleNote(t.googleRefused);
-        } else if (!navigator.onLine) {
+        } else if (!navigator.onLine || (err && err instanceof TypeError)) {
           googleNote(t.googleOffline);
         } else {
+          // Includes the per-account limit (ten a minute): that sentence is
+          // written for the student and is safe to repeat.
           googleNote(friendlyError(err));
         }
       }
@@ -446,7 +465,7 @@ var ZafarAuth = (function () {
     var api = window.google && window.google.accounts && window.google.accounts.id;
     if (!api) return;
     api.initialize({
-      client_id: window.GOOGLE_CLIENT_ID,
+      client_id: window.GOOGLE_CLIENT_ID.trim(),
       ux_mode: "popup",
       auto_select: false,
       cancel_on_tap_outside: true,

@@ -1,1 +1,9 @@
 node_modules/
+
+# Never commit a Google OAuth client secret. This app's sign-in only ever needs
+# the public client ID (config.js): the browser hands Google's signed ID token
+# to the backend, which verifies it against Google's keys.
+client_secret*.json
+**/client_secret*.json
+.env
+.env.*

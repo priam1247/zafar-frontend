@@ -313,6 +313,10 @@ img { display: block; }
 
 .google-note[hidden] { display: none; }
 
+/* "Checking your Google account…" is not a refusal: it is the quiet half of
+   the same line. */
+.google-note.is-info { color: var(--t-70); }
+
 /* ---------- Notice ---------- */
 
 .banner {
