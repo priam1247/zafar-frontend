@@ -421,7 +421,7 @@ var ZafarList = (function () {
       var group = card.closest(".grid");
       card.remove();
       renderedCount = Math.max(0, renderedCount - 1);
-      shell.count.textContent = t("list.savedCount", renderedCount);
+      updateCount(renderedCount);
       if (group && !group.querySelector(".item")) {
         var heading = group.previousElementSibling;
         if (heading && heading.classList.contains("group-title")) heading.remove();
@@ -795,6 +795,7 @@ var ZafarList = (function () {
     function resetEntry(section) {
       var entry = {
         rows: [], nextOffset: 0, done: false, at: 0, loading: false, ids: {},
+        total: null,
       };
       pages[pageKey(section)] = entry;
       return entry;
@@ -808,6 +809,55 @@ var ZafarList = (function () {
       query.set("limit", String(PAGE_SIZE));
       query.set("offset", String(offset));
       return "/drive/papers?" + query.toString();
+    }
+
+    // How big the answer is. With the server's own count every view knows it
+    // from the first page; without it, the number can only grow as pages
+    // arrive, so the page says "50+" and never pretends the list ends at fifty.
+    function groupCount(n) {
+      try { return Number(n).toLocaleString("en-GB"); } catch (e) { return String(n); }
+    }
+
+    // The whole answer's size, but only if every section this view reads has
+    // reported one. Favorites reads five sections, and one missing number
+    // cannot be added to the others.
+    function totalAcross() {
+      var sum = 0;
+      var every = sectionList().every(function (section) {
+        var entry = pages[pageKey(section)];
+        if (!entry || entry.total === null || entry.total === undefined) return false;
+        sum += entry.total;
+        return true;
+      });
+      return every ? sum : null;
+    }
+
+    // Written from three places — the first paint, every later page, and
+    // removing a favourite — so they can never disagree.
+    function updateCount(n) {
+      var done = !failure && !hasMore();
+      if (cfg.favoritesOnly) {
+        // The saved list itself lives on the phone, so its size is known
+        // exactly — no page has to arrive for it. With a filter on, the answer
+        // is "saved documents that match", which can only be counted as pages
+        // of each section are read, so that one may say "+".
+        if (!state.q && !state.category) {
+          shell.count.textContent = t("list.savedCount", Zafar.getBookmarks().length);
+          return;
+        }
+        shell.count.textContent = done
+          ? t("list.savedCount", n)
+          : t("list.savedAtLeast", n);
+        return;
+      }
+      var total = totalAcross();
+      if (total !== null) {
+        shell.count.textContent = t("list.results", groupCount(total));
+      } else if (done) {
+        shell.count.textContent = t("list.results", groupCount(n));
+      } else {
+        shell.count.textContent = t("list.resultsAtLeast", groupCount(n));
+      }
     }
 
     function hasMore() {
@@ -833,12 +883,16 @@ var ZafarList = (function () {
       entry.loading = true;
       syncMore();
 
-      Zafar.authGet(pageURL(section, entry.nextOffset)).then(
-        function (batch) {
+      Zafar.authGetMeta(pageURL(section, entry.nextOffset)).then(
+        function (answer) {
           entry.loading = false;
           if (mine !== loadSeq) return finished(null);
 
+          var batch = answer.data;
           var rows = Array.isArray(batch) ? batch : [];
+          // How many documents the whole answer holds, not how many came back
+          // in this page. Null until the server sends it.
+          if (answer.total !== null && answer.total !== undefined) entry.total = answer.total;
           var fresh = 0;
           rows.forEach(function (doc) {
             if (!doc || !doc.id || entry.ids[doc.id]) return;
@@ -850,12 +904,17 @@ var ZafarList = (function () {
             fresh += 1;
           });
 
-          // A short page is the end of the section. A full page that brought
-          // nothing new means this backend ignored `offset`: stop, rather than
-          // ask for the same page until something gives.
-          entry.done = rows.length < PAGE_SIZE || fresh === 0;
           entry.nextOffset += rows.length;
           entry.at = Date.now();
+          // Three ways to know the section has ended: the page was short, the
+          // page brought nothing new (a backend ignoring `offset`), or the
+          // server's own count says every document has now been read. The
+          // third is why a shelf of exactly 250 does not need an empty sixth
+          // page to announce itself.
+          entry.done =
+            rows.length < PAGE_SIZE ||
+            fresh === 0 ||
+            (entry.total !== null && entry.nextOffset >= entry.total);
           finished(null);
         },
         function (error) {
@@ -971,11 +1030,12 @@ var ZafarList = (function () {
       docs = docs.slice().sort(SORTS[state.sort] || SORTS["name-asc"]);
       renderedCount = docs.length;
 
-      shell.count.textContent = cfg.favoritesOnly
-        ? t("list.savedCount", docs.length)
-        : t("list.results", docs.length);
+      updateCount(docs.length);
 
       if (!docs.length) {
+        // Nothing on this shelf: the cards from the last view must not linger
+        // behind the empty state.
+        el.grid.innerHTML = "";
         var p = el.empty.querySelector("p");
         var h = el.empty.querySelector("h3");
         if (partial) {

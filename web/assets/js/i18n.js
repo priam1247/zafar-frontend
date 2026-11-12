@@ -121,8 +121,12 @@ favorites: "Favorites", support: "Support", help: "Help & FAQ",
       emptySectionBody: function (item) { return "No " + item + "s have been published to this section."; },
       noFavoritesTitle: "No favorites yet",
       noFavoritesBody: "Tap the heart on any document to keep it here for quick access.",
-      results: function (n) { return n + " result" + (n === 1 ? "" : "s"); },
+      results: function (n) { return n + " result" + (Number(n) === 1 ? "" : "s"); },
       savedCount: function (n) { return n + " saved"; },
+      // Until the server sends the size of the whole answer, the page can only
+      // say how many it has: "50+" is a floor, "50 results" would be a lie.
+      resultsAtLeast: function (n) { return n + "+ result" + (Number(n) === 1 ? "" : "s"); },
+      savedAtLeast: function (n) { return n + "+ saved"; },
       loading: "Loading…",
       offline: "Offline",
       savedToFavorites: "Saved to favorites",

@@ -442,8 +442,14 @@ test("the first page is 50, and the next page waits until the end is reached", a
       if (/\/drive\/papers/.test(u.pathname)) {
         const limit = Number(u.searchParams.get("limit"));
         const offset = Number(u.searchParams.get("offset")) || 0;
+        const q = (u.searchParams.get("q") || "").toLowerCase();
         assert.equal(limit, 50, "the page should ask for 50, the backend's default: " + url);
-        return reply(all.slice(offset, offset + limit));
+        const matched = all.filter((d) => !q || d.name.toLowerCase().includes(q));
+        // The count beside the page is of the whole answer, as the backend
+        // sends it: a header, not the page size.
+        return reply(matched.slice(offset, offset + limit), 200, {
+          "X-Total-Count": String(matched.length),
+        });
       }
       return reply({});
     },
@@ -452,14 +458,14 @@ test("the first page is 50, and the next page waits until the end is reached", a
 
   const d = dom.window.document;
   const papers = () => seen.filter((u) => /\/drive\/papers/.test(u));
+  const count = () => d.querySelector("[data-count]").textContent;
 
   // One request on load. Not two, not twenty-five.
   assert.equal(papers().length, 1, "one page on load: " + papers().join(", "));
   assert.match(papers()[0], /offset=0/);
   assert.equal(d.querySelectorAll(".item").length, 50);
-  assert.equal(d.querySelector("[data-count]").textContent, "50 results");
-
-  assert.equal(d.querySelector("[data-switch]"), null, "no levels: this is not Past Papers");
+  // And the number is the library's, not the page's.
+  assert.equal(count(), "250 results", "the count is the whole answer, not the page");
 
   const more = d.querySelector("[data-more]");
   const moreBtn = d.querySelector("[data-more-btn]");
@@ -477,6 +483,7 @@ test("the first page is 50, and the next page waits until the end is reached", a
   assert.equal(papers().length, 2);
   assert.match(papers()[1], /offset=50/);
   assert.equal(d.querySelectorAll(".item").length, 100);
+  assert.equal(count(), "250 results", "a second page does not change how big the answer is");
 
   // The button does the same for a browser without the observer.
   moreBtn.dispatchEvent(new dom.window.Event("click", { bubbles: true }));
@@ -485,7 +492,8 @@ test("the first page is 50, and the next page waits until the end is reached", a
   assert.match(papers()[2], /offset=100/);
   assert.equal(d.querySelectorAll(".item").length, 150);
 
-  // A new question starts at the first page, and the old rows go with it.
+  // A new question starts at the first page, and the old rows go with it. The
+  // count follows the question: "Document 1" is 111 names, not 250.
   const input = d.querySelector("[data-search]");
   input.value = "Document 1";
   input.dispatchEvent(new dom.window.Event("input", { bubbles: true }));
@@ -493,12 +501,61 @@ test("the first page is 50, and the next page waits until the end is reached", a
   const last = papers()[papers().length - 1];
   assert.match(last, /offset=0/, "a new question starts at the first page");
   assert.match(last, /q=Document/);
+  assert.equal(d.querySelectorAll(".item").length, 50);
+  assert.equal(count(), "111 results", "the count is of the search, not of the shelf");
 
   // The same question again is answered from the cache.
   const before = papers().length;
   input.dispatchEvent(new dom.window.Event("input", { bubbles: true }));
   await wait(500);
   assert.equal(papers().length, before, "a repeated question should not hit the server");
+  dom.window.close();
+});
+
+test("a server that sends no count gets 50+, never 50", async () => {
+  const all = catalogue(250);
+  const seen = [];
+  const dom = await openPage("/notes.html", {
+    storage: { zafar_token: token("student") },
+    fetch: (input) => {
+      const url = String(input && input.url ? input.url : input);
+      seen.push(url);
+      const u = new URL(url, origin + "/");
+      if (/\/auth\/quota/.test(u.pathname)) return reply(QUOTA);
+      if (/\/drive\/categories/.test(u.pathname)) return reply(["Senior"]);
+      // An older backend: pages, but no X-Total-Count beside them.
+      if (/\/drive\/papers/.test(u.pathname)) {
+        const limit = Number(u.searchParams.get("limit"));
+        const offset = Number(u.searchParams.get("offset")) || 0;
+        return reply(all.slice(offset, offset + limit));
+      }
+      return reply({});
+    },
+  });
+  await wait(900);
+
+  const d = dom.window.document;
+  const count = () => d.querySelector("[data-count]").textContent;
+  assert.equal(d.querySelectorAll(".item").length, 50);
+  // It cannot know it is 250, so it must not claim the list ends at 50 either.
+  assert.equal(count(), "50+ results");
+
+  // Once every page is in, "250+" would be as wrong as "250" was early: the
+  // page knows the whole answer now.
+  const moreBtn = d.querySelector("[data-more-btn]");
+  // 250 is exactly five pages, so every page is full and five pages fill the
+  // screen — but without a count the page cannot yet say the shelf has ended.
+  for (let i = 0; i < 4; i++) {
+    moreBtn.dispatchEvent(new dom.window.Event("click", { bubbles: true }));
+    await wait(300);
+  }
+  assert.equal(d.querySelectorAll(".item").length, 250);
+  assert.equal(d.querySelector("[data-count]").textContent, "250+ results");
+  moreBtn.dispatchEvent(new dom.window.Event("click", { bubbles: true }));
+  await wait(300);
+  assert.equal(d.querySelectorAll(".item").length, 250);
+  assert.equal(count(), "250 results");
+  assert.equal(d.querySelector("[data-more]").hidden, true);
   dom.window.close();
 });
 
@@ -525,6 +582,7 @@ test("a backend that ignores offset is read once, not in a loop", async () => {
   const papers = () => seen.filter((u) => /\/drive\/papers/.test(u));
   const expected = d.querySelectorAll(".item").length;
   assert.equal(expected, 200, "what came back is shown");
+  assert.equal(d.querySelector("[data-count]").textContent, "200+ results", "no count, no claim");
 
   // Asking again brings the same rows. Nothing new means the end of the list,
   // so the button goes away rather than asking for a page that cannot arrive.
@@ -564,7 +622,9 @@ test("Primary swaps the shelf, not the allowance", async () => {
             : ["MSCE Maneb", "Mock"]
         );
       }
-      if (/\/drive\/papers/.test(u.pathname)) return reply([row(u.searchParams.get("section"))]);
+      if (/\/drive\/papers/.test(u.pathname)) {
+        return reply([row(u.searchParams.get("section"))], 200, { "X-Total-Count": "1" });
+      }
       return reply({});
     },
   });
@@ -601,6 +661,60 @@ test("Primary swaps the shelf, not the allowance", async () => {
   assert.equal(seen.filter((u) => /\/auth\/quota/.test(u)).length, 1, "no second allowance");
   // And the download knows which shelf the file came from.
   assert.equal(d.querySelector("[data-download]").dataset.section, "primary");
+  dom.window.close();
+});
+
+/* ---------- 8c. Favorites ---------- */
+
+test("Favorites says how many are saved, and reads the Primary shelf too", async () => {
+  const seen = [];
+  const dom = await openPage("/favorites.html", {
+    storage: {
+      zafar_token: token("student"),
+      // The saved list lives on the phone: two ids, one from each shelf.
+      zafar_bookmarks_student: JSON.stringify(["s1", "p1"]),
+    },
+    fetch: (input) => {
+      const url = String(input && input.url ? input.url : input);
+      seen.push(url);
+      const u = new URL(url, origin + "/");
+      const section = u.searchParams.get("section");
+      if (/\/auth\/quota/.test(u.pathname)) return reply(QUOTA);
+      if (/\/drive\/papers/.test(u.pathname)) {
+        const rows =
+          section === "primary"
+            ? [{ id: "p1", name: "PSLC Mathematics 2023.pdf", category: "PSLC Maneb", size_bytes: 1000 }]
+            : section === "papers"
+              ? [{ id: "s1", name: "MSCE Biology 2022.pdf", category: "MSCE Maneb", size_bytes: 1000 }]
+              : [{ id: section + "-x", name: "Other.pdf", category: "Cat", size_bytes: 1000 }];
+        return reply(rows, 200, { "X-Total-Count": "1" });
+      }
+      return reply({});
+    },
+  });
+  await wait(1300);
+
+  const d = dom.window.document;
+  const papers = seen.filter((u) => /\/drive\/papers/.test(u));
+  // Five shelves, each asked for its first page and nothing more.
+  assert.equal(papers.length, 5, "one page per section: " + papers.join(", "));
+  assert.ok(papers.every((u) => /offset=0/.test(u)), "a saved list does not read the shelf");
+  assert.ok(papers.some((u) => /section=primary/.test(u)), "Favorites reads the Primary shelf");
+
+  // Both saved documents are on screen, each under its own shelf.
+  const titles = [...d.querySelectorAll(".item-title")].map((n) => n.textContent).sort();
+  assert.deepEqual(titles, ["MSCE Biology 2022", "PSLC Mathematics 2023"]);
+  const groups = [...d.querySelectorAll(".group-title")].map((h) =>
+    h.textContent.replace(/\d+$/, "").trim()
+  );
+  assert.deepEqual(groups, ["Past Papers", "Primary"]);
+
+  // The number is the saved list's, not the page's.
+  assert.equal(d.querySelector("[data-count]").textContent, "2 saved");
+
+  // A saved Primary file downloads as Primary, so the server charges papers.
+  const primaryCard = [...d.querySelectorAll(".item")].find((c) => /PSLC/.test(c.textContent));
+  assert.equal(primaryCard.querySelector("[data-download]").dataset.section, "primary");
   dom.window.close();
 });
 
