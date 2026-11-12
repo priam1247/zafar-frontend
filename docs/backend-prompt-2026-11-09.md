@@ -213,6 +213,8 @@ growing.
   `offset` must skip, on the **filtered** result (section + category + q), in a
   stable order — otherwise pages overlap or skip documents. Guard the values
   (`limit` 1–500, `offset` ≥ 0) and keep returning a plain array.
+  *(Shipped in `0b07721`. The page now asks for **50** and reads only the first
+  page until the student reaches the end of the list.)*
 
 **Tests:** register 409 carries `code` for both cases; login 403 carries
 `email_not_verified`; `?limit=2&offset=2` on a five-document section returns

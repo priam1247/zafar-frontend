@@ -456,6 +456,57 @@ a { color: inherit; }
   transition: color .18s var(--ease), background .18s var(--ease), border-color .18s var(--ease);
 }
 .cat-chip:hover { color: var(--brand); border-color: var(--line-2); }
+
+/* Primary / Secondary — a shelf inside Past Papers, so it sits above the
+   search box and reads as a toggle, not as another tab. */
+.section-switch {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: 1fr;
+  gap: 4px;
+  margin: 0 0 12px;
+  padding: 4px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--field);
+}
+
+.switch-btn {
+  height: 34px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--t-70);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: color .18s var(--ease), background .18s var(--ease);
+}
+
+.switch-btn:hover { color: var(--brand); }
+
+.switch-btn.active {
+  background: var(--sheet);
+  color: var(--brand);
+  box-shadow: 0 1px 2px rgba(var(--brand-rgb), .12);
+}
+
+/* The end of the list. The sentinel is a hairline the observer watches; it is
+   not meant to be seen. */
+.load-more {
+  display: flex;
+  justify-content: center;
+  padding: 18px 0 4px;
+}
+
+.load-more[hidden] { display: none; }
+
+.load-sentinel {
+  height: 1px;
+  margin-top: -1px;
+}
 .cat-chip.active {
   background: var(--brand);
   border-color: var(--brand);

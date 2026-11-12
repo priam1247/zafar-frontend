@@ -32,6 +32,9 @@
       if (!shell) return; // not signed in — already navigating to login
       ZafarList.init({
         section: "papers",
+        // Secondary and Primary are both Past Papers: `section` picks which
+        // shelf is asked for, `quotaKey` stays "papers" for both.
+        sectionChoices: p.levels,
         quotaKey: "papers",
         itemLabel: p.itemLabel,
         searchPlaceholder: p.searchPlaceholder,

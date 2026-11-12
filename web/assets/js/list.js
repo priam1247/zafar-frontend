@@ -42,6 +42,13 @@ var ZafarList = (function () {
           "</div>"
         : "") +
 
+      // A level inside one section, not a sixth tab: the tab bar is for
+      // sections, and Primary is a shelf inside Past Papers.
+      (cfg.sectionChoices && cfg.sectionChoices.length
+        ? '<div class="section-switch" data-switch role="group" aria-label="' +
+            Zafar.escapeHTML(t("list.chooseLevel")) + '"></div>'
+        : "") +
+
       '<div class="toolbar">' +
         '<label class="search">' + svg("search", 18) +
           '<input type="search" data-search placeholder="' +
@@ -71,6 +78,14 @@ var ZafarList = (function () {
 
       '<div class="skeleton" data-skeleton>' + skeletonHTML(5) + "</div>" +
       '<div class="grid" data-grid style="display:none"></div>' +
+
+      // The end of what is on screen. A page is fetched when the student gets
+      // here, not before: the first request has to come back before anyone is
+      // told how big the library is.
+      '<div class="load-more" data-more hidden>' +
+        '<button type="button" class="btn btn-ghost btn-sm" data-more-btn></button>' +
+      "</div>" +
+      '<div class="load-sentinel" data-sentinel aria-hidden="true"></div>' +
 
       '<div class="state" data-empty>' + svg("empty", 38) +
         "<h3>" + t("list.emptySectionTitle") + "</h3><p></p></div>" +
@@ -171,12 +186,23 @@ var ZafarList = (function () {
       noticeBody: root.querySelector("[data-notice-body]"),
       search: root.querySelector("[data-search]"),
       sort: root.querySelector("[data-sort]"),
+      switch: root.querySelector("[data-switch]"),
+      more: root.querySelector("[data-more]"),
+      moreBtn: root.querySelector("[data-more-btn]"),
+      sentinel: root.querySelector("[data-sentinel]"),
       limit: shell.quota || null,
       limitText: shell.quota ? shell.quota.querySelector("[data-quota-text]") : null,
     };
 
     var params = new URLSearchParams(location.search);
+
+    // The section on screen. Pages that pass `sectionChoices` (Past Papers:
+    // Secondary / Primary) can switch it; everything else keeps `cfg.section`.
+    // The quota key never moves — Primary spends the papers allowance.
+    var choiceKeys = (cfg.sectionChoices || []).map(function (c) { return c.key; });
+    var wanted = params.get("section");
     var state = {
+      section: choiceKeys.indexOf(wanted) !== -1 ? wanted : cfg.section,
       category: params.get("category") || "",
       q: params.get("q") || "",
       sort: "name-asc",
@@ -206,6 +232,7 @@ var ZafarList = (function () {
     /* ---------- Favorites: group by section ---------- */
     var SECTION_LABELS = {
       papers: "Past Papers",
+      primary: "Primary",
       books: "Books",
       notes: "Notes",
       "marking-keys": "Marking Keys",
@@ -521,7 +548,7 @@ var ZafarList = (function () {
       // The card knows which section its document came from; Favorites has no
       // section of its own, so without it a saved note would be charged to
       // papers.
-      var section = btn.dataset.section || cfg.section;
+      var section = btn.dataset.section || state.section;
       var card = btn.closest(".item");
       // Remembered only once the file is actually on the phone — a reservation
       // that never delivered anything is not a download.
@@ -603,18 +630,30 @@ var ZafarList = (function () {
     }
 
     /* ---------- Category chips ---------- */
-    // The folders belong to the library, not to this file: ask the server once
-    // and keep the page's static list only until (or unless) it answers. A chip
-    // whose folder has been renamed or removed would otherwise filter to nothing
-    // and look like broken search.
-    var catList = (cfg.categories || []).slice();
+    // The folders belong to the library, not to this file: ask the server,
+    // again whenever the section changes, and keep the page's static list only
+    // until (or unless) it answers. A chip whose folder has been renamed or
+    // removed would otherwise filter to nothing and look like broken search.
+    var catList = [];
     function renderCatChips() {
       if (!el.catChips) return;
       el.catChips.innerHTML = catChipsHTML(catList, state.category);
     }
-    if (el.catChips && cfg.section) {
-      Zafar.authGet("/drive/categories?section=" + encodeURIComponent(cfg.section))
+    function loadCategories() {
+      if (!el.catChips) return;
+      var wanted = state.section;
+      // Until the server answers: this section's own list. Primary has no
+      // static list — its folders are whatever the library has.
+      catList = wanted === cfg.section ? (cfg.categories || []).slice() : [];
+      if (state.category && catList.indexOf(state.category) === -1) {
+        catList = [state.category].concat(catList);
+      }
+      renderCatChips();
+
+      Zafar.authGet("/drive/categories?section=" + encodeURIComponent(wanted))
         .then(function (names) {
+          // The student switched again while this was in the air.
+          if (wanted !== state.section) return;
           if (!Array.isArray(names) || !names.length) return;
           catList = names.slice();
           // A category that arrived in the URL but is no longer a folder keeps
@@ -625,8 +664,35 @@ var ZafarList = (function () {
           renderCatChips();
         })
         .catch(function () {
-          // The static list stays. Chips are a convenience, not an answer.
+          // The fallback list stays. Chips are a convenience, not an answer.
         });
+    }
+
+    /* ---------- Primary / Secondary ---------- */
+    // Inside the page, not in the tab bar: Primary is a level within Past
+    // Papers, and it spends the same papers allowance. Switching changes the
+    // section that is asked for, not the bucket that is charged.
+    function renderSwitch() {
+      if (!el.switch) return;
+      el.switch.innerHTML = (cfg.sectionChoices || []).map(function (choice) {
+        var on = choice.key === state.section;
+        return '<button type="button" class="switch-btn' + (on ? " active" : "") +
+          '" data-level="' + Zafar.escapeHTML(choice.key) + '" aria-pressed="' + on + '">' +
+          Zafar.escapeHTML(choice.label) + "</button>";
+      }).join("");
+    }
+    if (el.switch) {
+      el.switch.addEventListener("click", function (e) {
+        var btn = e.target.closest("[data-level]");
+        if (!btn || btn.dataset.level === state.section) return;
+        state.section = btn.dataset.level;
+        // Folder names differ between the two shelves: the old category would
+        // filter the new section to nothing.
+        state.category = "";
+        renderSwitch();
+        loadCategories();
+        load();
+      });
     }
     if (el.catChips) {
       el.catChips.addEventListener("click", function (e) {
@@ -668,6 +734,8 @@ var ZafarList = (function () {
 
     function syncURL() {
       var url = new URL(location.href);
+      if (state.section && state.section !== cfg.section) url.searchParams.set("section", state.section);
+      else url.searchParams.delete("section");
       if (state.category) url.searchParams.set("category", state.category);
       else url.searchParams.delete("category");
       if (state.q) url.searchParams.set("q", state.q);
@@ -695,86 +763,105 @@ var ZafarList = (function () {
       return mins === 1 ? "a minute" : mins + " minutes";
     }
 
-    // Two rules keep this page cheap and honest.
+    // The list is read one page at a time: 50 documents, the size the backend
+    // defaults to. A page is fetched when the page needs it — once to put
+    // something on screen, then again only when the student reaches the end.
+    // Reading the whole library before drawing the first card is what made the
+    // old version slow on a phone in Lilongwe.
     //
-    // Cheap: an answer is reused for a minute, keyed by the exact query that
-    // produced it. Favorites asks four sections at once, so starring a document,
-    // re-typing the same search or coming back to the same category would
-    // otherwise cost four more requests each — out of one 120-a-minute budget
-    // shared by everyone behind a school's connection.
-    //
-    // Honest: every load takes a ticket, and a slow answer that arrives after a
-    // newer one is dropped. The grid can then never show results for a search
-    // the box no longer holds.
+    // Two other rules stay. A page is reused for a minute, keyed by the exact
+    // query that produced it, so starring a favourite or coming back to the
+    // same search costs nothing. And every view takes a ticket, so a slow
+    // answer cannot overwrite a newer one.
     var CACHE_TTL_MS = 60000;
-    var cache = {};
+    var PAGE_SIZE = 50;
+    var pages = {};        // "section|category|q" -> { rows, nextOffset, done, at, loading, ids }
     var loadSeq = 0;
+    var failure = null;
+    var observer = null;
 
-    // A section is read a page at a time. The backend takes `limit` and
-    // `offset`; while a page comes back full there may be more, so ask again
-    // and keep going until one comes back short. The pages are combined into
-    // one answer and cached under the query that produced it, so categories,
-    // search, favorites and rendering all see the same complete list — and a
-    // second identical question still costs nothing.
-    var PAGE_SIZE = 200;
-    var MAX_PAGES = 25;   // a stop, not a target: 5,000 documents
+    function sectionList() { return cfg.sections || [state.section]; }
 
-    function fetchSection(section, force) {
-      var base = new URLSearchParams();
-      base.set("section", section);
-      if (state.category) base.set("category", state.category);
-      if (state.q) base.set("q", state.q);
-      var key = base.toString();
-      var hit = cache[key];
-      if (!force && hit && Date.now() - hit.at < CACHE_TTL_MS) {
-        return Promise.resolve(hit.result);
-      }
+    function pageKey(section) { return [section, state.category, state.q].join("|"); }
 
-      var rows = [];
-      var seen = {};
+    function freshEntry(section) {
+      var entry = pages[pageKey(section)];
+      return entry && entry.at && Date.now() - entry.at < CACHE_TTL_MS ? entry : null;
+    }
 
-      // `pages` counts the pages already in hand; the caller starts at 0.
-      function page(offset, pages) {
-        var query = new URLSearchParams(base);
-        query.set("limit", String(PAGE_SIZE));
-        query.set("offset", String(offset));
-        return Zafar.authGet("/drive/papers?" + query.toString()).then(
-          function (batch) {
-            var list = Array.isArray(batch) ? batch : [];
-            var fresh = 0;
-            list.forEach(function (doc) {
-              if (!doc || !doc.id || seen[doc.id]) return;
-              seen[doc.id] = true;
-              rows.push(doc);
-              fresh += 1;
-            });
-            // A short page is the last page. A full page that brought nothing
-            // new means this backend ignored `offset` (an older one did):
-            // stop, rather than ask for the same page until the cap.
-            var more = list.length >= PAGE_SIZE && fresh > 0 && pages + 1 < MAX_PAGES;
-            return more ? page(offset + list.length, pages + 1) : rows;
-          },
-          function (error) {
-            // The first page failing is the section failing. A later page
-            // failing leaves a real, if shorter, list: keep it and say so.
-            if (pages > 0) {
-              rows.partial = true;
-              return rows;
-            }
-            throw error;
-          }
-        );
-      }
+    // A new query starts with nothing in hand. The old entry is replaced, not
+    // emptied: a request still in flight for the previous view writes into the
+    // object it closed over, and nobody reads that one again.
+    function resetEntry(section) {
+      var entry = {
+        rows: [], nextOffset: 0, done: false, at: 0, loading: false, ids: {},
+      };
+      pages[pageKey(section)] = entry;
+      return entry;
+    }
 
-      return page(0, 0).then(
-        function (all) {
-          var result = { rows: all };
-          cache[key] = { at: Date.now(), result: result };
-          return result;
+    function pageURL(section, offset) {
+      var query = new URLSearchParams();
+      query.set("section", section);
+      if (state.category) query.set("category", state.category);
+      if (state.q) query.set("q", state.q);
+      query.set("limit", String(PAGE_SIZE));
+      query.set("offset", String(offset));
+      return "/drive/papers?" + query.toString();
+    }
+
+    function hasMore() {
+      return sectionList().some(function (section) {
+        var entry = pages[pageKey(section)];
+        return entry && !entry.done;
+      });
+    }
+
+    function busy() {
+      return sectionList().some(function (section) {
+        var entry = pages[pageKey(section)];
+        return entry && entry.loading;
+      });
+    }
+
+    // The next page of one section. `finished` is called exactly once, with an
+    // error or with null, so the caller can wait on every section it asked.
+    function fetchPage(section, mine, finished) {
+      var entry = pages[pageKey(section)];
+      if (!entry || entry.done || entry.loading) return finished(null);
+
+      entry.loading = true;
+      syncMore();
+
+      Zafar.authGet(pageURL(section, entry.nextOffset)).then(
+        function (batch) {
+          entry.loading = false;
+          if (mine !== loadSeq) return finished(null);
+
+          var rows = Array.isArray(batch) ? batch : [];
+          var fresh = 0;
+          rows.forEach(function (doc) {
+            if (!doc || !doc.id || entry.ids[doc.id]) return;
+            entry.ids[doc.id] = true;
+            // So Favorites can group a document and charge its download to the
+            // right section without the backend sending one.
+            doc._section = section;
+            entry.rows.push(doc);
+            fresh += 1;
+          });
+
+          // A short page is the end of the section. A full page that brought
+          // nothing new means this backend ignored `offset`: stop, rather than
+          // ask for the same page until something gives.
+          entry.done = rows.length < PAGE_SIZE || fresh === 0;
+          entry.nextOffset += rows.length;
+          entry.at = Date.now();
+          finished(null);
         },
         function (error) {
-          // A failure is never cached: the next attempt really tries.
-          return { error: error };
+          entry.loading = false;
+          if (mine !== loadSeq) return finished(null);
+          finished(error);
         }
       );
     }
@@ -783,116 +870,182 @@ var ZafarList = (function () {
       var mine = ++loadSeq;
       renderChips();
       renderCatChips();
+      renderSwitch();
       syncURL();
 
-      // Fresh view: nothing rendered yet.
+      // A fresh view: nothing rendered, nothing promised.
       renderedCount = 0;
+      failure = null;
       show("loading");
       shell.count.textContent = t("list.loading");
+      // Nothing to continue until something is on screen.
+      if (el.more) el.more.hidden = true;
+      watchTail(false);
 
-      // Favorites span every section, so that page passes a list of sections
-      // and the results are merged into one grid. Each section is answered on
-      // its own: one section the worker has never seen must not hide the
-      // documents the others can still show.
-      var sections = cfg.sections || [cfg.section];
-      var requests = sections.map(function (section) {
-        return fetchSection(section, !!force);
+      var list = sectionList();
+      var reuse = !force && list.every(function (section) { return freshEntry(section); });
+      list.forEach(function (section) {
+        if (!freshEntry(section)) resetEntry(section);
+      });
+      if (reuse) return paint(mine);
+
+      var pending = list.length;
+      var firstError = null;
+      list.forEach(function (section) {
+        fetchPage(section, mine, function (error) {
+          if (error && !firstError) firstError = error;
+          pending -= 1;
+          if (pending === 0 && mine === loadSeq) {
+            failure = firstError;
+            paint(mine);
+          }
+        });
+      });
+    }
+
+    // One more page for every section that still has one. Favorites asks five
+    // sections, so this waits for all of them before repainting once.
+    function loadMore() {
+      if (busy()) return;
+      var mine = loadSeq;
+      var list = sectionList().filter(function (section) {
+        var entry = pages[pageKey(section)];
+        return entry && !entry.done;
+      });
+      if (!list.length) return;
+
+      var pending = list.length;
+      var anyError = null;
+      list.forEach(function (section) {
+        fetchPage(section, mine, function (error) {
+          if (error && !anyError) anyError = error;
+          pending -= 1;
+          if (pending === 0 && mine === loadSeq) {
+            if (anyError) {
+              shell.showToast(Zafar.safeMessage(anyError, t("list.loadMoreFailed")), "alert");
+            }
+            paint(mine);
+          }
+        });
+      });
+    }
+
+    function paint(mine) {
+      if (mine !== loadSeq) return;
+
+      var list = sectionList();
+      var docs = [];
+      list.forEach(function (section) {
+        var entry = pages[pageKey(section)];
+        if (entry) docs = docs.concat(entry.rows);
       });
 
-      Promise.all(requests)
-        .then(function (results) {
-          // A newer search already answered; this one is history.
-          if (mine !== loadSeq) return;
-          var failures = results.filter(function (result) { return result.error; });
-          // One section answered in part: its last page did not arrive.
-          var cutShort = results.some(function (result) {
-            return result.rows && result.rows.partial;
+      // Nothing came back, and something went wrong getting it.
+      if (!docs.length && failure) {
+        if (!navigator.onLine) {
+          shell.count.textContent = t("list.offline");
+          show("offline");
+        } else {
+          shell.count.textContent = "\u2014";
+          show("error");
+          shell.showToast(
+            failure.status === 429
+              ? t("list.tooManyRequests", waitPhrase(failure.retryAfter))
+              : Zafar.safeMessage(failure, t("list.loadError")),
+            "alert"
+          );
+        }
+        if (el.more) el.more.hidden = true;
+        return;
+      }
+
+      // Part of the answer never arrived. "Nothing here" is a claim we cannot
+      // make when a section we asked about did not answer — and on Favorites
+      // that section may be where the saved documents are.
+      var partial = !!failure;
+
+      if (cfg.favoritesOnly) {
+        var saved = Zafar.getBookmarks();
+        docs = docs.filter(function (d) { return saved.indexOf(d.id) !== -1; });
+      }
+      docs = docs.slice().sort(SORTS[state.sort] || SORTS["name-asc"]);
+      renderedCount = docs.length;
+
+      shell.count.textContent = cfg.favoritesOnly
+        ? t("list.savedCount", docs.length)
+        : t("list.results", docs.length);
+
+      if (!docs.length) {
+        var p = el.empty.querySelector("p");
+        var h = el.empty.querySelector("h3");
+        if (partial) {
+          h.textContent = t("list.partialTitle");
+          p.textContent = t("list.partialBody");
+          show("empty");
+          shell.showToast(t("list.partialResults"), "offline");
+          if (el.more) el.more.hidden = true;
+          return;
+        }
+        if (cfg.favoritesOnly && !state.q && !state.category) {
+          h.textContent = t("list.noFavoritesTitle");
+          p.innerHTML = t("list.noFavoritesBody");
+        } else if (state.category || state.q) {
+          h.textContent = t("list.noMatchesTitle");
+          p.textContent = t("list.noMatchesBody");
+        } else {
+          h.textContent = t("list.emptySectionTitle");
+          p.textContent = t("list.emptySectionBody", cfg.itemLabel);
+        }
+        show("empty");
+        if (el.more) el.more.hidden = true;
+        return;
+      }
+
+      if (cfg.favoritesOnly) {
+        el.grid.classList.add("grouped");
+        el.grid.innerHTML = groupedBySection(docs);
+      } else {
+        el.grid.classList.remove("grouped");
+        el.grid.innerHTML = docs.map(function (d) {
+          return cardHTML(d, state.section);
+        }).join("");
+      }
+      show("grid");
+      syncMore();
+
+      if (partial) shell.showToast(t("list.partialResults"), "offline");
+    }
+
+    function syncMore() {
+      if (!el.more) return;
+      var more = hasMore() && current === "grid";
+      el.more.hidden = !more;
+      if (el.moreBtn) {
+        el.moreBtn.disabled = busy();
+        el.moreBtn.textContent = busy() ? t("list.loadingMore") : t("list.loadMore");
+      }
+      watchTail(more);
+    }
+
+    // A phone scrolls faster than it taps, so the next page starts arriving as
+    // the end of the list comes into view. The button stays for browsers
+    // without IntersectionObserver, and for anyone who would rather ask.
+    function watchTail(on) {
+      if (!el.sentinel || typeof IntersectionObserver !== "function") return;
+      if (!observer) {
+        observer = new IntersectionObserver(function (entries) {
+          entries.forEach(function (entry) {
+            if (!entry.isIntersecting || busy() || !hasMore()) return;
+            loadMore();
           });
+        }, { rootMargin: "240px" });
+      }
+      if (on) observer.observe(el.sentinel);
+      else observer.unobserve(el.sentinel);
+    }
 
-          // Tag each doc with the section it came from, so the
-          // Favorites page can group by section without the
-          // backend having to send one.
-          var docs = [];
-          results.forEach(function (result, i) {
-            (result.rows || []).forEach(function (d) {
-              d._section = sections[i];
-              docs.push(d);
-            });
-          });
-
-          // Nothing came back from anywhere.
-          if (!docs.length && failures.length) {
-            if (!navigator.onLine) {
-              shell.count.textContent = t("list.offline");
-              show("offline");
-            } else {
-              shell.count.textContent = "—";
-              show("error");
-              var first = failures[0].error;
-              shell.showToast(
-                first && first.status === 429
-                  ? t("list.tooManyRequests", waitPhrase(first.retryAfter))
-                  : Zafar.safeMessage(first, t("list.loadError")),
-                "alert"
-              );
-            }
-            return;
-          }
-
-          if (cfg.favoritesOnly) {
-            var saved = Zafar.getBookmarks();
-            docs = docs.filter(function (d) { return saved.indexOf(d.id) !== -1; });
-          }
-          docs = docs.slice().sort(SORTS[state.sort] || SORTS["name-asc"]);
-          renderedCount = docs.length;
-
-          var label = cfg.favoritesOnly
-            ? t("list.savedCount", docs.length)
-            : t("list.results", docs.length);
-          shell.count.textContent = label;
-
-          if (!docs.length) {
-            var p = el.empty.querySelector("p");
-            var h = el.empty.querySelector("h3");
-            if (failures.length) {
-              // Part of the answer never arrived. "Nothing here" is a claim we
-              // cannot make when a section we asked about did not answer — and
-              // on Favorites that section may be where the saved documents are.
-              h.textContent = t("list.partialTitle");
-              p.textContent = t("list.partialBody");
-              show("empty");
-              shell.showToast(t("list.partialResults"), "offline");
-              return;
-            }
-            if (cfg.favoritesOnly && !state.q && !state.category) {
-              h.textContent = t("list.noFavoritesTitle");
-              p.innerHTML = t("list.noFavoritesBody");
-            } else if (state.category || state.q) {
-              h.textContent = t("list.noMatchesTitle");
-              p.textContent = t("list.noMatchesBody");
-            } else {
-              h.textContent = t("list.emptySectionTitle");
-              p.textContent = t("list.emptySectionBody", cfg.itemLabel);
-            }
-            show("empty");
-            return;
-          }
-
-          if (cfg.favoritesOnly) {
-            el.grid.classList.add("grouped");
-            el.grid.innerHTML = groupedBySection(docs);
-          } else {
-            el.grid.classList.remove("grouped");
-            el.grid.innerHTML = docs.map(function (d) {
-              return cardHTML(d, cfg.section);
-            }).join("");
-          }
-          show("grid");
-
-          // Some sections answered and some did not — or one stopped a page
-          // early: the list is real, but it is not the whole list.
-          if (failures.length || cutShort) shell.showToast(t("list.partialResults"), "offline");
-        });
+    if (el.moreBtn) {
+      el.moreBtn.addEventListener("click", loadMore);
     }
 
     root.querySelector("[data-retry]").addEventListener("click", function () { load(true); });
@@ -926,6 +1079,7 @@ var ZafarList = (function () {
       }
     });
 
+    loadCategories();
     load();
   }
 

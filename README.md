@@ -59,9 +59,10 @@ the column keeps its 470px phone width and centres itself, so what you see on a
 phone is what you see everywhere. Type is fixed in px — nothing scales with the
 viewport — so the two never drift apart.
 
-The mobile header carries a CSS-drawn library — floating past-paper cards over
-a shelf of book spines — which costs zero bytes. Phones therefore never
-download a hero image.
+The sign-in sheet opens with a small CSS-drawn stack of books — three spines
+and a leaning one, straight-line SVG in the markup — which costs zero bytes.
+Phones therefore never download a hero image, and the hero is sized by its own
+copy rather than by a picture.
 
 **The signed-in app** (`app.css`) is the same system, built the same way. A
 teal bar carries the wordmark, the page title, the day's download allowance and
@@ -70,6 +71,29 @@ bottom hold the sections (Past Papers, Books, Notes, Marking Keys, Favorites).
 There is no sidebar and no drawer — categories are chips that scroll sideways
 on the list pages, and Help sits in the bar with its word on it next to an
 icon-only Log out.
+
+**Past Papers holds two shelves.** A Primary / Secondary switch sits above the
+search box — inside the page, not in the tab bar, because Primary is a level of
+the same subject, not a sixth section. Secondary asks the server for
+`section=papers`, Primary for `section=primary`; both read the **papers**
+allowance (`quotaKey` stays `papers`), so Primary never opens a second bucket
+to spend. Switching reloads the folder chips for that shelf and starts again at
+the first page, because a Secondary folder would filter Primary to nothing. The
+choice is written to `?section=` so a link or the back button returns to it, and
+Favorites reads `primary` as well, so a saved Primary paper is listed under
+*Primary* and downloaded with `section=primary`.
+
+**The catalogue is read one page at a time.** The first request asks for
+`limit=50&offset=0` — the backend's default page — and nothing else is fetched
+until the student reaches the end of the list, by scrolling (an
+`IntersectionObserver` watches a hairline under the last card) or by tapping
+*Load more*. Each further page asks for the next `offset` and is appended, not
+replaced. A page shorter than 50 is the end of the shelf; a full page that
+brings no new ids means the server ignored `offset`, so the page stops there
+rather than asking forever. Changing the switch, the search or the category
+throws the offsets and the rows away and starts at `offset=0` again. Answers
+are kept for one minute per exact view (`section|category|q`), so starring a
+favourite or repeating a search costs no request.
 
 Glyphs are near-black ink (`--ink`) on the light surfaces — files, hearts,
 search, tabs — while teal is kept for text, headers and the filled download
@@ -224,7 +248,7 @@ backend. Endpoints used:
 | POST | `/auth/forgot-password` | email a reset code — `{email}` |
 | POST | `/auth/reset-password` | set a new password — `{email, code, new_password}` |
 | GET | `/auth/quota` | today's remaining downloads, per section |
-| GET | `/drive/papers` | catalogue, filtered by `section`, `category`, `q`; read with `limit` + `offset`, a page at a time |
+| GET | `/drive/papers` | catalogue, filtered by `section`, `category`, `q`; read 50 at a time with `limit` + `offset`, on demand |
 | GET | `/drive/categories` | the folder names inside a `section` |
 | POST | `/drive/download/{id}` | spend quota, return a short-lived signed URL |
 | POST | `/drive/confirm/{download_id}` | confirm the bytes actually arrived |
