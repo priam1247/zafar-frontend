@@ -199,8 +199,80 @@ favorites: "Favorites", support: "Support", help: "Help & FAQ",
              "and a new password will be set for you.</p>" },
         { id: "missing", q: "A paper or subject is missing.",
           a: "<p>The library mirrors what's been published to the StudyMW Drive folders. If a subject or year isn't " +
-             "there yet, it hasn't been uploaded — send the request through and it usually appears within a few days.</p>" },
+             "there yet, it hasn't been uploaded — <a href=\"#request\">send the request through</a> and it " +
+             "usually appears within a few days.</p>" },
       ],
+    },
+
+    /* ---------- What a student can send us ----------
+       Two different things, deliberately two forms: asking for a file that is
+       not here yet, and telling us one that is here does not work. The second
+       one starts from the file's own card, because a report has to carry the
+       id of a real file — a typed-in name could be anything. */
+    support: {
+      requestTitle: "Request a paper, book or notes",
+      requestBody:
+        "If what you need is not in the library, ask for it here. An editor reads these, and the file " +
+        "usually appears within a few days.",
+      requestSection: "Where it belongs",
+      // The library's own folder keys. A request that names a folder an editor
+      // can open is one they can act on; a free-typed one is a guess.
+      sections: {
+        papers: "Past Papers",
+        primary: "Primary",
+        books: "Books",
+        notes: "Notes",
+        "marking-keys": "Marking Keys",
+      },
+      requestWhat: "What you need",
+      requestWhatPh: "e.g. MSCE Geography Paper 1 2019",
+      requestNote: "Anything else",
+      requestOptional: "(optional)",
+      requestNotePh: "e.g. the year, or the school it came from",
+      requestSend: "Send request",
+      requestSending: "Sending\u2026",
+      requestDoneTitle: "Request sent",
+      requestDone: "An editor will see it in the queue. You do not have to do anything else.",
+      requestAgain: "Send another request",
+
+      reportOpen: "Report a problem with this file",
+      reportTitle: "Report a problem",
+      reportBody: "Tell us what is wrong and an editor will check this file.",
+      reportReason: "What is wrong?",
+      // The last one cannot stand on its own: an editor needs the note when the
+      // reason is "something else", so the form asks for it before sending.
+      reportOther: "Something else",
+      reportReasons: [
+        "The download does not work",
+        "The file will not open",
+        "This is the wrong file",
+        "Pages are missing or blank",
+        "Something else",
+      ],
+      reportNote: "More detail",
+      reportNotePh: "e.g. page 4 is blank, or the link stops halfway",
+      reportSend: "Send report",
+      reportSending: "Sending\u2026",
+      reportDoneTitle: "Report sent",
+      reportDone: "Thank you \u2014 an editor will check this file.",
+      reportClose: "Close",
+      reportCancel: "Cancel",
+
+      // What can go wrong sending either of the two. The API's own sentence
+      // never goes on screen: it is written for whoever reads the logs.
+      errFill: "Fill in what is asked for first.",
+      errReportDetail: "Say what is wrong in the detail box, then send.",
+      errTooMany: function (wait) {
+        return wait
+          ? "That is a lot of requests just now. Try again in " + wait + "."
+          : "That is a lot of requests just now. Try again in a minute.";
+      },
+      errOffline: "You are offline. Connect to the internet and try again.",
+      errUnverified: "Verify your email address first \u2014 the code was sent when you registered.",
+      errSuspended: "This account is suspended, so it cannot send anything.",
+      errForbidden: "This account cannot send that at the moment.",
+      errRefused: "The library would not accept that. Check what you wrote and try again.",
+      errServer: "That did not reach the library. Try again in a moment.",
     },
   };
 

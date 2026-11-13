@@ -11,7 +11,7 @@
      its own room for the status bar (see .app-bar in app.css). -->
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <title>Help &amp; FAQ — StudyMW</title>
-<meta name="description" content="Answers to common questions about downloads, limits and favorites on StudyMW.">
+<meta name="description" content="Answers to common questions about downloads, limits and favorites on StudyMW — and a way to ask for a paper that is missing or report one that does not work.">
 <link rel="preload" href="assets/fonts/instrument-sans.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="assets/css/app.css">
 <!-- The mark, in every size a browser, an installed app or a search engine
@@ -32,7 +32,7 @@
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="StudyMW">
 <meta property="og:title" content="Help &amp; FAQ — StudyMW">
-<meta property="og:description" content="Answers to common questions about downloads, limits and favorites on StudyMW.">
+<meta property="og:description" content="Answers to common questions about downloads, limits and favorites on StudyMW — and a way to ask for a paper that is missing or report one that does not work.">
 <meta property="og:url" content="https://studymw.netlibrary.dpdns.org/help.html">
 <meta property="og:image" content="https://studymw.netlibrary.dpdns.org/assets/img/og-1200x630.png">
 <meta property="og:image:width" content="1200">
@@ -60,6 +60,10 @@
       if (!shell) return;
 
       var QA = t("help.qa");
+      // The library's folder keys, in the order the app shows them. `primary`
+      // is its own folder even though it spends the papers allowance. The
+      // labels come from the string table, like every other name on the page.
+      var REQUEST_SECTIONS = ["papers", "primary", "books", "notes", "marking-keys"];
       var icon = ZafarShell.svg;
 
       shell.content.innerHTML =
@@ -92,6 +96,47 @@
               '<span class="contact-cta">' + t("help.contactCta") + icon("bolt", 13) + "</span>" +
             "</a>"
           : "") +
+
+        // Asking for a file that is not here yet. POST /requests with the
+        // bearer token: the API attributes it to this account, so no email is
+        // typed or sent. The form is the whole panel, so the anchor link from
+        // the FAQ ("send the request through") lands on something usable.
+        '<section class="stack" id="request">' +
+          '<div class="section-head"><h2>' + t("support.requestTitle") + "</h2></div>" +
+          '<form class="panel" data-request-form novalidate>' +
+            '<p class="form-lede">' + t("support.requestBody") + "</p>" +
+            '<div class="form-field">' +
+              '<label for="request-section">' + t("support.requestSection") + "</label>" +
+              '<select class="form-select" id="request-section">' +
+                REQUEST_SECTIONS.map(function (key) {
+                  return '<option value="' + key + '">' +
+                    Zafar.escapeHTML(t("support.sections." + key)) + "</option>";
+                }).join("") +
+              "</select>" +
+            "</div>" +
+            '<div class="form-field">' +
+              '<label for="request-title">' + t("support.requestWhat") + "</label>" +
+              '<input class="form-input" id="request-title" type="text" maxlength="200" ' +
+                'autocomplete="off" placeholder="' + Zafar.escapeHTML(t("support.requestWhatPh")) + '">' +
+            "</div>" +
+            '<div class="form-field">' +
+              '<label for="request-note">' + t("support.requestNote") +
+                ' <span class="form-optional">' + t("support.requestOptional") + "</span></label>" +
+              '<textarea class="form-textarea" id="request-note" rows="3" maxlength="1000" placeholder="' +
+                Zafar.escapeHTML(t("support.requestNotePh")) + '"></textarea>' +
+            "</div>" +
+            '<p class="form-error" role="alert" data-request-error hidden></p>' +
+            '<div class="form-actions">' +
+              '<button class="btn btn-primary" type="submit" data-request-send>' + t("support.requestSend") + "</button>" +
+            "</div>" +
+          "</form>" +
+          '<div class="panel form-done" data-request-done hidden>' +
+            '<span class="done-glyph">' + icon("check", 18) + "</span>" +
+            "<h3>" + t("support.requestDoneTitle") + "</h3>" +
+            "<p>" + t("support.requestDone") + "</p>" +
+            '<button class="btn btn-ghost" type="button" data-request-again>' + t("support.requestAgain") + "</button>" +
+          "</div>" +
+        "</section>" +
 
         '<section class="stack">' +
           '<div class="section-head"><h2>' + t("help.faqTitle") + "</h2></div>" +
@@ -181,6 +226,81 @@
         renderCount(visible);
       }
       searchInput.addEventListener("input", filterFaq);
+
+      /* ---------- Requesting a file that is not here ----------
+         POST /requests {section, title, note?} with the bearer token. The
+         section keys are the library's own folders, so a request lands in the
+         same place the file will: a request that says "Past Papers" is one an
+         editor can act on, where a free-typed one is a guess. */
+      var requestForm = shell.content.querySelector("[data-request-form]");
+      var requestDone = shell.content.querySelector("[data-request-done]");
+      var requestError = shell.content.querySelector("[data-request-error]");
+      var requestSend = shell.content.querySelector("[data-request-send]");
+      var requestSending = false;
+
+      // Typing clears the red border: it marked one empty box, and it has
+      // stopped being true the moment a letter goes in.
+      shell.content.querySelector("#request-title").addEventListener("input", function () {
+        this.classList.remove("has-error");
+        if (!shell.content.querySelector("[data-request-error]").hidden) {
+          shell.content.querySelector("[data-request-error]").hidden = true;
+        }
+      });
+
+      requestForm.addEventListener("submit", function (e) {
+        e.preventDefault();
+        if (requestSending) return;
+
+        var title = shell.content.querySelector("#request-title");
+        var note = shell.content.querySelector("#request-note");
+        var section = shell.content.querySelector("#request-section").value;
+        var what = (title.value || "").trim();
+
+        requestError.hidden = true;
+        title.classList.remove("has-error");
+        if (!what) {
+          title.classList.add("has-error");
+          requestError.textContent = t("support.errFill");
+          requestError.hidden = false;
+          title.focus();
+          return;
+        }
+
+        requestSending = true;
+        requestSend.disabled = true;
+        requestSend.textContent = t("support.requestSending");
+
+        Zafar.submitRequest(section, what, (note.value || "").trim()).then(
+          function () {
+            requestSending = false;
+            requestSend.disabled = false;
+            requestSend.textContent = t("support.requestSend");
+            title.classList.remove("has-error");
+            requestError.hidden = true;
+            requestForm.hidden = true;
+            requestDone.hidden = false;
+            var again = requestDone.querySelector("[data-request-again]");
+            if (again) again.focus();
+          },
+          function (err) {
+            requestSending = false;
+            requestSend.disabled = false;
+            requestSend.textContent = t("support.requestSend");
+            requestError.textContent = Zafar.submitMessage(err);
+            requestError.hidden = false;
+          }
+        );
+      });
+
+      // "Send another": the boxes are cleared, so a second request is a fresh
+      // one rather than an accidental duplicate of the first.
+      shell.content.querySelector("[data-request-again]").addEventListener("click", function () {
+        requestForm.reset();
+        requestDone.hidden = true;
+        requestForm.hidden = false;
+        var title = shell.content.querySelector("#request-title");
+        if (title) title.focus();
+      });
 
       // Deep links like help.html#password open the matching question.
       if (location.hash) {

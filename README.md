@@ -15,7 +15,7 @@ web/                     static frontend (no build step, no framework)
   notes.html             summary notes
   marking-keys.html      marking keys
   favorites.html         saved documents, across every section
-  help.html              FAQ
+  help.html              FAQ, and the form that asks for a missing file
   favicon.ico            the tab icon, three sizes in one file
   robots.txt             what a crawler may read: the icons, not the shelves
   assets/img/icon-*.png  the mark at every size a browser or a search engine
@@ -430,6 +430,30 @@ The contract the page already speaks — routes, payload shapes, what each numbe
 means and where it should come from, 2FA for the owner, audit rows inside the
 same transaction, signed export links — is `docs/admin-portal.md`. It is written
 so the backend can be built against it without another round of guessing.
+
+## What students can send back
+
+Two forms, and they are deliberately different things:
+
+- **A request** — "this paper is not in the library". The Help page
+  (`help.html#request`) posts `POST /requests` with the library folder the file
+  belongs in (`papers`, `primary`, `books`, `notes`, `marking-keys`), a title and
+  an optional note. The FAQ answer that mentions missing papers links straight
+  to the form.
+- **A report** — "this file is broken". Every catalogue card carries an alert
+  button that opens a small dialog on the same page, then posts `POST /reports`
+  with the file's own id, one of five reasons and an optional note. It starts at
+  the card because a report has to name a real file, and the id exists nowhere
+  else on the page; the API looks the file name up in the live library itself,
+  so no name, email or id the client invents can reach the queue. "Something
+  else" cannot be sent without a note, or the row is useless to an editor.
+
+Both carry the ordinary student bearer token: the submission belongs to the
+account that sent it, and a `401` sends the student to sign in rather than
+showing an error. Both are rate-limited per account; the `429` arrives with
+`Retry-After` and the page says "Try again in 2 minutes" instead of repeating
+the server's sentence. The portal side of both queues is in
+`docs/admin-portal.md`.
 
 ## Downloads
 

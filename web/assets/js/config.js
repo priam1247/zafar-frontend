@@ -198,6 +198,48 @@ var Zafar = {
     return mb < 0.1 ? Math.ceil(bytes / 1024) + " KB" : mb.toFixed(1) + " MB";
   },
 
+  // "in 20 seconds", "in a minute": the wait a 429 is asking for, in words a
+  // person would use. One copy, because the list and the two forms all show it.
+  waitPhrase: function (seconds) {
+    if (!(seconds > 0)) return "";
+    if (seconds <= 1) return "a second";
+    if (seconds < 60) return seconds + " seconds";
+    var mins = Math.ceil(seconds / 60);
+    return mins === 1 ? "a minute" : mins + " minutes";
+  },
+
+  // What to tell a student when a form did not send. The API's own sentence
+  // is written for whoever reads the logs, so it stays off the screen; the
+  // status and the machine code are what this maps from. Anything unrecognised
+  // gets the plain "that did not reach the library", never a guess at a cause.
+  submitMessage: function (err) {
+    var t = ZafarI18n.t;
+    if (typeof navigator !== "undefined" && navigator.onLine === false) return t("support.errOffline");
+    if (!err || !err.status) return t("support.errServer");
+    if (err.status === 429) return t("support.errTooMany", this.waitPhrase(err.retryAfter));
+    // Two 403s name their own cause; the rest stay general rather than guess.
+    if ((err.code || "") === "email_not_verified") return t("support.errUnverified");
+    if ((err.code || "") === "user_suspended") return t("support.errSuspended");
+    if (err.status === 401 || err.status === 403) return t("support.errForbidden");
+    if (err.status === 400 || err.status === 422) return t("support.errRefused");
+    return t("support.errServer");
+  },
+
+  // Send one of the two student submissions. Both are authenticated posts with
+  // a bearer token: the API attributes them to the signed-in account and takes
+  // the file name from the live library, so no name or email is sent from here.
+  submitReport: function (fileId, reason, note) {
+    var body = { file_id: fileId, reason: reason };
+    if (note) body.note = note;
+    return this.authPostJSON("/reports", body);
+  },
+
+  submitRequest: function (section, title, note) {
+    var body = { section: section, title: title };
+    if (note) body.note = note;
+    return this.authPostJSON("/requests", body);
+  },
+
   // FastAPI error bodies come in two shapes:
   //   {"detail": "some string"}                       (HTTPException)
   //   {"detail": [{"loc": [...], "msg": "..."}]}      (pydantic 422)

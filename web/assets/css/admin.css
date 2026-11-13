@@ -168,6 +168,18 @@ a { color: var(--brand); }
 .kpi-card .k-value { font-size: 26px; font-weight: 700; letter-spacing: -.03em; margin-top: 4px; color: var(--brand); }
 .kpi-card .k-note { font-size: 12px; color: var(--muted); margin-top: 2px; }
 
+/* A note in a queue row is student-written and can be a paragraph. Three
+   lines is enough to act on, and it keeps one long report from pushing the
+   rest of the queue off the screen. */
+td .k-note {
+  max-width: 46ch;
+  overflow-wrap: anywhere;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
 /* ---------- tables ---------- */
 
 .table-scroll { overflow-x: auto; }
