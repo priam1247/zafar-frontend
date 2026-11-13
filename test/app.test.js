@@ -1040,10 +1040,31 @@ test("the email and password fields read as fields, not as disabled boxes", () =
 
   // The placeholder, still readable rather than a rumour.
   const ph = rule(".input::placeholder");
-  const phAlpha = Number(/\.(\d+)\)/.exec(ph)[1]) / 100;
-  const phColour = over(over([16, 20, 19], 1, field), phAlpha, field);
-  assert.ok(contrast(phColour, field) >= 4.5, "the placeholder is only " + contrast(phColour, field).toFixed(1) + ":1");
+  const placeholder = hex(/--placeholder:\s*(#[0-9A-Fa-f]{6})/.exec(css)[1]);
+  assert.match(ph, /color:\s*var\(--placeholder\)/);
+  assert.ok(
+    contrast(placeholder, field) >= 4.5,
+    "the placeholder is only " + contrast(placeholder, field).toFixed(1) + ":1"
+  );
   assert.match(ph, /opacity:\s*1/, "the placeholder must not be faded twice");
+
+  // The quiet text on the sheet — "Don't have an account?", "Remember me",
+  // OR, the footer — measured where it actually sits, on the sheet colour.
+  const sheet = hex(/--sheet:\s*(#[0-9A-Fa-f]{6})/.exec(css)[1]);
+  const muted = hex(/--muted:\s*(#[0-9A-Fa-f]{6})/.exec(css)[1]);
+  assert.ok(
+    contrast(muted, sheet) >= 4.5,
+    "muted text is only " + contrast(muted, sheet).toFixed(1) + ":1 on the sheet"
+  );
+  for (const selector of [".head p", ".or-rule", ".stay-signed", ".sheet-footer"]) {
+    assert.match(rule(selector), /color:\s*var\(--muted\)/, selector + " still uses a pale tint");
+  }
+  // And nothing on this page goes back to a translucent teal for text: .45
+  // and .60 of #006D7C measure about 3:1 on cream, which is what made the
+  // labels and the OR look washed out in the first place.
+  assert.doesNotMatch(css, /color:\s*var\(--t-(45|60|70)\)/);
+  // The eye button is a control, so it is held to the same floor.
+  assert.match(rule(".toggle-show"), /color:\s*var\(--muted\)/);
 
   // Focus is visible on a phone, where :focus-visible never fires.
   assert.match(rule(".input:focus"), /box-shadow:\s*0 0 0 3px rgba\(var\(--brand-rgb\), \.18\)/);
@@ -1088,8 +1109,31 @@ test("Google is offered where it can work, and nowhere else", async () => {
   const ld = lw.document;
 
   assert.match(lw.GOOGLE_CLIENT_ID, /\.apps\.googleusercontent\.com$/);
-  assert.equal(ld.getElementById("googleZone").hidden, false, "the block is visible on sign-in");
+  const zone = ld.getElementById("googleZone");
+  assert.equal(zone.hidden, false, "the block is visible on sign-in");
   assert.equal(ld.getElementById("txt-or").textContent, "or");
+
+  // Google is the first thing offered, above the email form — one tap instead
+  // of typing an address and a password on a phone — and it is outside the
+  // <form>, so it can never submit one.
+  const form = ld.getElementById("authForm");
+  assert.ok(
+    zone.compareDocumentPosition(form) & 4,
+    "Continue with Google comes before the form"
+  );
+  assert.equal(zone.closest("form"), null, "and it is not inside the form");
+  // The OR rule explains why a form follows, so the two travel together.
+  assert.ok(zone.querySelector(".or-rule"), "the OR rule belongs to the Google block");
+  assert.equal(ld.getElementById("txt-or").textContent, "or");
+
+  // The phone keyboard and the password manager get what they need.
+  const email = ld.getElementById("email");
+  const password = ld.getElementById("password");
+  assert.equal(email.getAttribute("autocomplete"), "email");
+  assert.equal(email.getAttribute("inputmode"), "email");
+  assert.equal(email.getAttribute("type"), "email");
+  assert.equal(password.getAttribute("autocomplete"), "current-password");
+  assert.equal(password.getAttribute("type"), "password");
   assert.deepEqual(requested, ["https://accounts.google.com/gsi/client"], "Google's script, once");
 
   // What counts as a client ID.
@@ -1257,44 +1301,34 @@ test("no OAuth client secret is in the repository", () => {
 
 /* ---------- 9. the hero ---------- */
 
-test("the hero says what StudyMW is, on every auth page", async () => {
+test("the hero says what StudyMW is in two lines, and offers nothing to tap", async () => {
   const dom = await openPage("/login.html", { fetch: () => reply({}) });
   await wait(300);
   const d = dom.window.document;
 
   assert.equal(d.querySelector(".wordmark").textContent.trim(), "STUDYMW");
-  assert.equal(
-    d.querySelector("#txt-headline").textContent,
-    "Pass MSCE & JCE with real past papers."
-  );
-  assert.equal(
-    d.querySelector("#txt-subtitle").textContent,
-    "Download past papers, marking keys, books and notes. Free, every day."
-  );
-  assert.deepEqual(
-    [...d.querySelectorAll(".mast-chips li")].map((li) => li.textContent),
-    ["MSCE", "JCE", "Marking keys", "Notes"]
-  );
-  assert.equal(d.querySelector("#txt-footer").textContent, "PAPERS · MARKING KEYS · BOOKS · NOTES · FREE");
+  // One short line: the point of the hero is to say what this is, not to fill
+  // the top of the screen. The first version's headline wrapped to two lines
+  // and, with four chip-shaped tags under it, pushed the buttons below the fold
+  // on a 360x640 phone.
+  assert.equal(d.querySelector("#txt-headline").textContent, "Pass MSCE & JCE.");
+  // What is inside the library now lives in the sentence, not in four pill-
+  // shaped things that looked tappable and were not.
+  const lede = d.querySelector("#txt-subtitle").textContent;
+  for (const word of ["past papers", "marking keys", "books", "notes", "Free"]) {
+    assert.match(lede, new RegExp(word, "i"), "the promise lost \"" + word + "\": " + lede);
+  }
+  assert.equal(d.querySelectorAll(".mast-chips, .mast .chip, .mast li").length, 0, "no chips");
 
-  // The one picture lives in the white card now, above the heading — not in
-  // the teal hero, where it cost height the form needed.
-  // The wordmark's own glyph is the only drawing the hero keeps.
-  assert.equal(
-    d.querySelectorAll(".mast .spines, .mast .doc, .mast .lib, .mast .card-art").length,
-    0,
-    "the hero carries no illustration"
-  );
-  const art = d.querySelector(".sheet-body .card-art svg");
-  assert.ok(art, "the book stack is the first thing in the sheet");
-  assert.ok(art.querySelectorAll("rect").length >= 6, "the stack is drawn, not a placeholder");
-  const body = d.querySelector(".sheet-body");
-  assert.equal(body.firstElementChild.className, "card-art", "it sits where the gap above Sign in used to be");
-  const children = [...body.children];
-  assert.ok(
-    children.indexOf(d.querySelector(".card-art")) < children.indexOf(d.querySelector("#panel-auth")),
-    "the art comes before the form, and so before Sign in"
-  );
+  // Nothing in the hero looks like a control except the wordmark.
+  const interactive = [...d.querySelectorAll(".mast button, .mast a, .mast [role=button], .mast [tabindex]")]
+    .filter((el) => !el.classList.contains("wordmark"));
+  assert.deepEqual(interactive.map((el) => el.outerHTML.slice(0, 60)), [], "the hero has no fake buttons");
+
+  // The footer keeps the list, and the one amber word.
+  const foot = d.querySelector("#txt-footer");
+  assert.equal(foot.textContent, "PAPERS · MARKING KEYS · BOOKS · NOTES · FREE");
+  assert.equal(foot.querySelector("b.free").textContent, "FREE", "FREE is the accent, and only it");
   dom.window.close();
 
   // It is a promise, not a greeting: it belongs on the create form too.
@@ -1306,19 +1340,26 @@ test("the hero says what StudyMW is, on every auth page", async () => {
   reg.window.close();
 });
 
-test("the hero's subtext stays legible", () => {
+test("the hero is sized by its words, and the phone gets the room back", () => {
   const css = read(path.join(WEB, "assets/css/auth.css"));
-  const blocks = [...css.matchAll(/\.mast-lede\s*\{([^}]*)\}/g)].map((m) => m[1]);
-  assert.ok(blocks.length, "the subtext has a rule");
-  for (const block of blocks) {
-    const size = /font-size:\s*([\d.]+)px/.exec(block);
-    if (size) assert.ok(Number(size[1]) >= 15, "subtext is " + size[1] + "px, below the 15px floor");
-    const alpha = /rgba\([^)]*,\s*([\d.]+)\s*\)/.exec(block);
-    if (alpha) assert.ok(Number(alpha[1]) >= 0.85, "subtext opacity " + alpha[1] + " on teal is too low");
+
+  // No viewport-relative height: the hero used to reserve a quarter of the
+  // screen before it said anything.
+  const mast = css.split("\n.mast {")[1].split("}")[0];
+  assert.doesNotMatch(mast, /min-height/, "the hero is content-sized");
+
+  // The subtext stays legible on teal.
+  const lede = /\n\.mast-lede \{([^}]*)\}/.exec(css)[1];
+  assert.match(lede, /font-size:\s*15px/);
+  assert.match(lede, /rgba\(250, 245, 233, \.9\d\)/, "the subtext is at least 90% opaque");
+
+  // On a phone the illustration goes, because the form is the reason the page
+  // exists; on a short screen every band gets tighter.
+  assert.match(css, /@media \(max-width: 480px\), \(max-height: 760px\) \{\s*\.card-art \{ display: none; \}/);
+  const short = css.split("@media (max-height: 700px) {")[1].split("\n}")[0];
+  for (const rule of [/\.mast \{ padding:/, /\.mast-head \{/, /\.input \{ height: 50px/, /\.submit \{ height: 52px/]) {
+    assert.match(short, rule, "the short-screen layout is incomplete");
   }
-  // The hero must stay a quarter of the screen, not a third of it.
-  const mast = css.split(".mast {")[1].split("}")[0];
-  assert.match(mast, /min-height:\s*25(vh|svh)/, "the hero is sized to a quarter of the viewport");
 });
 
 /* ---------- 10. the headers that cost nothing are actually served ---------- */

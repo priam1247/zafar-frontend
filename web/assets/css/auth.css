@@ -42,11 +42,21 @@
   --ink: #101413;
   --field: #FFFFFF;
 
+  /* Secondary text on the sheet. The old --t-45/--t-60 teal washes measured
+     about 3:1 on cream, which is not a caption in daylight on a phone, it is a
+     rumour. #4B666A is 6.4:1 and still reads as quiet next to the teal. */
+  --muted: #4B666A;
+  /* Placeholders are the palest text allowed anywhere, and still clear 4.5:1
+     on the white field: #6B8286 (the first suggestion) measured 4.1:1, which is
+     under the floor for 16px text, so it is a shade darker. */
+  --placeholder: #5D7275;
+  /* The accent is a highlight, never a requirement: one word in the footer.
+     #F4A300 is too light to carry text, so text uses --accent-ink. */
+  --accent: #F4A300;
+  --accent-ink: #8A5A00;
+
   --line: rgba(var(--brand-rgb), .15);
   --line-2: rgba(var(--brand-rgb), .30);
-  --t-70: rgba(var(--brand-rgb), .70);
-  --t-60: rgba(var(--brand-rgb), .60);
-  --t-45: rgba(var(--brand-rgb), .45);
 
   --on: #FAF5E9;
   --on-72: rgba(250, 245, 233, .72);
@@ -116,12 +126,9 @@ img { display: block; }
   flex: none;
   display: flex;
   flex-direction: column;
-  /* A quarter of the screen, not a third: the sign-in form has to be visible
-     without scrolling. `svh` measures the viewport with the browser's toolbars
-     showing, so the estimate is the small one rather than the hopeful one. */
-  min-height: 25vh;
-  min-height: 25svh;
-  justify-content: center;
+  /* Content-sized, not viewport-sized. The hero says what StudyMW is in two
+     short lines; everything else it used to hold (chips, a quarter of the
+     screen's height) pushed the buttons below the fold on a 360x640 phone. */
   padding: 12px 18px 14px;
   background: var(--brand);
   color: var(--on);
@@ -157,7 +164,7 @@ img { display: block; }
 /* The promise, on every panel: what the student gets, and on what. */
 .mast-head {
   margin: 10px 0 0;
-  font-size: 23px;
+  font-size: 26px;
   font-weight: 640;
   line-height: 1.15;
   letter-spacing: -.03em;
@@ -170,31 +177,12 @@ img { display: block; }
 /* Never smaller than 15px and never dimmer than 88%: this is the sentence
    that has to be read on a phone held at arm's length in daylight. */
 .mast-lede {
-  margin: 7px 0 0;
-  max-width: 34ch;
+  margin: 6px 0 0;
+  max-width: 36ch;
   font-size: 15px;
   line-height: 1.4;
   letter-spacing: -.005em;
-  color: rgba(250, 245, 233, .88);
-}
-
-/* What is inside, before anyone signs in. */
-.mast-chips {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  margin: 8px 0 0;
-  padding: 0;
-  list-style: none;
-}
-.mast-chips li {
-  padding: 5px 12px;
-  border-radius: 999px;
-  background: rgba(250, 245, 233, .16);
-  font-size: 12px;
-  font-weight: 600;
-  letter-spacing: .01em;
-  color: rgba(250, 245, 233, .96);
+  color: rgba(250, 245, 233, .92);
 }
 
 /* ---------- Sheet ---------- */
@@ -204,7 +192,7 @@ img { display: block; }
   flex: 1 1 auto;
   display: flex;
   flex-direction: column;
-  padding: 0 20px max(16px, env(safe-area-inset-bottom));
+  padding: 18px 20px max(16px, env(safe-area-inset-bottom));
   background: var(--sheet);
   border-radius: 26px 26px 0 0;
 }
@@ -226,6 +214,12 @@ img { display: block; }
   justify-content: center;
   margin: 2px 0 6px;
 }
+/* A phone is where the room is short and the picture is worth least: the form
+   is the reason the page exists. Kept on a tablet and a desktop, where it has
+   the height to sit without pushing anything below the fold. */
+@media (max-width: 480px), (max-height: 760px) {
+  .card-art { display: none; }
+}
 .card-art svg { display: block; }
 
 .panel { width: 100%; }
@@ -243,8 +237,8 @@ img { display: block; }
 }
 .head p {
   margin: 0;
-  font-size: 13px;
-  color: var(--t-60);
+  font-size: 14px;
+  color: var(--muted);
 }
 
 .link-btn {
@@ -267,7 +261,7 @@ img { display: block; }
 
 /* Rendered only when a client ID is configured: an empty slot would be a
    promise nobody can keep, so the whole zone stays hidden until it can work. */
-.google-zone { margin-top: 18px; }
+.google-zone { margin: 0 0 16px; }
 
 .google-zone[hidden] { display: none; }
 
@@ -276,7 +270,7 @@ img { display: block; }
   align-items: center;
   gap: 12px;
   margin: 0 0 14px;
-  color: var(--t-60);
+  color: var(--muted);
   font-size: 12px;
   font-weight: 600;
   letter-spacing: .04em;
@@ -315,7 +309,7 @@ img { display: block; }
 
 /* "Checking your Google account…" is not a refusal: it is the quiet half of
    the same line. */
-.google-note.is-info { color: var(--t-70); }
+.google-note.is-info { color: var(--muted); }
 
 /* ---------- Notice ---------- */
 
@@ -352,7 +346,7 @@ img { display: block; }
   left: 16px;
   top: 50%;
   transform: translateY(-50%);
-  color: var(--t-70);
+  color: var(--muted);
   pointer-events: none;
   transition: color .16s var(--ease);
 }
@@ -376,7 +370,7 @@ img { display: block; }
   font-weight: 500;
   transition: border-color .16s var(--ease), box-shadow .16s var(--ease), background .16s var(--ease);
 }
-.input::placeholder { color: rgba(16, 20, 19, .62); opacity: 1; }
+.input::placeholder { color: var(--placeholder); opacity: 1; }
 .input:hover { border-color: rgba(var(--brand-rgb), .85); }
 .input:focus {
   outline: none;
@@ -398,7 +392,7 @@ img { display: block; }
   border: 0;
   border-radius: 50%;
   background: none;
-  color: var(--t-45);
+  color: var(--muted);
   cursor: pointer;
   transition: color .16s var(--ease);
 }
@@ -437,7 +431,7 @@ img { display: block; }
 .strength[data-score="1"] i:nth-child(1) { background: var(--brand); opacity: .4; }
 .strength[data-score="2"] i:nth-child(-n+2) { background: var(--brand); opacity: .65; }
 .strength[data-score="3"] i { background: var(--brand); }
-.strength-label { font-size: 11.5px; color: var(--t-60); margin-top: 5px; }
+.strength-label { font-size: 12px; color: var(--muted); margin-top: 5px; }
 
 /* ---------- Remember / forgot ---------- */
 
@@ -454,8 +448,8 @@ img { display: block; }
   display: inline-flex;
   align-items: center;
   gap: 9px;
-  font-size: 13px;
-  color: var(--t-70);
+  font-size: 14px;
+  color: var(--muted);
   cursor: pointer;
   user-select: none;
 }
@@ -486,7 +480,7 @@ img { display: block; }
   transform: rotate(45deg);
 }
 
-.options-row .link-btn { font-size: 13px; margin-left: 0; }
+.options-row .link-btn { font-size: 14px; margin-left: 0; }
 
 /* ---------- CTA ---------- */
 
@@ -566,11 +560,11 @@ img { display: block; }
 .resend-row {
   margin: 12px 0 0;
   text-align: center;
-  font-size: 13px;
-  color: var(--t-60);
+  font-size: 14px;
+  color: var(--muted);
 }
 .resend-row .link-btn.disabled {
-  color: var(--t-45);
+  color: var(--muted);
   font-weight: 500;
   cursor: default;
   text-decoration: none;
@@ -582,8 +576,8 @@ img { display: block; }
 .alt {
   margin: 18px 0 0;
   text-align: center;
-  font-size: 13px;
-  color: var(--t-60);
+  font-size: 14px;
+  color: var(--muted);
 }
 
 /* ---------- Success ---------- */
@@ -607,9 +601,9 @@ img { display: block; }
 }
 .done p {
   margin: 0 0 22px;
-  font-size: 13.5px;
+  font-size: 14px;
   line-height: 1.5;
-  color: var(--t-60);
+  color: var(--muted);
 }
 
 /* ---------- Footer ---------- */
@@ -624,30 +618,39 @@ img { display: block; }
   padding-top: 14px;
   margin-top: 16px;
   border-top: 1px solid var(--line);
-  font-size: 9.5px;
+  font-size: 10px;
   font-weight: 650;
-  letter-spacing: .14em;
+  letter-spacing: .12em;
   text-transform: uppercase;
-  color: var(--t-45);
+  color: var(--muted);
   text-align: center;
 }
+/* The accent, in the one place it cannot be mistaken for a control. */
+.sheet-footer .free { font-weight: 750; color: var(--accent-ink); }
 
 @media (max-width: 380px) {
-  .mast-head { font-size: 21px; }
+  .mast-head { font-size: 23px; }
   .input { height: 50px; }
   .submit { height: 52px; }
   .form { gap: 11px; }
 }
 
-/* A short screen has less room for the picture, not less room for the form. */
+/* A short screen gets less hero and less air, never less form. The whole card
+   has to be reachable without scrolling at 360x640 — measured in the layout
+   below, not hoped for: hero ~120px, sheet ~410px. */
 @media (max-height: 700px) {
-  .card-art { margin: 0 0 2px; }
-  .card-art svg { width: 58px; height: 52px; }
-}
-@media (max-height: 640px) {
-  .mast { padding-top: 10px; }
-  .mast-head { font-size: 20px; }
-  .mast-chips { margin-top: 8px; }
+  .mast { padding: 9px 16px 11px; }
+  .mast-head { margin-top: 7px; font-size: 21px; }
+  .mast-lede { margin-top: 4px; font-size: 14px; }
+  .sheet { padding-top: 14px; }
+  .head { margin: 0 0 14px; }
+  .head h1 { font-size: 23px; }
+  .google-zone { margin-bottom: 12px; }
+  .or-rule { margin-bottom: 11px; }
+  .form { gap: 10px; }
+  .input { height: 50px; }
+  .submit { height: 52px; }
+  .sheet-footer { margin-top: 12px; padding-top: 10px; }
 }
 
 @media (prefers-reduced-motion: reduce) {
