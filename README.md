@@ -357,7 +357,13 @@ empty means no button anywhere, a real client ID (it ends in
 backend needs the same value in its own `GOOGLE_CLIENT_ID`; until that
 deployment has it, the route answers 503 `google_not_configured` and the card
 says so instead of pretending. The contract the API implements is recorded in
-`docs/backend-prompt-google-signin.md`.
+`docs/backend-prompt-google-signin.md`, and the two-host runbook — Cloudflare
+for the site, Koyeb for the API — is `docs/deploy-cloudflare-koyeb.md`.
+
+The site is served by a Cloudflare Worker on
+`studymw.netlibrary.dpdns.org`; the API runs on Koyeb. What has to agree between
+the two — CORS, the Google client ID on both sides, the headers Cloudflare must
+keep — is in `docs/deploy-cloudflare-koyeb.md`.
 
 A **local** page may point at another backend with `?api=http://localhost:8000`.
 On the live site the parameter is ignored: honouring it there would let a link
