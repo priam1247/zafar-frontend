@@ -598,6 +598,228 @@ test("a backend that ignores offset is read once, not in a loop", async () => {
   dom.window.close();
 });
 
+/* ---------- 8e2. the owner's second factor ---------- */
+
+test("the authenticator code is asked for only when the API asks for it", async () => {
+  const posts = [];
+  const dom = await openPage("/login.html", {
+    fetch: (input, init) => {
+      const url = String(input && input.url ? input.url : input);
+      const body = String((init && init.body) || "");
+      posts.push({ url, body });
+      if (/\/auth\/login/.test(url)) {
+        // First attempt: no code, so the API says it needs one. Second: accepted.
+        if (/totp_code=\d{6}/.test(body)) return reply({ access_token: "jwt" });
+        return reply({ detail: "Enter the current authenticator code" }, 401, {
+          "X-Error-Code": "admin_totp_required",
+        });
+      }
+      return reply({});
+    },
+  });
+  await wait(300);
+  const w = dom.window;
+  const d = w.document;
+
+  // Nothing asks a student for a code before the server does.
+  assert.equal(d.getElementById("field-totp").hidden, true, "the field starts hidden");
+
+  d.getElementById("email").value = "owner@gmail.com";
+  d.getElementById("password").value = "correct horse";
+  submit(w, d.getElementById("authForm"));
+  await wait(400);
+
+  assert.equal(d.getElementById("field-totp").hidden, false, "the field appears when asked");
+  assert.match(d.getElementById("authBanner").textContent, /authenticator app/i);
+  assert.equal(d.activeElement, d.getElementById("totpCode"), "and the cursor is in it");
+  assert.doesNotMatch(d.getElementById("authBanner").textContent, /Enter the current authenticator code/,
+    "the server's sentence is not repeated");
+
+  d.getElementById("totpCode").value = "123456";
+  submit(w, d.getElementById("authForm"));
+  await wait(400);
+
+  const second = posts.filter((p) => /\/auth\/login/.test(p.url)).pop();
+  assert.match(second.body, /totp_code=123456/, "the second attempt carries the code");
+  assert.match(second.body, /email=owner%40gmail\.com/);
+  dom.window.close();
+});
+
+test("an owner with no authenticator is told why they cannot sign in", async () => {
+  const dom = await openPage("/login.html", {
+    fetch: (input) => {
+      const url = String(input && input.url ? input.url : input);
+      if (/\/auth\/login/.test(url)) {
+        return reply({ detail: "Owner authenticator is not enrolled" }, 403, {
+          "X-Error-Code": "admin_mfa_unavailable",
+        });
+      }
+      return reply({});
+    },
+  });
+  await wait(300);
+  const w = dom.window;
+  const d = w.document;
+  d.getElementById("email").value = "owner@gmail.com";
+  d.getElementById("password").value = "correct horse";
+  submit(w, d.getElementById("authForm"));
+  await wait(400);
+
+  const banner = d.getElementById("authBanner").textContent;
+  assert.match(banner, /authenticator enrolled/i);
+  assert.doesNotMatch(banner, /Owner authenticator is not enrolled/, "no server wording");
+  // It is a dead end that needs a human, so the field would only tease.
+  assert.equal(d.getElementById("field-totp").hidden, true);
+  dom.window.close();
+});
+
+test("a Google owner is asked for the code and the token is reused", async () => {
+  const bodies = [];
+  const dom = await openPage("/login.html", {
+    fetch: (input, init) => {
+      const url = String(input && input.url ? input.url : input);
+      if (/\/auth\/google/.test(url)) {
+        const body = JSON.parse(String((init && init.body) || "{}"));
+        bodies.push(body);
+        if (!body.totp_code) {
+          return reply({ detail: "Enter the current authenticator code" }, 401, {
+            "X-Error-Code": "admin_totp_required",
+          });
+        }
+        return reply({ access_token: "jwt" });
+      }
+      return reply({});
+    },
+  });
+  await wait(300);
+  const w = dom.window;
+  const d = w.document;
+
+  w.ZafarAuth.signInWithGoogle("google-id-token");
+  await wait(400);
+
+  assert.equal(d.getElementById("field-totp").hidden, false);
+  assert.match(d.getElementById("authBanner").textContent, /authenticator app/i);
+  assert.equal(d.getElementById("googleZone").hidden, true, "Google steps aside for the code");
+
+  d.getElementById("totpCode").value = "654321";
+  submit(w, d.getElementById("authForm"));
+  await wait(400);
+
+  assert.deepEqual(bodies[bodies.length - 1], { credential: "google-id-token", totp_code: "654321" },
+    "the same Google token, with the code: no second popup");
+  dom.window.close();
+});
+
+/* ---------- 8e3. public settings reach the student site ---------- */
+
+function siteConfigPage(config, opts) {
+  const extra = opts || {};
+  const seen = [];
+  return openPage(extra.path || "/dashboard.html", {
+    storage: { zafar_token: token("student") },
+    fetch: (input) => {
+      const url = String(input && input.url ? input.url : input);
+      seen.push(url);
+      const u = new URL(url, origin + "/");
+      if (/\/site-config$/.test(u.pathname)) return reply(config);
+      if (/\/auth\/quota/.test(u.pathname)) return reply(QUOTA);
+      if (/\/admin\/whoami/.test(u.pathname)) return reply({ detail: "Admins only" }, 403);
+      if (/\/drive\/categories/.test(u.pathname)) return reply(["MSCE Maneb"]);
+      if (/\/drive\/papers/.test(u.pathname)) {
+        return reply(
+          [
+            { id: "featured-1", name: "MSCE Chemistry 2024.pdf", category: "MSCE Maneb", size_bytes: 1000 },
+            { id: "other-2", name: "MSCE Biology 2024.pdf", category: "MSCE Maneb", size_bytes: 1000 },
+          ],
+          200,
+          { "X-Total-Count": "2" }
+        );
+      }
+      return reply({});
+    },
+  }).then((dom) => ({ dom, seen }));
+}
+
+test("an announcement and the featured papers come from the server, not the code", async () => {
+  const { dom, seen } = await siteConfigPage({
+    announcement: "MSCE 2026 papers are up",
+    maintenance: false,
+    featured: ["featured-1"],
+  });
+  await wait(900);
+  const d = dom.window.document;
+
+  assert.equal(d.querySelector(".announce").textContent.includes("MSCE 2026 papers are up"), true);
+
+  // One pill, on the right card, and nothing invented from an id alone.
+  const pills = [...d.querySelectorAll(".item-featured")];
+  assert.equal(pills.length, 1, "exactly one featured badge");
+  // The card title drops the extension; the point is that it is the right card.
+  assert.equal(pills[0].closest(".item").textContent.includes("MSCE Chemistry 2024"), true);
+
+  // Dismissal is per session: the strip goes, and stays gone for this visit.
+  d.querySelector(".announce-x").click();
+  assert.equal(d.querySelector(".announce"), null);
+  assert.equal(dom.window.sessionStorage.getItem("zafar_announce_dismissed"), "MSCE 2026 papers are up");
+  dom.window.close();
+});
+
+test("maintenance hides the app from students, and only from students", async () => {
+  const student = await siteConfigPage({ announcement: null, maintenance: true, featured: [] });
+  await wait(900);
+  const text = student.dom.window.document.body.textContent;
+  assert.ok(student.dom.window.document.querySelector(".maintenance"), "the app is replaced");
+  assert.match(text, /being updated/i);
+  // No half-drawn app behind it.
+  assert.equal(student.dom.window.document.querySelector(".app-bar"), null);
+  student.dom.window.close();
+
+  // An admin who is signed in still gets in: they are the one who turns it off.
+  const admin = await openPage("/dashboard.html", {
+    storage: { zafar_token: token("owner") },
+    fetch: (input) => {
+      const url = String(input && input.url ? input.url : input);
+      const u = new URL(url, origin + "/");
+      if (/\/site-config$/.test(u.pathname)) return reply({ maintenance: true, featured: [] });
+      if (/\/admin\/whoami/.test(u.pathname)) return reply({ email: "owner@gmail.com", role: "owner" });
+      if (/\/auth\/quota/.test(u.pathname)) return reply(QUOTA);
+      if (/\/drive\/categories/.test(u.pathname)) return reply(["MSCE Maneb"]);
+      return reply([]);
+    },
+  });
+  await wait(900);
+  assert.equal(admin.window.document.querySelector(".maintenance"), null, "an admin is not locked out");
+  assert.equal(admin.window.document.querySelector("[data-admin-slot] a").getAttribute("href"), "admin.html",
+    "and finds a way into the portal");
+  admin.window.close();
+});
+
+test("the public config is fetched once per session", async () => {
+  const seen = [];
+  const dom = await openPage("/dashboard.html", {
+    storage: { zafar_token: token("student") },
+    fetch: (input) => {
+      const url = String(input && input.url ? input.url : input);
+      seen.push(url);
+      const u = new URL(url, origin + "/");
+      if (/\/site-config$/.test(u.pathname)) return reply({ featured: [] });
+      if (/\/auth\/quota/.test(u.pathname)) return reply(QUOTA);
+      if (/\/drive\/categories/.test(u.pathname)) return reply([]);
+      return reply([]);
+    },
+  });
+  await wait(900);
+  // The page asks, and an explicit second ask is served from the cache.
+  await dom.window.Zafar.siteConfig(true).catch(() => null);
+  const before = seen.filter((u) => /\/site-config$/.test(u)).length;
+  await dom.window.Zafar.siteConfig();
+  await dom.window.Zafar.siteConfig();
+  const after = seen.filter((u) => /\/site-config$/.test(u)).length;
+  assert.equal(after, before, "the second and third reads cost nothing");
+  dom.window.close();
+});
+
 /* ---------- 8f. the admin portal: gates, roles, and no invented numbers ---------- */
 
 const ADMIN_OVERVIEW = {
@@ -1477,6 +1699,126 @@ test("no OAuth client secret is in the repository", () => {
   const ignore = read(path.join(ROOT, ".gitignore"));
   assert.match(ignore, /client_secret\*\.json/);
   assert.match(ignore, /^\s*\.env$/m);
+});
+
+test("an expired session sends the portal back to sign-in", async () => {
+  const dom = await adminPage({
+    storage: { zafar_token: token("owner") },
+    fetch: (input) => {
+      const url = String(input && input.url ? input.url : input);
+      if (/\/admin\/whoami/.test(url)) return reply({ detail: "Not authenticated" }, 401);
+      return reply({});
+    },
+  });
+  await wait(400);
+  const d = dom.window.document;
+  // jsdom cannot navigate, so the decision is recorded where a test can see it.
+  assert.equal(d.documentElement.getAttribute("data-admin-redirect"), "login");
+  assert.match(d.getElementById("view").textContent, /Sign in/i);
+  dom.window.close();
+});
+
+test("an owner can change a role, and the conflicts are explained", async () => {
+  const sent = [];
+  let patchReply = () => reply({ id: "u2", email: "editor@gmail.com", role: "viewer" });
+  // GET /admin/users answers with a bare array and the count in a header.
+  const users = () =>
+    reply(
+      [{ id: "u2", email: "editor@gmail.com", name: "Editor", role: "", suspended: false,
+         is_verified: true, signup_method: "password", created_at: "2026-11-01T09:00:00Z",
+         last_active_at: "2026-11-07T09:00:00Z", downloads: 3 }],
+      200,
+      { "X-Total-Count": "1" }
+    );
+
+  const dom = await adminPage({
+    storage: { zafar_token: token("owner") },
+    fetch: (input, init) => {
+      const url = String(input && input.url ? input.url : input);
+      const method = (init && init.method) || "GET";
+      if (/\/admin\/whoami/.test(url)) return reply({ email: "owner@gmail.com", name: "Owner", role: "owner" });
+      if (/\/admin\/overview/.test(url)) return reply(ADMIN_OVERVIEW);
+      if (/\/admin\/users(\?|$)/.test(url) && method === "GET") return users();
+      if (/\/admin\/users\/u2$/.test(url) && method === "PATCH") {
+        sent.push(JSON.parse(String(init.body || "{}")));
+        return patchReply();
+      }
+      return reply({});
+    },
+  });
+  await wait(500);
+  const w = dom.window;
+  const d = w.document;
+
+  // Go to the users panel through the tab, the way a person would.
+  const usersTab = [...d.querySelectorAll("#tabs button")].find((b) => /Users/.test(b.textContent));
+  usersTab.click();
+  await wait(400);
+
+  const select = d.querySelector("select[data-action='role']");
+  assert.ok(select, "each account has a role control");
+  assert.equal(select.value, "", "a student account shows Student");
+  assert.match(select.getAttribute("aria-label"), /editor@gmail\.com/, "and names the account it changes");
+
+  select.value = "viewer";
+  select.dispatchEvent(new w.Event("change", { bubbles: true }));
+  await wait(400);
+
+  assert.deepEqual(sent, [{ role: "viewer" }], "the role goes up as an object, not a form field");
+  assert.match(d.getElementById("toast").textContent, /editor@gmail\.com is now Viewer/);
+
+  // The one conflict that matters most: an owner without an authenticator.
+  patchReply = () =>
+    reply({ detail: "Enroll the target account's authenticator with the owner bootstrap CLI" }, 409, {
+      "X-Error-Code": "owner_mfa_not_enrolled",
+    });
+  const again = d.querySelector("select[data-action='role']");
+  again.value = "owner";
+  again.dispatchEvent(new w.Event("change", { bubbles: true }));
+  await wait(400);
+
+  const toast = d.getElementById("toast").textContent;
+  assert.match(toast, /authenticator enrolled/i, toast);
+  assert.doesNotMatch(toast, /bootstrap CLI before assigning/, "no server wording");
+  assert.equal(d.querySelector("select[data-action='role']").value, "", "the control snaps back to the truth");
+  dom.window.close();
+});
+
+test("what the API does not report is not drawn as zero", async () => {
+  const dom = await adminPage({
+    storage: { zafar_token: token("owner") },
+    fetch: (input) => {
+      const url = String(input && input.url ? input.url : input);
+      if (/\/admin\/whoami/.test(url)) return reply({ email: "owner@gmail.com", name: "Owner", role: "owner" });
+      if (/\/admin\/overview/.test(url)) {
+        // The shipped payload: no top_subjects, on purpose.
+        const { top_subjects, ...rest } = ADMIN_OVERVIEW;
+        return reply(rest);
+      }
+      if (/\/admin\/ops/.test(url)) {
+        // The shipped payload: db kind and errors, no storage and no backups.
+        return reply({ db: { kind: "d1" }, errors: [], errors_today: 0 });
+      }
+      return reply({});
+    },
+  });
+  await wait(500);
+  const w = dom.window;
+  const d = w.document;
+
+  assert.doesNotMatch(d.getElementById("view").textContent, /Top subjects/,
+    "no card for a field the API does not send");
+
+  const opsTab = [...d.querySelectorAll("#tabs button")].find((b) => /Operations/.test(b.textContent));
+  opsTab.click();
+  await wait(400);
+
+  const text = d.getElementById("view").textContent;
+  assert.doesNotMatch(text, /Storage used/, "no storage figure it never received");
+  assert.doesNotMatch(text, /Backups/, "and no backup count");
+  assert.match(text, /does not report storage or backups/i, "it says so instead of implying zero");
+  assert.match(text, /\bd1\b/);
+  dom.window.close();
 });
 
 /* ---------- 9. the hero ---------- */

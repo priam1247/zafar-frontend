@@ -79,6 +79,8 @@ var ZafarShell = (function () {
             '<span class="glyph">' + svg("logo", 15, 2) + "</span>STUDYMW" +
           "</a>" +
           '<div class="bar-actions">' +
+            // Filled in only for an admin: see maybeShowAdminLink().
+            '<span data-admin-slot></span>' +
             '<a class="bar-btn bar-btn-wide" href="help.html">' + svg("help", 16) + "<span>Help</span></a>" +
             '<a class="bar-btn" href="login.html" data-logout aria-label="Log out">' + svg("logout", 17) + "</a>" +
           "</div>" +
@@ -179,6 +181,88 @@ var ZafarShell = (function () {
   /* ---------- Init ---------- */
   // Returns null when the visitor isn't signed in (page is already
   // navigating to login.html), so page scripts can bail out early.
+  /* ---------- What the owner says ----------
+     GET /site-config is public, cached for a minute, and never fatal: if it
+     fails the page is exactly what it was before. Two things come out of it
+     here — an announcement strip, and maintenance mode. */
+
+  function showAnnounce(root, text) {
+    if (!text) return;
+    var dismissed = "";
+    try { dismissed = sessionStorage.getItem("zafar_announce_dismissed") || ""; } catch (e) {}
+    if (dismissed === text) return;
+
+    var strip = document.createElement("div");
+    strip.className = "announce";
+    strip.setAttribute("role", "status");
+    strip.innerHTML =
+      svg("bolt", 15) + '<span class="announce-text"></span>' +
+      '<button type="button" class="announce-x" aria-label="Dismiss">&times;</button>';
+    strip.querySelector(".announce-text").textContent = text;
+    strip.querySelector(".announce-x").addEventListener("click", function () {
+      try { sessionStorage.setItem("zafar_announce_dismissed", text); } catch (e) {}
+      strip.remove();
+    });
+    var bar = root.querySelector(".app-bar");
+    if (bar && bar.parentNode) bar.parentNode.insertBefore(strip, bar.nextSibling);
+  }
+
+  // Maintenance mode is for students, not the people doing the maintenance: an
+  // admin keeps working (that is how the flag gets switched off again).
+  function showMaintenance(root) {
+    root.innerHTML =
+      '<div class="maintenance">' +
+        '<span class="m-glyph">' + svg("logo", 22, 2) + "</span>" +
+        "<h1>StudyMW is being updated</h1>" +
+        "<p>The library is briefly closed while we fix something. Nothing of yours is lost — " +
+        "your favorites and download allowance are on your account, not this phone.</p>" +
+        "<p class=\"m-hint\">Try again in a few minutes.</p>" +
+        '<div class="m-actions"><a class="btn btn-ghost btn-sm" href="login.html" data-logout>Log out</a></div>' +
+      "</div>";
+    var out = root.querySelector("[data-logout]");
+    if (out) out.addEventListener("click", function () { Zafar.clearToken(); });
+  }
+
+  function applySiteConfig(root) {
+    return Zafar.siteConfig().then(function (cfg) {
+      if (!cfg) return null;
+      showAnnounce(root, cfg.announcement);
+      if (!cfg.maintenance) return cfg;
+      return Zafar.adminWhoami().then(function (me) {
+        if (!me || !me.role) showMaintenance(root);
+        return cfg;
+      });
+    }).catch(function () { return null; });
+  }
+
+  /* ---------- Admins can find the admin ----------
+     One request per browser session, not per page: /admin/whoami answers 200
+     with a role for an admin and 403 for everyone else, and the answer is kept
+     in sessionStorage so the bar does not ask again on every tab. A student
+     never sees a link to a door they cannot open. */
+  function maybeShowAdminLink(root) {
+    var cached = null;
+    try { cached = sessionStorage.getItem("zafar_admin_role"); } catch (e) {}
+    if (cached === "none") return;
+    if (cached) return addAdminLink(root, cached);
+    Zafar.adminWhoami().then(function (me) {
+      var role = me && me.role ? me.role : "none";
+      try { sessionStorage.setItem("zafar_admin_role", role); } catch (e) {}
+      if (role !== "none") addAdminLink(root, role);
+    });
+  }
+
+  function addAdminLink(root, role) {
+    var slot = root.querySelector("[data-admin-slot]");
+    if (!slot || slot.querySelector("a")) return;
+    var link = document.createElement("a");
+    link.className = "bar-btn bar-btn-wide";
+    link.href = "admin.html";
+    link.setAttribute("title", "Admin portal (" + role + ")");
+    link.innerHTML = svg("grid", 16) + "<span>Admin</span>";
+    slot.appendChild(link);
+  }
+
   function init(opts) {
     opts = opts || {};
 
@@ -198,16 +282,23 @@ var ZafarShell = (function () {
     Zafar.updateFavCountPill();
     retireStoredCopy();
 
+    // The announcement and the maintenance flag come from the API, so they are
+    // applied when they arrive rather than blocking the first paint.
+    var config = applySiteConfig(root);
+    maybeShowAdminLink(root);
+
     root.querySelector("[data-logout]").addEventListener("click", function () {
       // The token is the only thing held here, and it goes with the click. There
       // is no stored catalogue to clear: nothing is cached.
       Zafar.clearToken();
+      try { sessionStorage.removeItem("zafar_admin_role"); } catch (e) {}
     });
 
     // The bar is sticky, so a long page still needs its landmark announced.
     root.querySelector(".app-title").setAttribute("tabindex", "-1");
 
     return {
+      config: config,
       content: root.querySelector("[data-content]"),
       count: root.querySelector("[data-count]"),
       meta: root.querySelector("[data-meta]"),

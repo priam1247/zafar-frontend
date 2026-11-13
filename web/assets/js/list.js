@@ -123,6 +123,12 @@ var ZafarList = (function () {
     return chips.join("");
   }
 
+  // Ids the owner has featured in the admin portal (GET /site-config). They are
+  // marked on the card that carries them; a dedicated "featured" shelf would
+  // need an API that returns those files directly, and inventing one here would
+  // mean inventing file names, so this shows the truth: "this one is featured".
+  var featured = [];
+
   // pageSection is the fallback for a list that came from one section: on
   // Favorites the documents arrive from several, and each one carries the
   // section it came from, so a saved note spends the notes allowance rather
@@ -138,7 +144,8 @@ var ZafarList = (function () {
         '<div class="item-top">' +
           '<span class="glyph-tile">' + svg("file", 19) + "</span>" +
           '<div class="item-head">' +
-            '<h3 class="item-title">' + title + "</h3>" +
+            '<h3 class="item-title">' + title +
+              (featured.indexOf(doc.id) !== -1 ? '<span class="item-featured">Featured</span>' : "") + "</h3>" +
             '<span class="item-cat">' + Zafar.escapeHTML(doc.category || t("list.document")) + "</span>" +
           "</div>" +
           '<button class="fav-btn' + (saved ? " on" : "") + '" data-fav="' + Zafar.escapeHTML(doc.id) +
@@ -163,6 +170,19 @@ var ZafarList = (function () {
   function init(cfg, shell) {
     var t = ZafarI18n.t;
     var root = shell.content;
+
+    // Fetched beside the catalogue, not before it: the badge is a decoration,
+    // and a decoration must never delay the list.
+    var config = shell.config || Zafar.siteConfig();
+    if (config && typeof config.then === "function") {
+      config.then(function (site) {
+        if (!site || !Array.isArray(site.featured) || !site.featured.length) return;
+        featured = site.featured.map(String);
+        // Whatever is already on screen gets its badge without a second
+        // request: repaint with the rows we hold.
+        if (typeof paint === "function") paint(loadSeq);
+      }).catch(function () {});
+    }
     root.innerHTML = layout(cfg);
 
     // What is on screen right now (loading / grid / empty / error / offline),
