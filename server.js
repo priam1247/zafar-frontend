@@ -311,6 +311,11 @@ const server = http.createServer((req, res) => {
   }
 
   if (urlPath === "/" || urlPath === "") urlPath = "/login.html";
+  // Cloudflare serves these pages at their clean paths (/login, /register,
+  // /verify), so the dev server answers those too. Without this, a page-name
+  // check tuned to "login.html" looks fine here and fails only in production —
+  // which is exactly what hid the Google button on the live site.
+  else if (!path.extname(urlPath)) urlPath = urlPath.replace(/\/+$/, "") + ".html";
 
   // Resolve inside ROOT only — ".." never escapes the web directory.
   const filePath = path.join(ROOT, path.normalize(urlPath));

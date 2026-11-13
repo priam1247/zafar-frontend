@@ -70,6 +70,24 @@ A last check that only a browser can make: open the sign-in page, and look for
 **Continue with Google** at the bottom. If the button is missing but the ID is
 in the file, the scenario is almost always Cloudflare — see below.
 
+## The deployed paths have no `.html` on them
+
+Cloudflare serves the pages at their clean paths — `/login`, `/register`,
+`/verify`, `/dashboard` — and a request for `/login.html` is normally redirected
+to `/login`. That is one URL shape too many for a page that asks "which page am
+I?" and forgets to allow for both.
+
+It has already happened once: the sign-in card's Google block was drawn only on
+`login.html` or `register.html`, so on the deployed `/login` it decided it was
+not a sign-in page, hid itself, and never asked Google for a script. Localhost
+and the test suite were both happy, because both served `login.html`. The fix is
+`currentPage()` in `web/assets/js/auth.js`: strip the directory, strip the
+extension, compare against `login` / `register` / `verify`. The dev server now
+answers the clean paths too (see `server.js`), so the next bug of this kind
+fails locally rather than on a phone.
+
+Anything new that branches on `location.pathname` must go through that helper.
+
 ## Cloudflare settings that break this button
 
 * **Rocket Loader must stay off.** It defers third-party scripts and rewrites
