@@ -235,6 +235,50 @@ var Zafar = {
   // request therefore has a deadline — 15 s for an answer, 90 s for a file.
   REQUEST_TIMEOUT_MS: 15000,
   FILE_TIMEOUT_MS: 90000,
+  // The catalogue is a different animal. On a cold start the server walks the
+  // whole Drive tree before it can answer, and each of those Drive calls is
+  // allowed twenty seconds on its own — so the *server* can legitimately take
+  // longer than a browser's patience. Fifteen seconds was cutting that scan off
+  // mid-flight, and a refresh then worked because the tree was cached by the
+  // time it finished. The first listing therefore gets LIST_TIMEOUT_MS, and a
+  // timeout is retried once: the scan the abort interrupted is usually finished
+  // by the time the retry arrives, so the second answer is quick.
+  LIST_TIMEOUT_MS: 45000,
+  LIST_RETRY_DELAY_MS: 1200,
+  // A 5xx from the platform in front of the app is worth one more try; a 4xx is
+  // an answer, not a hiccup, and is never repeated.
+  RETRYABLE_STATUS: { 502: true, 503: true, 504: true, 0: true },
+
+  _retryable: function (err) {
+    if (!err) return false;
+    if (err.status === 401 || err.status === 403 || err.status === 404) return false;
+    if (err.timeout) return true;
+    if (!err.status) return true; // a dropped connection, not a refusal
+    return this.RETRYABLE_STATUS[err.status] === true;
+  },
+
+  // Runs `make` up to `attempts` times (default 2) when the failure looks
+  // transient. Every call it wraps is a GET, so repeating one cannot spend a
+  // download, a code or a quota.
+  _withRetry: function (make, opts) {
+    var self = this;
+    var conf = opts || {};
+    var attempts = Math.max(1, Number(conf.attempts) || 2);
+    var gap = Number(conf.delay) || self.LIST_RETRY_DELAY_MS;
+
+    function attempt(n) {
+      return make().catch(function (err) {
+        if (n >= attempts || !self._retryable(err)) throw err;
+        var wait = gap * n;
+        if (typeof conf.onRetry === "function") {
+          try { conf.onRetry(n + 1, attempts, wait); } catch (e) {}
+        }
+        return new Promise(function (resolve) { setTimeout(resolve, wait); })
+          .then(function () { return attempt(n + 1); });
+      });
+    }
+    return attempt(1);
+  },
 
   _fetch: function (url, options, timeoutMs) {
     if (typeof AbortController === "undefined") return fetch(url, options);
@@ -335,36 +379,42 @@ var Zafar = {
     return new Promise(function () {});
   },
 
-  authGet: function (path) {
+  authGet: function (path, opts) {
     var self = this;
-    return this._fetch(API_BASE_URL + path, {
-      headers: { Authorization: "Bearer " + this.getToken() },
-    })
-      .then(function (res) {
-        if (res.status === 401) return self._unauthorized();
-        return self._json(res);
-      });
+    var conf = opts || {};
+    return this._withRetry(function () {
+      return self._fetch(API_BASE_URL + path, {
+        headers: { Authorization: "Bearer " + self.getToken() },
+      }, conf.timeout)
+        .then(function (res) {
+          if (res.status === 401) return self._unauthorized();
+          return self._json(res);
+        });
+    }, conf);
   },
 
   // Same as authGet, but keeps one number from the response headers. A
   // catalogue answer is one page of a longer list, and the count of the whole
   // list arrives beside it: `{ data, total }`, where `total` is null when the
   // server does not send it (or the browser is not allowed to read it).
-  authGetMeta: function (path) {
+  authGetMeta: function (path, opts) {
     var self = this;
-    return this._fetch(API_BASE_URL + path, {
-      headers: { Authorization: "Bearer " + this.getToken() },
-    })
-      .then(function (res) {
-        if (res.status === 401) return self._unauthorized();
-        return self._json(res).then(function (data) {
-          var raw = res.headers && typeof res.headers.get === "function"
-            ? res.headers.get("X-Total-Count")
-            : null;
-          var total = raw === null || raw === "" ? null : Number(raw);
-          return { data: data, total: isFinite(total) && total >= 0 ? total : null };
+    var conf = opts || {};
+    return this._withRetry(function () {
+      return self._fetch(API_BASE_URL + path, {
+        headers: { Authorization: "Bearer " + self.getToken() },
+      }, conf.timeout)
+        .then(function (res) {
+          if (res.status === 401) return self._unauthorized();
+          return self._json(res).then(function (data) {
+            var raw = res.headers && typeof res.headers.get === "function"
+              ? res.headers.get("X-Total-Count")
+              : null;
+            var total = raw === null || raw === "" ? null : Number(raw);
+            return { data: data, total: isFinite(total) && total >= 0 ? total : null };
+          });
         });
-      });
+    }, conf);
   },
 
   authPostJSON: function (path, body) {

@@ -110,6 +110,20 @@ Anything new that branches on `location.pathname` must go through that helper.
 * The free instance sleeps. The app pings `/health` once per page load
   (`Zafar.warmUp()`) so the instance is awake by the time someone presses a
   button — but the first page of the day can still take ~30 s to answer.
+* **The first listing is the slowest request in the app.** Answering it means
+  walking the Drive tree, and each of those Drive calls may take up to 20 s on
+  its own; the result is then cached, so every later visit is quick. A browser
+  deadline shorter than that can only abort work that was going to answer, and
+  the student sees a failure that "works after a refresh". That is exactly what
+  a 15 s deadline did. Two deadlines now exist in `config.js`:
+  `REQUEST_TIMEOUT_MS` (15 s) for forms and small reads, `LIST_TIMEOUT_MS`
+  (45 s) for `/drive/papers` and `/drive/categories`, and a timed-out catalogue
+  request is retried once — the scan it interrupted is usually finished by the
+  time the retry arrives. While that happens the count line reads *"Still
+  loading — the first visit takes a moment."*, and if both attempts fail the
+  page shows its error state with a **Try again** button.
+  Do not "fix" a slow first listing by shortening these: it makes the symptom
+  (refresh works) into the cause (the scan never finishes in the browser).
 * Environment variables are read at process start: change `GOOGLE_CLIENT_ID`
   and you must redeploy/restart, not just save.
 * `ALLOWED_ORIGINS` is the exact site origin. A wrong value here fails every

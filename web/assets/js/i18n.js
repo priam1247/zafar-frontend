@@ -128,6 +128,10 @@ favorites: "Favorites", support: "Support", help: "Help & FAQ",
       resultsAtLeast: function (n) { return n + "+ result" + (Number(n) === 1 ? "" : "s"); },
       savedAtLeast: function (n) { return n + "+ saved"; },
       loading: "Loading…",
+      // Shown when the catalogue is being retried: a first visit can start a
+      // full scan of the library on the server, and silence for that long
+      // reads as a broken page.
+      loadingSlow: "Still loading — the first visit takes a moment.",
       offline: "Offline",
       savedToFavorites: "Saved to favorites",
       removedFromFavorites: "Removed from favorites",
