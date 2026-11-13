@@ -402,9 +402,49 @@ users and their sign-in method, the numbers, the queue of "this paper is
 missing" and "this file is broken", site settings, roles and the audit log, and
 the operational state of the deployment — storage, backups, exports.
 
-It is **not** linked from any student page. It is `noindex` in its own `<meta>`,
-`Disallow: /admin` in `robots.txt`, and `_headers` sends `X-Robots-Tag` for
-anything that asks anyway.
+It is `noindex` in its own `<meta>`, `Disallow: /admin` in `robots.txt`, and
+`_headers` sends `X-Robots-Tag` for anything that asks anyway. There is no link
+to it on any student page: the bar shows an **Admin** button only after
+`GET /admin/whoami` has answered with a role for the account that is signed in,
+which is one request per browser session and a `403` for everyone else.
+
+### Getting in the first time
+
+Being an owner is a database fact, not a form. Nothing in the app can grant it —
+that is the point — so the first one is made from a trusted terminal:
+
+```bash
+# 1. The account must exist and have a verified email already: sign up in the
+#    app with a gmail.com address and enter the code it emails you.
+# 2. With the production environment loaded (the same DATABASE_URL / D1
+#    variables the service runs with), from the backend checkout:
+python -m scripts.make_owner owner@gmail.com
+```
+
+The script prints an `otpauth://` URI (paste it into an authenticator app, or
+type the secret it also prints), then asks for the six-digit code showing in
+that app. Only after the code verifies does it write `role = owner` and the
+encrypted secret — a wrong code saves nothing. It refuses to run if an owner
+already exists.
+
+Then, in the browser:
+
+1. **Sign out and back in.** The old token was issued before the account had a
+   second factor, and every protected route refuses an owner token that carries
+   no MFA proof (`403 admin_mfa_required`) — so the existing session stops
+   working until it is replaced.
+2. Sign in with the password. The card asks for the authenticator code — the
+   field is hidden until the API answers `401 admin_totp_required`.
+3. The bar now has an **Admin** button; `/admin` works for that account and
+   returns *"This area is for administrators"* for every other one.
+
+Further admins never need the terminal twice: `python -m scripts.make_owner
+--enroll theirs@gmail.com` prints a URI for *their* authenticator, and the owner
+then sets the role in **Users** → the Role select. Assigning `owner` to an
+account without an enrolled authenticator is refused with
+`owner_mfa_not_enrolled`, which is why `--enroll` comes first. Every role change,
+suspend, deletion and settings save lands in the audit log, written in the same
+transaction as the change.
 
 **Nothing on it is invented.** Every figure comes from the API, and a missing
 field prints "—" rather than a zero, because a zero is a claim. That means the
@@ -412,19 +452,25 @@ portal is honest in the state the backend is in today: it opens, checks
 `GET /admin/whoami`, and if the API has no `/admin` routes it says *"The admin
 API isn't deployed yet"* and stops. No sample users, no made-up download charts.
 
-Three gates, each a sentence rather than a blank page:
+Four gates, each a sentence rather than a blank page:
 
 | What the API says | What the admin sees |
 | --- | --- |
 | no token | *Sign in first* — with a link back |
-| 401 / 403 | *This area is for administrators* |
+| 401 | sent straight to the sign-in screen, session cleared |
+| 403 | *This area is for administrators* |
 | 404 / 501 | *The admin API isn't deployed yet*, pointing at the contract |
 | anything else | the reason, and a Try again button |
 
+When an owner's sign-in is refused, the wording says which of the two it is:
+`401 admin_totp_required` reveals the code field and asks for it again, while
+`403 admin_mfa_unavailable` means the account has no authenticator enrolled and
+only the terminal can fix that.
+
 Roles are `owner` (everything), `editor` (library and moderation) and `viewer`
-(statistics only). The tabs follow the role, and so does every route on the API —
-hiding a tab is convenience, not security. Every change the portal makes is
-audited server-side.
+(statistics only); no role at all means ordinary student. The tabs follow the
+role, and so does every route on the API — hiding a tab is convenience, not
+security. Every change the portal makes is audited server-side.
 
 The contract the page already speaks — routes, payload shapes, what each number
 means and where it should come from, 2FA for the owner, audit rows inside the
