@@ -101,6 +101,33 @@ var ZafarAdmin = (function () {
     });
   }
 
+  // Conflicts the API reports with a machine code. Each one is a sentence the
+  // person can act on; none of them repeats what the server wrote, which is
+  // written for whoever reads logs.
+  var CONFLICT = {
+    owner_mfa_not_enrolled:
+      "That account needs an authenticator enrolled first. Run the owner bootstrap CLI for it " +
+      "(--enroll), then set the role again.",
+    owner_account_suspended: "Restore the account before making it an owner.",
+    last_owner: "There must always be one active owner, so that change was refused.",
+    self_role_change: "You cannot remove your own owner role. Ask another owner to do it.",
+    self_suspend: "You cannot suspend the session you are using.",
+    self_delete: "You cannot delete the account you are signed in with.",
+    // Settings: the API checks every featured id against the library, and
+    // refuses the whole save if one of them is not a real file.
+    admin_featured_file_missing:
+      "One of those ids is not a file in the library, so nothing was saved. " +
+      "Use the id shown on the file's own page.",
+    admin_featured_validation_unavailable:
+      "The library could not be read just now, so the featured list was not saved. Try again in a moment.",
+    admin_settings_unavailable: "The settings could not be saved. Try again.",
+  };
+
+  function conflictText(err) {
+    if (err && err.code && CONFLICT[err.code]) return CONFLICT[err.code];
+    return reason(err);
+  }
+
   function isMissing(err) {
     if (!err) return false;
     if (err.code === "admin_not_configured") return true;
@@ -188,7 +215,16 @@ var ZafarAdmin = (function () {
       open("overview");
       paintChrome();
     }).catch(function (err) {
-      if (err && err.status === 401) return gate("signin");
+      if (err && err.status === 401) {
+        // The token is gone or expired: this page has nothing to offer, so it
+        // sends the person to sign in rather than showing a dead portal. The
+        // attribute is the record of that decision, and the only way a test can
+        // see it — jsdom refuses to navigate.
+        document.documentElement.setAttribute("data-admin-redirect", "login");
+        try { Zafar.clearToken(); } catch (e) {}
+        location.replace("login.html?switch=1");
+        return gate("signin");
+      }
       if (err && err.status === 403) return gate("forbidden");
       if (isMissing(err)) return gate("missing");
       return gate("offline", err);
@@ -279,12 +315,18 @@ var ZafarAdmin = (function () {
               { label: "Downloads", num: true, render: function (row) { return esc(n(row.downloads)); } },
             ], topFiles, "No downloads recorded yet.") +
           "</div>" +
-          '<div class="card"><h3>Top subjects</h3>' +
-            tableHTML([
-              { label: "Subject", render: function (row) { return esc(row.subject || row.name); } },
-              { label: "Downloads", num: true, render: function (row) { return esc(n(row.downloads)); } },
-            ], topSubjects, "Nothing recorded yet.") +
-          "</div>" +
+          // top_subjects is omitted by the API on purpose: there is no
+          // trustworthy subject field, and it will not invent one from file
+          // names. An empty table here would say "nobody downloaded anything",
+          // which would be false, so the card is not drawn at all.
+          (Array.isArray(d.top_subjects)
+            ? '<div class="card"><h3>Top subjects</h3>' +
+                tableHTML([
+                  { label: "Subject", render: function (row) { return esc(row.subject || row.name); } },
+                  { label: "Downloads", num: true, render: function (row) { return esc(n(row.downloads)); } },
+                ], topSubjects, "Nothing recorded yet.") +
+              "</div>"
+            : "") +
         "</div>" +
         '<div class="card"><h3>Searches that found nothing</h3>' +
           '<p class="k-note" style="margin:0 0 10px">What students asked for and the library could not give. ' +
@@ -313,7 +355,21 @@ var ZafarAdmin = (function () {
           var how = row.signup_method || row.provider || "email";
           return '<span class="badge">' + esc(how === "google" ? "Google" : "Email") + "</span>";
         } },
-      { label: "Role", render: function (row) { return esc(ROLE_NAMES[row.role] || row.role || "student"); } },
+      // The role lives on the account, and only an owner can change it:
+      // PATCH /admin/users/{id} {"role": "viewer" | "editor" | "owner" | null}.
+      // An account must have an authenticator enrolled before it can become an
+      // owner, so that refusal is expected and has its own sentence.
+      { label: "Role", render: function (row) {
+          var current = row.role || "";
+          var options = [["", "Student"], ["viewer", "Viewer"], ["editor", "Editor"], ["owner", "Owner"]];
+          return '<select class="select role-select" data-action="role" data-id="' + esc(row.id) +
+            '" data-email="' + esc(row.email) + '" data-was="' + esc(current) +
+            '" aria-label="Role for ' + esc(row.email) + '">' +
+            options.map(function (pair) {
+              return '<option value="' + pair[0] + '"' + (pair[0] === current ? " selected" : "") + ">" +
+                esc(pair[1]) + "</option>";
+            }).join("") + "</select>";
+        } },
       { label: "Status", render: function (row) {
           if (row.suspended || row.is_active === false) return '<span class="badge warn">Suspended</span>';
           if (row.is_verified === false) return '<span class="badge off">Unverified</span>';
@@ -490,8 +546,11 @@ var ZafarAdmin = (function () {
 
     return req("/admin/settings", { method: "PATCH", body: body }).then(function () {
       toast("Settings saved.");
+      // The API returns what is now stored — including any limit it clipped —
+      // so the panel is redrawn from that rather than from the form.
+      return renderSettings();
     }).catch(function (err) {
-      toast(reason(err), true);
+      toast(conflictText(err), true);
     });
   }
 
@@ -506,8 +565,9 @@ var ZafarAdmin = (function () {
         return '<p style="margin:0 0 8px"><span class="badge">' + esc(ROLE_NAMES[role]) + "</span> " +
           esc(ROLE_WHAT[role]) + "</p>";
       }).join("") +
-      '<p class="k-note" style="margin:0">Roles are set in the database or by the owner, never from the ' +
-      "client, and every one of them is checked again on the API for each request.</p></div>";
+      '<p class="k-note" style="margin:0">Only an owner can change a role, and only in the Users tab. ' +
+      "The browser is never trusted with the decision: the API re-reads the role from the account on " +
+      "every request. An account must have an authenticator enrolled before it can become an owner.</p></div>";
 
     req("/admin/audit?limit=50").then(function (r) {
       var rows = Array.isArray(r.data) ? r.data : [];
@@ -545,11 +605,20 @@ var ZafarAdmin = (function () {
       v.innerHTML =
         head("Operations", "Storage, backups and what the API is logging.") +
         '<div class="grid kpi">' +
-          kpi("Storage used", bytes(used), isFinite(quota) && quota > 0 ? "of " + bytes(quota) : (storage.driver || "")) +
-          kpi("Database", bytes(Number(db.size_bytes)), db.kind || "") +
-          kpi("Backups", n(backups.length), "") +
+          // Storage and backups are only drawn when the API reports them. The
+          // service has no trustworthy provider inventory today, so it omits
+          // both — and "0 backups" would be a claim it never made.
+          (d.storage
+            ? kpi("Storage used", bytes(used), isFinite(quota) && quota > 0 ? "of " + bytes(quota) : (storage.driver || ""))
+            : "") +
+          kpi("Database", bytes(Number(db.size_bytes)), db.kind ? db.kind + (db.size_bytes ? "" : " · size not reported") : "") +
+          (Array.isArray(d.backups) ? kpi("Backups", n(backups.length), "") : "") +
           kpi("Errors today", n(Number(d.errors_today)), "") +
         "</div>" +
+        (!d.storage && !Array.isArray(d.backups)
+          ? '<div class="notice info">This deployment does not report storage or backups yet, so they are ' +
+            "not shown. An empty chart here would read as \"none\", which is not the same thing.</div>"
+          : "") +
         (share === null ? "" :
           '<div class="card"><h3>Storage</h3><div class="chart" style="height:24px">' +
             '<div class="col" style="height:100%"><div class="b" style="height:' + share + '%"></div></div></div>' +
@@ -562,11 +631,13 @@ var ZafarAdmin = (function () {
             '<button class="btn ghost small" data-action="export" data-kind="files">Files CSV</button>' +
           "</div></div>" +
         '<div class="grid two">' +
-          '<div class="card"><h3>Recent backups</h3>' +
-            tableHTML([
-              { label: "When", render: function (row) { return esc(when(row.at)); } },
-              { label: "Size", num: true, render: function (row) { return esc(bytes(Number(row.bytes))); } },
-            ], backups, "No backups recorded.") + "</div>" +
+          (Array.isArray(d.backups)
+            ? '<div class="card"><h3>Recent backups</h3>' +
+                tableHTML([
+                  { label: "When", render: function (row) { return esc(when(row.at)); } },
+                  { label: "Size", num: true, render: function (row) { return esc(bytes(Number(row.bytes))); } },
+                ], backups, "No backups recorded.") + "</div>"
+            : "") +
           '<div class="card"><h3>Errors</h3>' +
             tableHTML([
               { label: "When", render: function (row) { return esc(when(row.at)); } },
@@ -626,7 +697,7 @@ var ZafarAdmin = (function () {
       }).then(function () {
         toast(to ? "Account suspended." : "Account restored.");
         return reloadPanel("users");
-      }).catch(function (err) { toast(reason(err), true); });
+      }).catch(function (err) { toast(conflictText(err), true); });
     }
     if (action === "reset-password") {
       return req("/admin/users/" + encodeURIComponent(id) + "/reset-password", { method: "POST", body: {} })
@@ -638,8 +709,37 @@ var ZafarAdmin = (function () {
       if (typeof confirm === "function" && !confirm("Delete " + email + "? This cannot be undone.")) return;
       return req("/admin/users/" + encodeURIComponent(id), { method: "DELETE" })
         .then(function () { toast("Account deleted."); return reloadPanel("users"); })
-        .catch(function (err) { toast(reason(err), true); });
+        .catch(function (err) { toast(conflictText(err), true); });
     }
+  }
+
+  function changeRole(node) {
+    var id = node.getAttribute("data-id");
+    var was = node.getAttribute("data-was") || "";
+    var next = node.value;
+    var email = node.getAttribute("data-email") || "that account";
+    if (next === was) return;
+
+    node.disabled = true;
+    return req("/admin/users/" + encodeURIComponent(id), {
+      method: "PATCH",
+      body: { role: next === "" ? null : next },
+    }).then(function (r) {
+      var role = (r && r.data && r.data.role) || next || null;
+      node.setAttribute("data-was", role || "");
+      toast(email + " is now " + (ROLE_NAMES[role] || "a student") + ".");
+      // Changing your own role changes what this page may do.
+      return req("/admin/whoami").then(function (me) {
+        state.me = (me && me.data) || state.me;
+        if (!may(state.me.role, state.tab)) return open("overview");
+        paintChrome();
+        return loadUsers();
+      }).catch(function () { return loadUsers(); });
+    }).catch(function (err) {
+      node.disabled = false;
+      node.value = was;
+      toast(conflictText(err), true);
+    });
   }
 
   function exportCSV(kind) {
@@ -690,6 +790,7 @@ var ZafarAdmin = (function () {
         .catch(function (err) { toast(reason(err), true); });
     }
     if (action === "export") return exportCSV(node.getAttribute("data-kind"));
+    if (action === "role") return changeRole(node);
     return onUserAction(action, id, node);
   }
 
@@ -705,6 +806,12 @@ var ZafarAdmin = (function () {
     }, 260);
   }
 
+  function onChange(event) {
+    var node = event.target;
+    if (!node || node.getAttribute("data-action") !== "role") return;
+    changeRole(node);
+  }
+
   function onSubmit(event) {
     if (!event.target || event.target.id !== "settingsForm") return;
     event.preventDefault();
@@ -716,6 +823,7 @@ var ZafarAdmin = (function () {
     if (view) {
       view.addEventListener("click", onClick);
       view.addEventListener("input", onInput);
+      view.addEventListener("change", onChange);
       view.addEventListener("submit", onSubmit);
     }
     var tabs = el("tabs");

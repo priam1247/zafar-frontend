@@ -39,7 +39,7 @@ Hand this to whoever works in `priam1247/zafar-backend`.
 | GET | `/admin/settings` | owner | — | `{announcement, maintenance, featured: [ids], limits: {papers,books,notes,marking_keys}}` |
 | PATCH | `/admin/settings` | owner | any subset of the above | the settings |
 | GET | `/admin/audit` | owner | `?limit=50&offset=0` | `[{id,at,actor_email,action,target,detail}]` |
-| GET | `/admin/ops` | owner | — | `{storage:{driver,used_bytes,quota_bytes}, db:{kind,size_bytes}, backups:[{at,bytes}], errors:[{at,route,status,count}], errors_today}` |
+| GET | `/admin/ops` | owner | — | `{db:{kind,size_bytes?}, errors:[{at,route,status,count}], errors_today}` — **no storage, no backups** (see *Reconciled with the deployed API*) |
 | POST | `/admin/export/{users\|files}` | owner | `{}` | `{url, expires_at}` — a **signed, short-lived** link |
 
 ### `/admin/overview`
@@ -50,10 +50,12 @@ Hand this to whoever works in `priam1247/zafar-backend`.
   "downloads": {"today": 0, "total": 0, "failed_today": 0},
   "daily": [{"date": "2026-11-08", "signups": 3, "downloads": 12, "failed": 1}],
   "top_files": [{"id": "…", "name": "MSCE Maths 2023.pdf", "section": "papers", "downloads": 41}],
-  "top_subjects": [{"subject": "Mathematics", "downloads": 88}],
   "zero_result_searches": [{"q": "physics paper 2 2026", "count": 7}]
 }
 ```
+
+There is deliberately **no** `top_subjects`: the service has no trustworthy
+subject field and will not derive one from file names.
 
 `daily` is the whole window, oldest first, with zero-filled days — a chart that
 silently skips quiet days lies about the shape of the week. Fields the API
@@ -117,3 +119,24 @@ curl -s -o /dev/null -w '%{http_code}\n' \
 Then open `https://studymw.netlibrary.dpdns.org/admin` signed in as the owner.
 The page is `noindex`, in `robots.txt` as `Disallow: /admin`, and `_headers`
 sends `X-Robots-Tag: noindex` — it is a tool, not a page.
+
+## Reconciled with the deployed API
+
+The first draft of this contract was richer than the service that now exists.
+Where they differ, the code follows the service, and the portal says what it
+does not know instead of drawing a zero:
+
+| Draft asked for | Deployed API | What the portal does |
+| --- | --- | --- |
+| `overview.top_subjects` | omitted on purpose — no reliable subject field | no card at all; an empty table would read as "nobody downloaded anything" |
+| `ops.storage` (`driver`, `used_bytes`, `quota_bytes`) | not reported | KPI and note only when present, otherwise one sentence saying so |
+| `ops.backups` | not reported | same |
+| ops `db.size_bytes` | present only when the SQLite file is directly measurable | shows "size not reported" when it is not |
+| role changes | `PATCH /admin/users/{id}` `{role}`; **409** with `owner_mfa_not_enrolled`, `owner_account_suspended`, `last_owner`, `self_role_change` | a `<select>` per row, each conflict translated into a sentence a person can act on |
+| sign-in | optional `totp_code` on `POST /auth/login` (form field) and on the Google JSON body; **401 `admin_totp_required`**, **403 `admin_mfa_unavailable`** | the code field is hidden until the API asks, then revealed and focused; the Google token is resent with the code rather than showing a second popup |
+| `GET /site-config` | `{announcement, maintenance, featured}` | announcement strip (dismissible per session), maintenance page for students only, `Featured` badge on the matching card |
+| `PATCH /admin/settings` | also carries `limits`, and validates every featured id against the library (**422 `admin_featured_file_missing`**) | the panel redraws from the API's answer, and a save that fails says why |
+
+Two knobs the portal reads and never writes: `/admin/audit` has no delete, and
+the export links are five-minute signed URLs (`POST /admin/export/{kind}` →
+`{url, expires_at}`).

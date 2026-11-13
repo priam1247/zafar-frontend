@@ -262,6 +262,9 @@ td.num { text-align: right; font-variant-numeric: tabular-nums; }
 .input::placeholder, .textarea::placeholder { color: var(--placeholder); opacity: 1; }
 .input:focus, .textarea:focus, .select:focus { outline: none; border-color: var(--brand); box-shadow: 0 0 0 3px rgba(var(--brand-rgb), .18); }
 .textarea { min-height: 74px; resize: vertical; }
+/* The role control sits in a table cell, so it must not stretch to fill it. */
+.role-select { width: auto; min-width: 116px; padding: 6px 8px; font-size: 14px; }
+.role-select:disabled { opacity: .6; }
 .search-row { display: flex; gap: 8px; margin-bottom: 12px; }
 .search-row .input { max-width: 340px; }
 .switch-row { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; font-size: 14px; }

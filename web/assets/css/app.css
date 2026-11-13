@@ -867,6 +867,85 @@ a { color: inherit; }
 .btn.is-done .btn-spinner { border-color: var(--brand); }
 
 /* ============================================================
+   What the owner says — GET /site-config
+   ============================================================ */
+
+/* The announcement strip: under the bar, wraps to as many lines as it needs,
+   and closable for the session. An announcement that cannot be closed covers
+   the thing it is announcing. */
+.announce {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  padding: 10px 14px;
+  background: var(--mint);
+  color: var(--brand-deep);
+  font-size: 13.5px;
+  line-height: 1.45;
+  font-weight: 500;
+}
+.announce svg { margin-top: 2px; flex: none; }
+.announce-text { flex: 1; }
+.announce-x {
+  flex: none;
+  width: 26px;
+  height: 26px;
+  margin: -2px -4px -2px 0;
+  border: 0;
+  border-radius: 50%;
+  background: none;
+  color: var(--brand-deep);
+  font-size: 19px;
+  line-height: 1;
+  cursor: pointer;
+}
+.announce-x:hover { background: rgba(0, 83, 95, .12); }
+
+/* Maintenance: what a student sees while the library is closed. It replaces
+   the whole app, tab bar included — there is nothing to navigate to. */
+.maintenance {
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 40px 26px;
+  text-align: center;
+  background: var(--paper);
+  color: var(--ink);
+}
+.maintenance .m-glyph {
+  width: 46px;
+  height: 46px;
+  display: grid;
+  place-items: center;
+  border-radius: 13px;
+  background: var(--brand);
+  color: var(--on, #FAF5E9);
+  margin-bottom: 4px;
+}
+.maintenance h1 { margin: 0; font-size: 23px; letter-spacing: -.02em; color: var(--brand); }
+.maintenance p { margin: 0; max-width: 38ch; color: var(--ink-70); font-size: 15px; line-height: 1.5; }
+.maintenance .m-hint { font-size: 13.5px; }
+.maintenance .m-actions { margin-top: 10px; }
+
+/* A file the owner has featured, marked on its own card. */
+.item-featured {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 0 7px;
+  border-radius: 999px;
+  background: var(--mint);
+  color: var(--brand-deep);
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  vertical-align: 1px;
+}
+
+/* ============================================================
    Toast
    ============================================================ */
 

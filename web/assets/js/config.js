@@ -359,6 +359,37 @@ var Zafar = {
     });
   },
 
+  // Public display settings from the API (`GET /site-config`): the
+  // announcement, the maintenance flag and the featured file ids. Public —
+  // no token — and cached for a minute so a page load is not a request to the
+  // API for something that changes twice a month. A failure is not an error
+  // anywhere in the app: it returns null and the page behaves as it always did.
+  SITE_CONFIG_KEY: "zafar_site_config",
+  SITE_CONFIG_TTL_MS: 60000,
+  siteConfig: function (force) {
+    var self = this;
+    if (!force) {
+      try {
+        var raw = sessionStorage.getItem(self.SITE_CONFIG_KEY);
+        if (raw) {
+          var cached = JSON.parse(raw);
+          if (cached && typeof cached.at === "number" && Date.now() - cached.at < self.SITE_CONFIG_TTL_MS) {
+            return Promise.resolve(cached.data);
+          }
+        }
+      } catch (e) {}
+    }
+    return this._fetch(API_BASE_URL + "/site-config", {}, 8000)
+      .then(function (res) { return self._json(res); })
+      .then(function (data) {
+        try {
+          sessionStorage.setItem(self.SITE_CONFIG_KEY, JSON.stringify({ at: Date.now(), data: data }));
+        } catch (e) {}
+        return data;
+      })
+      .catch(function () { return null; });
+  },
+
   // Koyeb's free instance sleeps. One ping per page, sent before the person
   // has finished typing, so the instance is awake by the time they press a
   // button. Harmless if it was already awake.
@@ -377,6 +408,23 @@ var Zafar = {
     // Never resolves — the page is already navigating away, so no .catch()
     // downstream fires a toast on a page that's on its way out.
     return new Promise(function () {});
+  },
+
+  // Who is this token? `/admin/whoami` answers 200 with a role for an admin,
+  // 403 for a student and 404 on a deployment with no admin API. None of those
+  // is a reason to bounce anyone to the sign-in screen, so this one does not go
+  // through _unauthorized — it just reports the status.
+  adminWhoami: function () {
+    var self = this;
+    if (!this.getToken()) return Promise.resolve(null);
+    return this._fetch(API_BASE_URL + "/admin/whoami", {
+      headers: { Authorization: "Bearer " + this.getToken() },
+    }, 8000)
+      .then(function (res) {
+        if (res.status !== 200) return null;
+        return self._json(res).catch(function () { return null; });
+      })
+      .catch(function () { return null; });
   },
 
   authGet: function (path, opts) {

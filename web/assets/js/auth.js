@@ -43,6 +43,12 @@ var ZafarAuth = (function () {
       googleOffline: "No connection, so Google sign-in can\u2019t finish. Try again when you have data.",
       googleGmail: "StudyMW works with Gmail addresses. Sign in with your @gmail.com Google account.",
       googleUnavailable: "Google signed you in, but StudyMW couldn\u2019t finish setting up the account. Try again in a moment.",
+      // Owner accounts carry a second factor. The code is asked for only when
+      // the server says it is missing, so ordinary students never see the field.
+      mfaLabel: "Authenticator code", mfaPh: "6-digit code",
+      mfaPrompt: "Enter the 6-digit code from your authenticator app to finish signing in.",
+      mfaWrong: "That code isn\u2019t right. Enter the one showing in your authenticator app now.",
+      mfaUnavailable: "This owner account has no authenticator enrolled, so it can\u2019t sign in here. An administrator has to re-enrol it from the server.",
       continueBtn: "Sign in", createBtn: "Create account",
       signingIn: "Signing in\u2026", creatingAccount: "Creating account\u2026",
 
@@ -232,6 +238,17 @@ var ZafarAuth = (function () {
                 fieldMarkup({ field: "field-password", input: "password", label: "lbl-password",
                   icon: "lock", type: "password", ac: "current-password", min: 6,
                   reveal: true, err: "err-password", strength: true }) +
+                // The owner's second factor. Hidden until the API asks for it:
+                // a student must never be shown a field they cannot fill.
+                '<div class="field" id="field-totp" hidden>' +
+                  '<label class="sr-only" for="totpCode" id="lbl-totp"></label>' +
+                  '<div class="control">' +
+                    '<span class="ic">' + icon("lock", 18) + "</span>" +
+                    '<input class="input" id="totpCode" type="text" inputmode="numeric" ' +
+                      'autocomplete="one-time-code" maxlength="6" pattern="[0-9]*" ' +
+                      'aria-labelledby="lbl-totp">' +
+                  "</div>" +
+                "</div>" +
                 fieldMarkup({ field: "field-confirm", input: "confirmPassword", label: "lbl-confirm",
                   icon: "lock", type: "password", ac: "new-password", reveal: true, err: "err-confirm" }) +
                 '<div class="options-row">' +
@@ -358,6 +375,12 @@ var ZafarAuth = (function () {
     b.classList.toggle("error", !!isError);
     b.classList.toggle("show", !!message);
   }
+  // The bar remembers "this account is an admin" in sessionStorage; a new
+  // session must not inherit the previous account's answer.
+  function forgetAdminHint() {
+    try { sessionStorage.removeItem("zafar_admin_role"); } catch (e) {}
+  }
+
   function friendlyError(err) {
     if (!err) return T[lang].offline;
     if (err.timeout) return err.message;
@@ -368,7 +391,37 @@ var ZafarAuth = (function () {
     if (!err.status) return T[lang].offline;
     return err.message;
   }
+  // Set when the API has accepted the password (or the Google token) and is
+  // waiting for the authenticator code. Nothing is kept in it that the form
+  // does not already hold, except Google's token, which cannot be retyped.
+  var pendingMfa = null;
+
   function setError(fieldId, on) { el(fieldId).classList.toggle("has-error", on); }
+
+  function askForCode(kind, credential, message) {
+    pendingMfa = { kind: kind, credential: credential || null };
+    var field = el("field-totp");
+    if (field) field.hidden = false;
+    showBanner("authBanner", message || T[lang].mfaPrompt, false);
+    var input = el("totpCode");
+    if (input) {
+      input.value = "";
+      input.focus();
+    }
+  }
+
+  function clearCode() {
+    pendingMfa = null;
+    var field = el("field-totp");
+    if (field) field.hidden = true;
+    var input = el("totpCode");
+    if (input) input.value = "";
+  }
+
+  function codeValue() {
+    var input = el("totpCode");
+    return input ? input.value.replace(/\D/g, "").slice(0, 6) : "";
+  }
   function clearErrors(form) {
     form.querySelectorAll(".field, .otp-row").forEach(function (f) { f.classList.remove("has-error"); });
   }
@@ -415,20 +468,23 @@ var ZafarAuth = (function () {
   // The sign-in half: the ID token Google hands us is the only thing that goes
   // up. The backend verifies it with Google's keys and answers with the same
   // JWT /auth/login returns, so the rest of the app cannot tell the two apart.
-  function signInWithGoogle(credential, remember) {
+  function signInWithGoogle(credential, remember, totpCode) {
     var t = T[lang];
     if (!credential) return;
+    var body = { credential: credential };
+    if (totpCode) body.totp_code = totpCode;
     var zone = el("googleZone");
     if (zone) zone.classList.add("is-busy");
     googleNote(t.signingIn, "info");
 
-    return Zafar.postJSON("/auth/google", { credential: credential }).then(
+    return Zafar.postJSON("/auth/google", body).then(
       function (data) {
         if (!data || !data.access_token) {
           if (zone) zone.classList.remove("is-busy");
           googleNote(t.googleRefused);
           return;
         }
+        forgetAdminHint();
         Zafar.setToken(data.access_token, remember !== false);
         location.href = "dashboard.html";
       },
@@ -438,6 +494,21 @@ var ZafarAuth = (function () {
         // backend too old to send one. The backend's own sentence never goes
         // on screen here — it is written for an operator, not a student.
         var code = (err && err.code) || "";
+        if (code === "admin_totp_required") {
+          // Google already vouched for who this is; the owner still has to
+          // prove the second factor. The ID token is kept so the form's own
+          // Sign in button can send both together.
+          askForCode("google", credential, totpCode ? t.mfaWrong : t.mfaPrompt);
+          // The way in now is the form below, so Google steps aside rather than
+          // sitting there inviting a second popup.
+          googleNote("");
+          if (zone) zone.hidden = true;
+          return;
+        }
+        if (code === "admin_mfa_unavailable") {
+          googleNote(t.mfaUnavailable);
+          return;
+        }
         if (code === "google_not_configured" || (!code && err && (err.status === 404 || err.status === 501))) {
           // Wired on this side, not yet on that one. Say so, and point at the
           // way in that works.
@@ -546,6 +617,8 @@ var ZafarAuth = (function () {
     el("email").placeholder = t.emailPh;
     el("lbl-password").textContent = t.passLabel;
     el("password").placeholder = isCreate ? t.passPhCreate : t.passPhSignin;
+    el("lbl-totp").textContent = t.mfaLabel;
+    el("totpCode").placeholder = t.mfaPh;
     el("lbl-confirm").textContent = t.confirmLabel;
     el("confirmPassword").placeholder = t.confirmPh;
 
@@ -623,6 +696,7 @@ var ZafarAuth = (function () {
   }
 
   function setMode(next) {
+    clearCode();
     mode = next;
     clearErrors(el("authForm"));
     render();
@@ -739,6 +813,25 @@ var ZafarAuth = (function () {
       var isCreate = mode === "create";
 
       clearErrors(form);
+
+      // A Google sign-in that stopped at the second factor: the token is still
+      // in hand, so this resends it with the code instead of asking Google for
+      // a new one (which would show the popup again for no reason). Checked
+      // before the password rules, because this path has no password to give.
+      if (!isCreate && pendingMfa && pendingMfa.kind === "google") {
+        var googleCode = codeValue();
+        if (!googleCode) {
+          askForCode("google", pendingMfa.credential);
+          return;
+        }
+        busy(true, t.signingIn);
+        signInWithGoogle(pendingMfa.credential, el("staySignedIn").checked, googleCode).then(
+          function () { busy(false, t.continueBtn); },
+          function () { busy(false, t.continueBtn); }
+        );
+        return;
+      }
+
       var ok = true;
       if (isCreate && el("fullName").value.trim().length < 2) { setError("field-name", true); ok = false; }
       if (!isValidEmail(el("email").value.trim())) { setError("field-email", true); ok = false; }
@@ -755,18 +848,35 @@ var ZafarAuth = (function () {
       var password = el("password").value;
       showBanner("authBanner", "");
 
+
       if (!isCreate) {
+        var code = codeValue();
         busy(true, t.signingIn);
         // /auth/login is FastAPI's OAuth2PasswordRequestForm, so credentials
-        // go up form-encoded rather than as JSON.
-        Zafar.postForm("/auth/login", { email: email, password: password })
+        // go up form-encoded rather than as JSON. totp_code is only sent once
+        // the server has asked for it — an empty string would be the same as
+        // not sending it, and sending it unasked confuses the log.
+        var fields = { email: email, password: password };
+        if (code) fields.totp_code = code;
+
+        Zafar.postForm("/auth/login", fields)
           .then(function (data) {
+            forgetAdminHint();
             Zafar.setToken(data.access_token, el("staySignedIn").checked);
             location.href = "dashboard.html";
           })
           .catch(function (err) {
             busy(false, t.continueBtn);
             if (needsVerification(err)) return goToVerify(email, true);
+            // Two codes from the API, and the student never sees either.
+            if (err && err.code === "admin_totp_required") {
+              askForCode("password", null, code ? t.mfaWrong : t.mfaPrompt);
+              return;
+            }
+            if (err && err.code === "admin_mfa_unavailable") {
+              showBanner("authBanner", t.mfaUnavailable, true);
+              return;
+            }
             showBanner("authBanner", friendlyError(err), true);
           });
       } else {
