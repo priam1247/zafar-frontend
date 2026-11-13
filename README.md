@@ -395,6 +395,42 @@ The deployed app has no demo mode — it always talks to the real backend, and
 be reached, each page shows a clear error or offline state instead of inventing
 data, so what you see is what's actually published.
 
+## The admin portal
+
+`/admin` (also `/admin.html`) is a desk tool for whoever runs the library:
+users and their sign-in method, the numbers, the queue of "this paper is
+missing" and "this file is broken", site settings, roles and the audit log, and
+the operational state of the deployment — storage, backups, exports.
+
+It is **not** linked from any student page. It is `noindex` in its own `<meta>`,
+`Disallow: /admin` in `robots.txt`, and `_headers` sends `X-Robots-Tag` for
+anything that asks anyway.
+
+**Nothing on it is invented.** Every figure comes from the API, and a missing
+field prints "—" rather than a zero, because a zero is a claim. That means the
+portal is honest in the state the backend is in today: it opens, checks
+`GET /admin/whoami`, and if the API has no `/admin` routes it says *"The admin
+API isn't deployed yet"* and stops. No sample users, no made-up download charts.
+
+Three gates, each a sentence rather than a blank page:
+
+| What the API says | What the admin sees |
+| --- | --- |
+| no token | *Sign in first* — with a link back |
+| 401 / 403 | *This area is for administrators* |
+| 404 / 501 | *The admin API isn't deployed yet*, pointing at the contract |
+| anything else | the reason, and a Try again button |
+
+Roles are `owner` (everything), `editor` (library and moderation) and `viewer`
+(statistics only). The tabs follow the role, and so does every route on the API —
+hiding a tab is convenience, not security. Every change the portal makes is
+audited server-side.
+
+The contract the page already speaks — routes, payload shapes, what each number
+means and where it should come from, 2FA for the owner, audit rows inside the
+same transaction, signed export links — is `docs/admin-portal.md`. It is written
+so the backend can be built against it without another round of guessing.
+
 ## Downloads
 
 The catalogue response never carries a file URL — a permanent link there would

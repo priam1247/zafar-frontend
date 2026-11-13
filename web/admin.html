@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#00535F">
+<meta name="robots" content="noindex, nofollow, noarchive">
+<!-- An internal tool: not in the manifest, not in the sitemap, not linked from
+     any student page. robots.txt closes it as well, and _headers sends
+     X-Robots-Tag for anything that asks anyway. -->
+<title>Admin — StudyMW</title>
+<link rel="preload" href="assets/fonts/instrument-sans.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="assets/css/admin.css">
+<link rel="icon" href="favicon.ico" sizes="32x32">
+<link rel="icon" type="image/png" sizes="48x48" href="assets/img/icon-48.png">
+</head>
+<body>
+  <header class="bar">
+    <div class="bar-in">
+      <a class="mark" href="admin.html">
+        <span class="glyph" aria-hidden="true">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+               stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M4 5.5A2.5 2.5 0 0 1 6.5 3H19v15H6.5A2.5 2.5 0 0 0 4 20.5z"/>
+            <path d="M8 3v15"/>
+          </svg>
+        </span>
+        <span>StudyMW <b>admin</b></span>
+      </a>
+      <div class="bar-right" id="barRight"></div>
+    </div>
+  </header>
+
+  <nav class="tabs" id="tabs" aria-label="Admin sections" hidden></nav>
+
+  <main class="wrap" id="view" aria-live="polite">
+    <div class="state" id="boot">
+      <div class="spinner" aria-hidden="true"></div>
+      <p>Checking your access…</p>
+    </div>
+  </main>
+
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+  <script src="assets/js/config.js"></script>
+  <script src="assets/js/admin.js"></script>
+</body>
+</html>

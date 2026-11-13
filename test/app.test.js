@@ -598,6 +598,186 @@ test("a backend that ignores offset is read once, not in a loop", async () => {
   dom.window.close();
 });
 
+/* ---------- 8f. the admin portal: gates, roles, and no invented numbers ---------- */
+
+const ADMIN_OVERVIEW = {
+  users: { total: 128, verified: 96, new_today: 4 },
+  downloads: { today: 37, total: 1420, failed_today: 2 },
+  daily: [
+    { date: "2026-11-07", signups: 2, downloads: 20, failed: 1 },
+    { date: "2026-11-08", signups: 4, downloads: 37, failed: 2 },
+  ],
+  top_files: [{ id: "f1", name: "MSCE Maths 2023.pdf", section: "papers", downloads: 41 }],
+  top_subjects: [{ subject: "Mathematics", downloads: 88 }],
+  zero_result_searches: [{ q: "physics paper 2 2026", count: 7 }],
+};
+
+function adminPage(hooks) {
+  const opts = hooks || {};
+  return openPage("/admin", {
+    beforeParse: (win) => {
+      win.confirm = () => true;
+      if (opts.beforeParse) opts.beforeParse(win);
+    },
+    fetch: opts.fetch,
+    storage: opts.storage,
+  });
+}
+
+test("without an admin API the portal says so and shows no numbers", async () => {
+  const dom = await adminPage({
+    storage: { zafar_token: token("owner") },
+    fetch: () => reply({ detail: "Not Found" }, 404),
+  });
+  await wait(400);
+  const text = dom.window.document.getElementById("view").textContent;
+
+  assert.match(text, /admin API isn't deployed yet/i);
+  assert.match(text, /docs\/admin-portal\.md/, "and points at the contract");
+  // The whole point: no sample data anywhere on the page.
+  assert.doesNotMatch(text, /\b128\b|\b1,?420\b|MSCE Maths/, "nothing is invented: " + text.slice(0, 200));
+  assert.equal(dom.window.document.getElementById("tabs").hidden, true, "and no tabs to click");
+  dom.window.close();
+});
+
+test("signed out is a sign-in gate; a student is turned away", async () => {
+  const anon = await adminPage({ fetch: () => reply({}) });
+  await wait(300);
+  assert.match(anon.window.document.getElementById("view").textContent, /Sign in first/i);
+  assert.equal(anon.window.document.querySelector("#view a[href^='login.html']").getAttribute("href"), "login.html?switch=1");
+  anon.window.close();
+
+  const student = await adminPage({
+    storage: { zafar_token: token("student") },
+    fetch: (input) => {
+      const url = String(input && input.url ? input.url : input);
+      if (/\/admin\/whoami/.test(url)) return reply({ detail: "Admins only" }, 403, { "X-Error-Code": "admin_forbidden" });
+      return reply({});
+    },
+  });
+  await wait(400);
+  const text = student.window.document.getElementById("view").textContent;
+  assert.match(text, /for administrators/i);
+  assert.doesNotMatch(text, /Admins only/, "the server's own wording stays off the screen");
+  student.window.close();
+});
+
+test("an owner sees the numbers the API actually sent", async () => {
+  const seen = [];
+  const dom = await adminPage({
+    storage: { zafar_token: token("owner") },
+    fetch: (input) => {
+      const url = String(input && input.url ? input.url : input);
+      seen.push(url);
+      if (/\/admin\/whoami/.test(url)) return reply({ email: "owner@gmail.com", name: "Owner", role: "owner" });
+      if (/\/admin\/overview/.test(url)) return reply(ADMIN_OVERVIEW);
+      return reply({});
+    },
+  });
+  await wait(500);
+  const d = dom.window.document;
+  const text = d.getElementById("view").textContent;
+
+  assert.match(seen.join(" "), /\/admin\/overview\?days=14/);
+  assert.match(text, /128/);
+  assert.match(text, /96 verified/);
+  assert.match(text, /37/);
+  // Top files, top subjects and the upload list all come from the payload.
+  assert.match(text, /MSCE Maths 2023\.pdf/);
+  assert.match(text, /Mathematics/);
+  assert.match(text, /physics paper 2 2026/);
+  // Bars: one column per day, scaled from the data.
+  assert.equal(d.querySelectorAll(".chart .col").length, 2);
+  // The chrome names who you are and what you may do.
+  assert.equal(d.querySelector(".role-chip").textContent, "Owner");
+  assert.equal(d.getElementById("tabs").hidden, false);
+  dom.window.close();
+});
+
+test("a viewer gets the numbers and nothing that changes anything", async () => {
+  const dom = await adminPage({
+    storage: { zafar_token: token("viewer") },
+    fetch: (input) => {
+      const url = String(input && input.url ? input.url : input);
+      if (/\/admin\/whoami/.test(url)) return reply({ email: "v@gmail.com", role: "viewer" });
+      if (/\/admin\/overview/.test(url)) return reply(ADMIN_OVERVIEW);
+      return reply({});
+    },
+  });
+  await wait(500);
+  const d = dom.window.document;
+  const tabs = [...d.querySelectorAll("#tabs .tab")].map((b) => b.textContent);
+
+  assert.deepEqual(tabs, ["Overview"], "a viewer sees statistics only: " + tabs.join(", "));
+  // There is no tab to click, so there is nothing to click by accident — and a
+  // hand-typed #users does not open a panel the role cannot have.
+  assert.equal(d.querySelector('[data-tab="users"]'), null, "no users tab for a viewer");
+  assert.equal(dom.window.location.hash, "#overview");
+  dom.window.close();
+});
+
+test("the users table is real, and suspending posts the right thing", async () => {
+  const calls = [];
+  const users = [
+    { id: "1", email: "amina@gmail.com", name: "Amina", role: null, is_verified: true,
+      signup_method: "google", created_at: "2026-10-02T09:10:00Z", last_active_at: "2026-11-08T05:00:00Z", downloads: 12 },
+    { id: "2", email: "bob@gmail.com", name: "Bob", role: null, suspended: true,
+      signup_method: "email", created_at: "2026-09-01T09:10:00Z", last_active_at: null, downloads: 0 },
+  ];
+  const dom = await adminPage({
+    storage: { zafar_token: token("owner") },
+    fetch: (input, init) => {
+      const url = String(input && input.url ? input.url : input);
+      calls.push({ url, method: (init && init.method) || "GET", body: init && init.body });
+      if (/\/admin\/whoami/.test(url)) return reply({ email: "owner@gmail.com", role: "owner" });
+      if (/\/admin\/users\/1\/suspend/.test(url)) return reply({ id: "1", suspended: true });
+      if (/\/admin\/users/.test(url)) return reply(users, 200, { "X-Total-Count": "2" });
+      return reply({});
+    },
+  });
+  await wait(300);
+  const d = dom.window.document;
+
+  d.querySelector('[data-action="tab"][data-tab="users"]').dispatchEvent(new dom.window.MouseEvent("click", { bubbles: true }));
+  await wait(400);
+
+  const view = d.getElementById("view").textContent;
+  assert.match(view, /amina@gmail\.com/);
+  assert.match(view, /Google/, "the sign-in method is shown");
+  assert.match(view, /Suspended/, "so is a suspended account");
+  assert.match(view, /1\u20132 of 2/, "and the page count comes from X-Total-Count");
+
+  // Suspend is a POST with a boolean, on the account's own path.
+  d.querySelector('[data-action="suspend"][data-id="1"]').dispatchEvent(new dom.window.MouseEvent("click", { bubbles: true }));
+  await wait(400);
+  const suspend = calls.filter((c) => /\/admin\/users\/1\/suspend$/.test(c.url))[0];
+  assert.ok(suspend, "no suspend request: " + JSON.stringify(calls.map((c) => c.method + " " + c.url)));
+  assert.equal(suspend.method, "POST");
+  assert.deepEqual(JSON.parse(suspend.body), { suspended: true });
+
+  // Search is a query the API does, not a filter of the page.
+  const search = d.getElementById("userSearch");
+  search.value = "amina";
+  search.dispatchEvent(new dom.window.Event("input", { bubbles: true }));
+  await wait(600);
+  assert.ok(calls.some((c) => /\/admin\/users\?.*q=amina/.test(c.url)), "the search went to the API");
+  dom.window.close();
+});
+
+test("the portal is a tool, not a page", () => {
+  const html = read(path.join(WEB, "admin.html"));
+  assert.match(html, /<meta name="robots" content="noindex/);
+  const robots = read(path.join(WEB, "robots.txt"));
+  assert.match(robots, /Disallow: \/admin\b/);
+  const headers = read(path.join(WEB, "_headers"));
+  assert.match(headers, /X-Robots-Tag: noindex/);
+  // Nothing in the student app links to it.
+  for (const page of ["login.html", "dashboard.html", "help.html", "index.html"]) {
+    const body = read(path.join(WEB, page));
+    assert.doesNotMatch(body, /admin\.html/, page + " links to the admin portal");
+  }
+});
+
 /* ---------- 9a2. a cold library scan is not cut off at 15 seconds ---------- */
 
 test("the catalogue waits longer than the app's normal deadline, and retries once", async () => {
