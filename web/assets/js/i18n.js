@@ -268,6 +268,9 @@ favorites: "Favorites", support: "Support", help: "Help & FAQ",
           : "That is a lot of requests just now. Try again in a minute.";
       },
       errOffline: "You are offline. Connect to the internet and try again.",
+      // The catalogue can be older than the library: the file was removed
+      // between the list loading and the report being sent.
+      errFileGone: "That file is no longer in the library, so there is nothing to report. Refresh the page to see what is there now.",
       errUnverified: "Verify your email address first \u2014 the code was sent when you registered.",
       errSuspended: "This account is suspended, so it cannot send anything.",
       errForbidden: "This account cannot send that at the moment.",

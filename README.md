@@ -450,10 +450,13 @@ Two forms, and they are deliberately different things:
 
 Both carry the ordinary student bearer token: the submission belongs to the
 account that sent it, and a `401` sends the student to sign in rather than
-showing an error. Both are rate-limited per account; the `429` arrives with
-`Retry-After` and the page says "Try again in 2 minutes" instead of repeating
-the server's sentence. The portal side of both queues is in
-`docs/admin-portal.md`.
+showing an error. Caps match the API's own (`title` 160, `note` 2000, both
+`extra="forbid"`), and the rate limits are per account — 3 requests and 5
+reports per 10 minutes. The `429` arrives with `Retry-After` and the page says
+"Try again in 2 minutes" instead of repeating the server's sentence. A report
+for a file the library no longer has comes back `404 report_file_missing`, and
+the dialog asks for a refresh rather than a pointless retry. The portal side of
+both queues is in `docs/admin-portal.md`.
 
 ## Downloads
 

@@ -870,6 +870,8 @@ test("a broken file is reported from its own card, with its id", async () => {
   assert.match(d.querySelector("[data-report-file]").textContent, /MSCE Chemistry 2024\.pdf/,
     "and names the file being reported");
   assert.equal(d.activeElement, d.querySelector("#report-reason"), "focus moves into the dialog");
+  assert.equal(d.querySelector("#report-note").getAttribute("maxlength"), "2000",
+    "the note cap is the API's, not a smaller guess");
   assert.equal(modal.querySelector(".modal-card").getAttribute("aria-modal"), "true");
 
   d.querySelector("#report-reason").value = "Pages are missing or blank";
@@ -928,6 +930,32 @@ test("\u201csomething else\u201d cannot be sent without saying what", async () =
   dom.window.close();
 });
 
+test("a report for a file the library no longer has does not say \u201ctry again\u201d", async () => {
+  const dom = await studentSite({
+    onPost: (u) => {
+      if (!/\/reports$/.test(u.pathname)) return reply({});
+      // routers/intake.py: the id is looked up in the live library, and a
+      // removed file is a 404 with its own code, not a transient failure.
+      return reply({ detail: "The reported file is not in the current library" }, 404, {
+        "X-Error-Code": "report_file_missing",
+      });
+    },
+  });
+  await wait(900);
+  const w = dom.window;
+  const d = w.document;
+
+  d.querySelector("[data-report]").click();
+  submit(w, d.querySelector("[data-report-form]"));
+  await wait(400);
+
+  const error = d.querySelector("[data-report-error]").textContent;
+  assert.match(error, /no longer in the library/i, error);
+  assert.match(error, /Refresh the page/i, "and says what to do instead of retrying");
+  assert.doesNotMatch(error, /try again in a moment/i, "a retry would fail the same way");
+  dom.window.close();
+});
+
 test("a report the API refuses says why in words a student can act on", async () => {
   const dom = await studentSite({
     onPost: (u) => {
@@ -975,7 +1003,13 @@ test("a request for a missing file goes to the queue, not to an inbox", async ()
 
   // The library's own folder keys, not free text.
   const sections = [...d.querySelectorAll("#request-section option")].map((o) => o.value);
-  assert.deepEqual(sections, ["papers", "primary", "books", "notes", "marking-keys"]);
+  assert.deepEqual(sections, ["papers", "primary", "books", "notes", "marking-keys"],
+    "the API's Section literal, key for key");
+
+  // The API refuses more than 160 characters of title and 2000 of note
+  // (Field(max_length=…)); the boxes stop the typing instead of the 422.
+  assert.equal(d.querySelector("#request-title").getAttribute("maxlength"), "160");
+  assert.equal(d.querySelector("#request-note").getAttribute("maxlength"), "2000");
 
   // An empty box is not a request.
   submit(w, form);
