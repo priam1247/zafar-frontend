@@ -65,8 +65,25 @@ viewport — so the two never drift apart.
 
 The sign-in sheet opens with a small CSS-drawn stack of books — three spines
 and a leaning one, straight-line SVG in the markup — which costs zero bytes.
-Phones therefore never download a hero image, and the hero is sized by its own
-copy rather than by a picture.
+On a phone the drawing is hidden outright: the form is the reason the page
+exists, and at 360×640 every 60 pixels of decoration pushes a button below the
+fold.
+
+**The sign-in screen is sized so it does not scroll.** The teal band holds a
+wordmark, one short line ("Pass MSCE & JCE.") and a sentence that names what is
+inside — the four section names used to sit there as pill-shaped tags, which
+looked tappable and were not, so they moved into the sentence where they read as
+a promise. The band is sized by its own copy, never by a fraction of the
+viewport, and `@media (max-height: 700px)` trims the band, the fields and the
+button on a short screen — never the form itself.
+
+**Text is measured, not eyeballed.** Quiet text on the sheet is `--muted`
+`#4B666A` (6.1:1 on cream), placeholders are `#5D7275` (5.1:1 on white), typed
+text is ink (18.6:1), and the border a field shows at rest clears 3:1 against
+the field it surrounds. A test computes those ratios from the stylesheet itself,
+so a shade that "looks fine" on a desk cannot quietly become 4:1 in daylight.
+The one amber thing on the page is the word FREE in the footer: an accent is for
+a highlight, not for anything a student needs in order to sign in.
 
 **The signed-in app** (`app.css`) is the same system, built the same way. A
 teal bar carries the wordmark, the page title, the day's download allowance and
@@ -76,8 +93,11 @@ There is no sidebar and no drawer — categories are chips that scroll sideways
 on the list pages, and Help sits in the bar with its word on it next to an
 icon-only Log out.
 
-**Two ways in.** The sign-in card has the email and password form, and under an
-`or` rule a *Continue with Google* button. Google's own script draws it — the
+**Two ways in.** The sign-in card leads with *Continue with Google* — one tap
+instead of typing an address and a password on a phone — then an `or` rule, then
+the email and password form. (The rule belongs to Google: it is there to explain
+why a form follows, so the two appear and disappear together.) Google's own
+script draws the button — the
 branding is theirs to keep — and the only thing that leaves the page is the ID
 token Google issued: `POST /auth/google` verifies it against the client ID and
 answers with the same JWT the email form gets, so nothing downstream knows the
@@ -87,7 +107,7 @@ the address with a code) and off the code screen.
 It is drawn only when `GOOGLE_CLIENT_ID` in `config.js` is a real client ID, and
 it never fails silently: the backend's machine code in `X-Error-Code` picks the
 sentence, so a student is told *which* thing is wrong — `google_not_configured`
-("isn't switched on yet" — and go and use the form above), `google_email_unsupported`
+("isn't switched on yet" — and go and use the form below), `google_email_unsupported`
 ("StudyMW works with Gmail addresses"), `google_account_unavailable` ("try again
 in a moment") or `google_invalid_token` ("couldn't confirm that account"). The
 backend's own wording never reaches the screen; it is written for an operator.

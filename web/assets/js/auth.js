@@ -19,9 +19,12 @@ var ZafarAuth = (function () {
     en: {
       // The hero is a promise, not a greeting: what the student gets, and on
       // what. Short sentences, everyday words.
-      headline: "Pass MSCE &amp; JCE with real past papers.",
-      subtitle: "Download past papers, marking keys, books and notes. Free, every day.",
-      chips: ["MSCE", "JCE", "Marking keys", "Notes"],
+      // One line on a 360px phone, which is the point: the hero exists to say
+      // what this is, not to fill the top third of the screen. What is inside
+      // the library moved into the sentence underneath, where it reads as a
+      // promise instead of four things that look tappable but are not.
+      headline: "Pass MSCE &amp; JCE.",
+      subtitle: "Real past papers, marking keys, books and notes. Free, every day.",
 
       signin: "Sign in", create: "Create account",
       switchCreate: 'Don\u2019t have an account? <button type="button" class="link-btn" data-goto="create">Create one</button>',
@@ -43,7 +46,10 @@ var ZafarAuth = (function () {
       continueBtn: "Sign in", createBtn: "Create account",
       signingIn: "Signing in\u2026", creatingAccount: "Creating account\u2026",
 
-      footer: "PAPERS &middot; MARKING KEYS &middot; BOOKS &middot; NOTES &middot; FREE",
+      // The one amber word on the page: the accent is for a highlight, not for
+      // anything that has to be read in order to sign in.
+      footer:
+        "PAPERS &middot; MARKING KEYS &middot; BOOKS &middot; NOTES &middot; <b class=\"free\">FREE</b>",
 
       errName: "Enter your full name.",
       errEmail: "Enter a valid email address.",
@@ -192,7 +198,6 @@ var ZafarAuth = (function () {
           "</div>" +
           '<p class="mast-head" id="txt-headline"></p>' +
           '<p class="mast-lede" id="txt-subtitle"></p>' +
-          '<ul class="mast-chips" id="txt-chips" aria-label="What is inside"></ul>' +
         "</header>" +
 
         '<section class="sheet">' +
@@ -206,6 +211,19 @@ var ZafarAuth = (function () {
                 '<p id="switchLine"></p>' +
               "</div>" +
               '<div class="banner" id="authBanner" role="status"></div>' +
+
+              // Google first, above the form: one tap instead of typing an
+              // address and a password on a phone. The OR rule belongs to it —
+              // it explains why a form follows — so the two appear together,
+              // and neither appears when no client ID is configured (see
+              // GOOGLE_CLIENT_ID in config.js). It sits outside the <form> so
+              // it can never submit one by accident.
+              '<div class="google-zone" id="googleZone" hidden>' +
+                '<div class="google-btn" id="googleBtn"></div>' +
+                '<div class="or-rule"><span id="txt-or"></span></div>' +
+                '<p class="google-note" id="googleNote" role="status" hidden></p>' +
+              "</div>" +
+
               '<form class="form" id="authForm" novalidate>' +
                 fieldMarkup({ field: "field-name", input: "fullName", label: "lbl-name",
                   icon: "user", ac: "name", err: "err-name" }) +
@@ -225,14 +243,6 @@ var ZafarAuth = (function () {
                   '<span class="spinner"></span><span class="submit-label"></span>' +
                 "</button>" +
               "</form>" +
-              // The second way in, under the first, where people look for it.
-              // Hidden unless a Google client ID is configured: see
-              // GOOGLE_CLIENT_ID in config.js.
-              '<div class="google-zone" id="googleZone" hidden>' +
-                '<div class="or-rule"><span id="txt-or"></span></div>' +
-                '<div class="google-btn" id="googleBtn"></div>' +
-                '<p class="google-note" id="googleNote" role="status" hidden></p>' +
-              "</div>" +
             "</div>" +
 
             /* ---------- forgot ---------- */
@@ -526,9 +536,6 @@ var ZafarAuth = (function () {
 
     el("txt-headline").innerHTML = t.headline;
     el("txt-subtitle").innerHTML = t.subtitle;
-    el("txt-chips").innerHTML = t.chips.map(function (chip) {
-      return "<li>" + Zafar.escapeHTML(chip) + "</li>";
-    }).join("");
 
     el("txt-pageTitle").textContent = isCreate ? t.create : t.signin;
     el("switchLine").innerHTML = isCreate ? t.switchSignin : t.switchCreate;
