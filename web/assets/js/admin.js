@@ -473,7 +473,11 @@ var ZafarAdmin = (function () {
             { label: "Reported", render: function (row) { return esc(when(row.created_at)); } },
             { label: "File", render: function (row) {
                 return '<strong>' + esc(row.file_name || row.file_id || "\u2014") + "</strong>" +
-                  (row.reason ? '<div class="k-note">' + esc(row.reason) + "</div>" : "");
+                  (row.reason ? '<div class="k-note">' + esc(row.reason) + "</div>" : "") +
+                  // The student's own words, when they added any: the reason
+                  // is one of five sentences, and "page 4 is blank" is what
+                  // an editor can actually act on.
+                  (row.note ? '<div class="k-note">\u201c' + esc(row.note) + "\u201d</div>" : "");
               } },
             { label: "By", render: function (row) { return esc(row.email || "\u2014"); } },
             { label: "", render: function (row) {

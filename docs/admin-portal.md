@@ -140,3 +140,31 @@ does not know instead of drawing a zero:
 Two knobs the portal reads and never writes: `/admin/audit` has no delete, and
 the export links are five-minute signed URLs (`POST /admin/export/{kind}` →
 `{url, expires_at}`).
+
+## Where the queue comes from
+
+The two queues are not only read in the portal; students fill them from the app.
+Both posts are authenticated with the ordinary student bearer token and are
+attributed to that account server-side — the client sends no email, and a report
+sends no file name either.
+
+| Student action | Where | Request |
+| --- | --- | --- |
+| "I need a paper that isn't here" | Help & FAQ → *Request a paper, book or notes* (`/help.html#request`) | `POST /requests` `{section, title, note?}` |
+| "This file is broken" | the alert button on the file's own catalogue card → dialog | `POST /reports` `{file_id, reason, note?}` |
+
+- `section` is one of the library's folder keys — `papers`, `primary`, `books`,
+  `notes`, `marking-keys` — so a request lands where the file will live.
+- `file_id` comes from the card, because that is the only place it exists. A
+  typed-in name would be a guess, and the API looks the name up in the live
+  library anyway.
+- `reason` is one of five plain sentences ("The download does not work", "Pages
+  are missing or blank", …). The queue prints it as sent, so the vocabulary is
+  whatever the frontend and the API agree on — it is not an enum on the client.
+- `note` is free text and is optional; when there is none, the field is left out
+  of the JSON rather than sent empty.
+- Both endpoints answer `201` and `Cache-Control: no-store`, and both are
+  rate-limited per account. A `429` carries `Retry-After`, and the app turns it
+  into "Try again in 2 minutes" rather than repeating the server's sentence.
+- A `401` never shows an error: it sends the student to sign in, because a
+  submission has to belong to an account.

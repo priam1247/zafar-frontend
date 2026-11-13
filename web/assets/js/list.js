@@ -148,6 +148,12 @@ var ZafarList = (function () {
               (featured.indexOf(doc.id) !== -1 ? '<span class="item-featured">Featured</span>' : "") + "</h3>" +
             '<span class="item-cat">' + Zafar.escapeHTML(doc.category || t("list.document")) + "</span>" +
           "</div>" +
+          // Reports start here, not on the Help page: a report has to carry the
+          // id of a real file, and this card is the only place that knows it.
+          '<button class="fav-btn report-btn" data-report="' + Zafar.escapeHTML(doc.id) + '"' +
+            ' data-name="' + Zafar.escapeHTML(doc.name) + '"' +
+            ' aria-label="' + Zafar.escapeHTML(t("support.reportOpen") + ": " + doc.name) + '"' +
+            ' aria-haspopup="dialog">' + svg("alert", 17) + "</button>" +
           '<button class="fav-btn' + (saved ? " on" : "") + '" data-fav="' + Zafar.escapeHTML(doc.id) +
             '" aria-pressed="' + saved + '" aria-label="' +
             (saved ? "Remove from favorites" : "Save to favorites") + '">' + svg("heart", 17) + "</button>" +
@@ -165,6 +171,198 @@ var ZafarList = (function () {
         "</div>" +
       "</article>"
     );
+  }
+
+  /* ---------- Reporting a broken file ----------
+     POST /reports takes {file_id, reason, note?} with the bearer token. The
+     API looks the file up in the live library and takes the name from there,
+     so this dialog never sends a name or an email: a client that could supply
+     either could lie about both.
+
+     It is a dialog and not a page because the report starts on the card, and
+     leaving the catalogue to file it would lose the list — and the scroll
+     position — of someone who only meant to flag one file. */
+  function mountReportDialog(shell) {
+    var t = ZafarI18n.t;
+    var existing = document.querySelector("[data-report-modal]");
+    if (existing) existing.remove();
+
+    var wrap = document.createElement("div");
+    wrap.className = "modal";
+    wrap.setAttribute("data-report-modal", "");
+    wrap.hidden = true;
+    wrap.innerHTML =
+      '<div class="modal-scrim" data-report-close></div>' +
+      '<div class="modal-card" role="dialog" aria-modal="true" ' +
+          'aria-labelledby="report-heading" aria-describedby="report-file">' +
+        '<h2 id="report-heading">' + t("support.reportTitle") + "</h2>" +
+        '<p class="file-being-reported" id="report-file" data-report-file></p>' +
+        '<form data-report-form novalidate>' +
+          '<div class="form-field">' +
+            '<label for="report-reason">' + t("support.reportReason") + "</label>" +
+            '<select class="form-select" id="report-reason">' +
+              t("support.reportReasons").map(function (reason) {
+                return '<option value="' + Zafar.escapeHTML(reason) + '">' + Zafar.escapeHTML(reason) + "</option>";
+              }).join("") +
+            "</select>" +
+          "</div>" +
+          '<div class="form-field">' +
+            '<label for="report-note">' + t("support.reportNote") +
+              ' <span class="form-optional">' + t("support.requestOptional") + "</span></label>" +
+            '<textarea class="form-textarea" id="report-note" rows="2" maxlength="1000" placeholder="' +
+              Zafar.escapeHTML(t("support.reportNotePh")) + '"></textarea>' +
+          "</div>" +
+          '<p class="form-error" role="alert" data-report-error hidden></p>' +
+          '<div class="form-actions">' +
+            '<button class="btn btn-primary" type="submit" data-report-send>' + t("support.reportSend") + "</button>" +
+            '<button class="btn btn-ghost" type="button" data-report-close>' + t("support.reportCancel") + "</button>" +
+          "</div>" +
+        "</form>" +
+        '<div class="form-done" data-report-done hidden>' +
+          '<span class="done-glyph">' + svg("check", 18) + "</span>" +
+          "<h3>" + t("support.reportDoneTitle") + "</h3>" +
+          "<p>" + t("support.reportDone") + "</p>" +
+          '<button class="btn btn-ghost" type="button" data-report-close>' + t("support.reportClose") + "</button>" +
+        "</div>" +
+      "</div>";
+    document.body.appendChild(wrap);
+
+    var card = wrap.querySelector(".modal-card");
+    var form = wrap.querySelector("[data-report-form]");
+    var done = wrap.querySelector("[data-report-done]");
+    var fileLine = wrap.querySelector("[data-report-file]");
+    var errorLine = wrap.querySelector("[data-report-error]");
+    var select = wrap.querySelector("#report-reason");
+    var note = wrap.querySelector("#report-note");
+    var send = wrap.querySelector("[data-report-send]");
+    var current = null;   // { id, name, trigger }
+    var sending = false;
+
+    function focusables() {
+      return Array.prototype.slice
+        .call(card.querySelectorAll("button, select, textarea, [href]"))
+        .filter(function (node) {
+          return !node.disabled && !node.hidden && node.closest("[hidden]") === null;
+        });
+    }
+
+    function onKey(e) {
+      if (e.key === "Escape") {
+        e.preventDefault();
+        close();
+        return;
+      }
+      if (e.key !== "Tab") return;
+      // Keep Tab inside the dialog: behind it is a live catalogue, and a
+      // keyboard user who lands there has no way to tell what is on top.
+      var nodes = focusables();
+      if (!nodes.length) return;
+      var first = nodes[0];
+      var last = nodes[nodes.length - 1];
+      if (e.shiftKey && document.activeElement === first) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && document.activeElement === last) {
+        e.preventDefault();
+        first.focus();
+      }
+    }
+
+    // The page behind a fixed sheet still scrolls on a phone, which reads as
+    // the dialog sliding around. Freeze it while the sheet is up, and put back
+    // whatever was there before rather than assuming it was empty.
+    var bodyOverflow = null;
+
+    function open(button) {
+      current = {
+        id: button.getAttribute("data-report"),
+        name: button.getAttribute("data-name") || "",
+        trigger: button,
+      };
+      // The file's own name, carried on the button. The API takes the name
+      // from the library, not from here; this is only so the person can see
+      // which file they are about to report.
+      fileLine.textContent = current.name ? current.name + ". " + t("support.reportBody") : t("support.reportBody");
+
+      form.hidden = false;
+      done.hidden = true;
+      errorLine.hidden = true;
+      errorLine.textContent = "";
+      select.value = t("support.reportReasons")[0];
+      note.value = "";
+      send.disabled = false;
+      send.textContent = t("support.reportSend");
+      sending = false;
+
+      wrap.hidden = false;
+      bodyOverflow = document.body.style.overflow;
+      document.body.style.overflow = "hidden";
+      document.addEventListener("keydown", onKey);
+      select.focus();
+    }
+
+    function close() {
+      wrap.hidden = true;
+      if (bodyOverflow !== null) {
+        document.body.style.overflow = bodyOverflow;
+        bodyOverflow = null;
+      }
+      document.removeEventListener("keydown", onKey);
+      var trigger = current && current.trigger;
+      current = null;
+      if (trigger && trigger.focus) trigger.focus();
+    }
+
+    wrap.addEventListener("click", function (e) {
+      if (e.target.closest("[data-report-close]")) close();
+    });
+
+    form.addEventListener("submit", function (e) {
+      e.preventDefault();
+      if (sending || !current) return;
+
+      var reason = select.value;
+      var detail = (note.value || "").trim();
+      if (!reason) {
+        errorLine.textContent = t("support.errFill");
+        errorLine.hidden = false;
+        select.focus();
+        return;
+      }
+      // "Something else" with no detail is a row an editor cannot act on.
+      if (reason === t("support.reportOther") && !detail) {
+        errorLine.textContent = t("support.errReportDetail");
+        errorLine.hidden = false;
+        note.focus();
+        return;
+      }
+
+      sending = true;
+      send.disabled = true;
+      send.textContent = t("support.reportSending");
+      errorLine.hidden = true;
+
+      Zafar.submitReport(current.id, reason, detail).then(
+        function () {
+          sending = false;
+          form.hidden = true;
+          done.hidden = false;
+          var again = done.querySelector("button");
+          if (again) again.focus();
+        },
+        function (err) {
+          // The 401 case never arrives here: authPostJSON sends the person to
+          // sign in instead, because a report needs an account to belong to.
+          sending = false;
+          send.disabled = false;
+          send.textContent = t("support.reportSend");
+          errorLine.textContent = Zafar.submitMessage(err);
+          errorLine.hidden = false;
+        }
+      );
+    });
+
+    return { open: open, close: close };
   }
 
   function init(cfg, shell) {
@@ -453,6 +651,14 @@ var ZafarList = (function () {
         show("empty");
       }
     }
+
+    /* ---------- Reporting: the card button opens the dialog ---------- */
+    var reportDialog = mountReportDialog(shell);
+    el.grid.addEventListener("click", function (e) {
+      var btn = e.target.closest("[data-report]");
+      if (!btn) return;
+      reportDialog.open(btn);
+    });
 
     el.grid.addEventListener("click", function (e) {
       var btn = e.target.closest("[data-fav]");
@@ -775,13 +981,9 @@ var ZafarList = (function () {
     /* ---------- Load ---------- */
     // The server says how long to wait in Retry-After; say the same thing in
     // words instead of guessing at "a moment".
-    function waitPhrase(seconds) {
-      if (!(seconds > 0)) return "";
-      if (seconds <= 1) return "a second";
-      if (seconds < 60) return seconds + " seconds";
-      var mins = Math.ceil(seconds / 60);
-      return mins === 1 ? "a minute" : mins + " minutes";
-    }
+    // One implementation, in config.js: the request and report forms need the
+    // same words, and two copies would drift.
+    var waitPhrase = function (seconds) { return Zafar.waitPhrase(seconds); };
 
     // The list is read one page at a time: 50 documents, the size the backend
     // defaults to. A page is fetched when the page needs it — once to put

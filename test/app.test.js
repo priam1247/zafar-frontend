@@ -820,6 +820,192 @@ test("the public config is fetched once per session", async () => {
   dom.window.close();
 });
 
+/* ---------- 8e4. what a student can send us ---------- */
+
+function studentSite(hooks) {
+  const extra = hooks || {};
+  return openPage(extra.path || "/dashboard.html", {
+    storage: { zafar_token: token("student") },
+    fetch: (input, init) => {
+      const url = String(input && input.url ? input.url : input);
+      const u = new URL(url, origin + "/");
+      if (/\/site-config$/.test(u.pathname)) return reply({ featured: [] });
+      if (/\/admin\/whoami/.test(u.pathname)) return reply({ detail: "Admins only" }, 403);
+      if (/\/auth\/quota/.test(u.pathname)) return reply(QUOTA);
+      if (/\/drive\/categories/.test(u.pathname)) return reply(["MSCE Maneb"]);
+      if (/\/drive\/papers/.test(u.pathname)) {
+        return reply(
+          [{ id: "p1", name: "MSCE Chemistry 2024.pdf", category: "MSCE Maneb", size_bytes: 1000 }],
+          200,
+          { "X-Total-Count": "1" }
+        );
+      }
+      if (extra.onPost && (init && init.method) === "POST") return extra.onPost(u, init);
+      return reply({});
+    },
+  });
+}
+
+test("a broken file is reported from its own card, with its id", async () => {
+  const posts = [];
+  const dom = await studentSite({
+    onPost: (u, init) => {
+      if (!/\/reports$/.test(u.pathname)) return reply({});
+      posts.push({ body: JSON.parse(String(init.body || "{}")), auth: init.headers && init.headers.Authorization });
+      return reply({ id: 1 }, 201);
+    },
+  });
+  await wait(900);
+  const w = dom.window;
+  const d = w.document;
+
+  const trigger = d.querySelector("[data-report]");
+  assert.ok(trigger, "the card offers a way to report it");
+  assert.equal(trigger.getAttribute("data-report"), "p1", "and carries the file's id");
+  assert.match(trigger.getAttribute("aria-label"), /Report a problem with this file: MSCE Chemistry 2024\.pdf/);
+
+  trigger.click();
+  const modal = d.querySelector("[data-report-modal]");
+  assert.equal(modal.hidden, false, "the dialog opens over the list");
+  assert.match(d.querySelector("[data-report-file]").textContent, /MSCE Chemistry 2024\.pdf/,
+    "and names the file being reported");
+  assert.equal(d.activeElement, d.querySelector("#report-reason"), "focus moves into the dialog");
+  assert.equal(modal.querySelector(".modal-card").getAttribute("aria-modal"), "true");
+
+  d.querySelector("#report-reason").value = "Pages are missing or blank";
+  d.querySelector("#report-note").value = "page 4 is blank";
+  submit(w, d.querySelector("[data-report-form]"));
+  await wait(400);
+
+  assert.equal(posts.length, 1, "one report, not one per click");
+  assert.deepEqual(posts[0].body, {
+    file_id: "p1",
+    reason: "Pages are missing or blank",
+    note: "page 4 is blank",
+  }, "the id and the reason, and only the note that was typed");
+  assert.match(posts[0].auth, /^Bearer /, "sent as the signed-in account");
+
+  assert.equal(d.querySelector("[data-report-done]").hidden, false, "it says it arrived");
+  assert.equal(d.querySelector("[data-report-form]").hidden, true);
+
+  // Closing puts the keyboard back where the person left it.
+  d.querySelector("[data-report-done] [data-report-close]").click();
+  assert.equal(modal.hidden, true);
+  assert.equal(d.activeElement, trigger);
+  assert.equal(posts.length, 1, "closing sends nothing");
+  dom.window.close();
+});
+
+test("\u201csomething else\u201d cannot be sent without saying what", async () => {
+  const posts = [];
+  const dom = await studentSite({
+    onPost: (u, init) => {
+      if (!/\/reports$/.test(u.pathname)) return reply({});
+      posts.push(JSON.parse(String(init.body || "{}")));
+      return reply({ id: 1 }, 201);
+    },
+  });
+  await wait(900);
+  const w = dom.window;
+  const d = w.document;
+
+  d.querySelector("[data-report]").click();
+  d.querySelector("#report-reason").value = "Something else";
+  submit(w, d.querySelector("[data-report-form]"));
+  await wait(300);
+
+  assert.equal(posts.length, 0, "an editor gets no unreadable row");
+  assert.match(d.querySelector("[data-report-error]").textContent, /detail box/i);
+  assert.equal(d.activeElement, d.querySelector("#report-note"), "and the cursor is where the answer goes");
+
+  d.querySelector("#report-note").value = "The file downloads as a photo instead of a PDF";
+  submit(w, d.querySelector("[data-report-form]"));
+  await wait(300);
+
+  assert.equal(posts.length, 1);
+  assert.equal(posts[0].reason, "Something else");
+  assert.equal(posts[0].note, "The file downloads as a photo instead of a PDF");
+  dom.window.close();
+});
+
+test("a report the API refuses says why in words a student can act on", async () => {
+  const dom = await studentSite({
+    onPost: (u) => {
+      if (!/\/reports$/.test(u.pathname)) return reply({});
+      // Per-account rate limit: the backend sends Retry-After with the 429.
+      return reply({ detail: "Too many reports" }, 429, { "Retry-After": "90" });
+    },
+  });
+  await wait(900);
+  const w = dom.window;
+  const d = w.document;
+
+  d.querySelector("[data-report]").click();
+  submit(w, d.querySelector("[data-report-form]"));
+  await wait(400);
+
+  const error = d.querySelector("[data-report-error]");
+  assert.equal(error.hidden, false);
+  assert.match(error.textContent, /Try again in 2 minutes/, error.textContent);
+  assert.doesNotMatch(error.textContent, /Too many reports/, "no server wording on screen");
+  assert.equal(d.querySelector("[data-report-form]").hidden, false, "the form stays, with the answer in it");
+  assert.equal(d.querySelector("[data-report-send]").disabled, false, "and can be sent again");
+  dom.window.close();
+});
+
+test("a request for a missing file goes to the queue, not to an inbox", async () => {
+  const posts = [];
+  const dom = await studentSite({
+    path: "/help.html",
+    onPost: (u, init) => {
+      if (!/\/requests$/.test(u.pathname)) return reply({});
+      posts.push({ body: JSON.parse(String(init.body || "{}")), auth: init.headers && init.headers.Authorization });
+      return reply({ id: 7 }, 201);
+    },
+  });
+  await wait(900);
+  const w = dom.window;
+  const d = w.document;
+
+  const form = d.querySelector("[data-request-form]");
+  const done = d.querySelector("[data-request-done]");
+  const error = d.querySelector("[data-request-error]");
+  assert.ok(form, "the Help page asks for what is missing");
+  assert.equal(done.hidden, true, "and starts by asking, not by thanking");
+
+  // The library's own folder keys, not free text.
+  const sections = [...d.querySelectorAll("#request-section option")].map((o) => o.value);
+  assert.deepEqual(sections, ["papers", "primary", "books", "notes", "marking-keys"]);
+
+  // An empty box is not a request.
+  submit(w, form);
+  await wait(200);
+  assert.equal(posts.length, 0, "nothing was sent");
+  assert.equal(error.hidden, false);
+  assert.match(error.textContent, /Fill in/i);
+  assert.equal(d.querySelector("#request-title").classList.contains("has-error"), true);
+
+  d.querySelector("#request-section").value = "books";
+  d.querySelector("#request-title").value = "Form 3 Biology textbook";
+  submit(w, form);
+  await wait(400);
+
+  assert.equal(posts.length, 1);
+  assert.deepEqual(posts[0].body, { section: "books", title: "Form 3 Biology textbook" },
+    "no empty note, no email: the account is the bearer token");
+  assert.match(posts[0].auth, /^Bearer /);
+
+  assert.equal(done.hidden, false, "the page confirms it arrived");
+  assert.equal(form.hidden, true);
+
+  // "Send another" clears the boxes rather than resending the same thing.
+  d.querySelector("[data-request-again]").click();
+  assert.equal(form.hidden, false);
+  assert.equal(d.querySelector("#request-title").value, "");
+  assert.equal(d.querySelector("#request-section").value, "papers", "back to the first section");
+  dom.window.close();
+});
+
 /* ---------- 8f. the admin portal: gates, roles, and no invented numbers ---------- */
 
 const ADMIN_OVERVIEW = {
