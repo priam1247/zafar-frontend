@@ -1037,6 +1037,51 @@ test("Google is offered where it can work, and nowhere else", async () => {
   register.window.close();
 });
 
+test("the deployed clean URLs behave exactly like the .html ones", async () => {
+  // Cloudflare serves /login, /register and /verify; a page-name check written
+  // against "login.html" passed on localhost and failed in production, which is
+  // how Continue with Google went missing from the live site while every test
+  // (and the dev server) said it was there.
+  const blockGoogleScripts = (win) => {
+    const realAppend = win.Node.prototype.appendChild;
+    win.Node.prototype.appendChild = function (node) {
+      if (node && node.tagName === "SCRIPT" && /accounts\.google\.com/.test(node.src || "")) return node;
+      return realAppend.call(this, node);
+    };
+  };
+
+  const login = await openPage("/login", { beforeParse: blockGoogleScripts, fetch: () => reply({}) });
+  await wait(300);
+  const lw = login.window;
+  assert.equal(lw.location.pathname, "/login", "the dev server answers the clean path");
+  assert.equal(lw.document.getElementById("googleZone").hidden, false, "/login shows Google");
+  // The sign-in side, not the create side.
+  assert.equal(lw.document.getElementById("field-name").hidden, true);
+  assert.equal(lw.document.querySelector("#submitBtn .submit-label").textContent, "Sign in");
+  login.window.close();
+
+  const register = await openPage("/register", { beforeParse: blockGoogleScripts, fetch: () => reply({}) });
+  await wait(300);
+  const rd = register.window.document;
+  // /register is the create form — this used to be the sign-in form, because
+  // the check compared against "register.html".
+  assert.equal(rd.getElementById("field-name").hidden, false, "/register is the create form");
+  assert.equal(rd.querySelector("#submitBtn .submit-label").textContent, "Create account");
+  assert.equal(rd.getElementById("googleZone").hidden, true, "and it has no Google block");
+  register.window.close();
+
+  // The code screen keeps its own branch rather than falling through to the
+  // sign-in one: with an address to verify it shows the code panel, which only
+  // happens when the page name matched "verify".
+  const verify = await openPage("/verify?email=student@gmail.com", { fetch: () => reply({}) });
+  await wait(300);
+  const vd = verify.window.document;
+  assert.equal(verify.window.location.pathname, "/verify");
+  assert.equal(vd.getElementById("panel-verify").hidden, false, "/verify shows the code screen");
+  assert.equal(vd.getElementById("panel-auth").hidden, true, "and not the sign-in form");
+  verify.window.close();
+});
+
 test("each Google refusal says something a student can act on", async () => {
   const cases = [
     {

@@ -322,6 +322,22 @@ var ZafarAuth = (function () {
   /* ---------------- state helpers ---------------- */
   var panels = ["auth", "forgot", "verify", "reset", "success"];
 
+  // which page is this? Cloudflare serves the pages at their clean paths
+  // (/login, /register, /verify, /help); the dev server and a local file also
+  // answer /login.html. They are the same page, so the name is reduced to a
+  // bare word once and every branch compares against "login" | "register" |
+  // "verify". Comparing against "login.html" is what hid Continue with Google
+  // on the live site while it worked perfectly on localhost: the deployed path
+  // has no extension, so the check quietly said "not a sign-in page".
+  function currentPage() {
+    var last =
+      location.pathname
+        .split("/")
+        .filter(function (part) { return part; })
+        .pop() || "login";
+    return last.replace(/\.html$/i, "").toLowerCase() || "login";
+  }
+
   function showPanel(name) {
     panels.forEach(function (p) { el("panel-" + p).hidden = p !== name; });
   }
@@ -452,8 +468,16 @@ var ZafarAuth = (function () {
     };
     script.onerror = function () {
       googleScript = "failed";
-      // No button and no cry for help: the email form is right above.
-      el("googleZone").hidden = true;
+      // No button and no cry for help: the email form is right above. The
+      // console keeps the reason, because "the button is missing" on a phone
+      // is unanswerable without it — Cloudflare's Rocket Loader, an offline
+      // connection and a blocked domain all end here and look identical.
+      console.warn(
+        "StudyMW: accounts.google.com/gsi/client did not load, so Continue with Google is hidden. " +
+          "Check the connection, and that Rocket Loader is off for this site."
+      );
+      var zone = el("googleZone");
+      if (zone) zone.hidden = true;
     };
     document.head.appendChild(script);
   }
@@ -531,10 +555,10 @@ var ZafarAuth = (function () {
     // of the card entirely when no client ID is configured.
     var zone = el("googleZone");
     if (zone) {
-      // Two conditions and a page check: the sign-in side, a real client ID,
-      // and a page that actually shows the sign-in form (not the code screen).
-      var here = (location.pathname.split("/").pop() || "login.html");
-      var signInPage = here === "login.html" || here === "register.html";
+      // Three conditions: the sign-in side, a page that shows this form at all
+      // (not the code screen), and a real client ID to draw the button with.
+      var page = currentPage();
+      var signInPage = page === "login" || page === "register";
       var showGoogle = !isCreate && signInPage && googleOn();
       zone.hidden = !showGoogle;
       el("txt-or").textContent = t.or;
@@ -948,12 +972,14 @@ var ZafarAuth = (function () {
     wireReset();
     wireStrength();
 
-    var page = (location.pathname.split("/").pop() || "login.html").replace(/^$/, "login.html");
+    var page = currentPage();
     var params = new URLSearchParams(location.search);
 
-    setMode(page === "register.html" ? "create" : "signin");
+    // /register, not /register.html: on the deployed site the extension is
+    // gone, and this comparison used to send that page to the sign-in form.
+    setMode(page === "register" ? "create" : "signin");
 
-    if (page === "verify.html") {
+    if (page === "verify") {
       var email = params.get("email") || pendingEmail();
       if (!email) {
         location.replace("register.html");
@@ -967,7 +993,7 @@ var ZafarAuth = (function () {
       else if (params.get("registered") === "1") showBanner("authBanner", T[lang].registeredBanner, false);
       // Already signed in and landing on the sign-in page? Skip the form.
       // register.html stays reachable so a second account can be made.
-      if (page === "login.html" && Zafar.getToken() && !params.get("switch") && !params.get("verified")) {
+      if (page === "login" && Zafar.getToken() && !params.get("switch") && !params.get("verified")) {
         location.replace("dashboard.html");
       }
     }
