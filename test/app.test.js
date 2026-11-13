@@ -598,6 +598,100 @@ test("a backend that ignores offset is read once, not in a loop", async () => {
   dom.window.close();
 });
 
+/* ---------- 9a2. a cold library scan is not cut off at 15 seconds ---------- */
+
+test("the catalogue waits longer than the app's normal deadline, and retries once", async () => {
+  const dom = await openPage("/login.html", { fetch: () => reply({}) });
+  await wait(300);
+  const Z = dom.window.Zafar;
+
+  // The two deadlines, and why they differ: the server may spend twenty
+  // seconds in a single Drive call while it builds its tree on a cold start, so
+  // a browser deadline at or below that can only ever abort work that was
+  // going to answer.
+  assert.equal(Z.REQUEST_TIMEOUT_MS, 15000, "forms keep the tight deadline");
+  assert.ok(Z.LIST_TIMEOUT_MS > 20000, "the catalogue deadline must outlast one Drive call");
+  assert.ok(Z.LIST_TIMEOUT_MS >= 30000, "and leave the scan room: " + Z.LIST_TIMEOUT_MS);
+
+  // The deadline actually reaches fetch: the third argument of _fetch is the
+  // one that arms the abort timer.
+  const seen = [];
+  Z._fetch = function (url, opts, ms) {
+    seen.push({ path: String(url).replace(/^https?:\/\/[^/]+/, ""), ms });
+    return Promise.resolve({
+      ok: true,
+      status: 200,
+      headers: { get: () => null },
+      json: () => Promise.resolve([]),
+    });
+  };
+  await Z.authGetMeta("/drive/papers?section=papers", { timeout: Z.LIST_TIMEOUT_MS, attempts: 1 });
+  assert.equal(seen[seen.length - 1].ms, Z.LIST_TIMEOUT_MS);
+
+  // A request that asks for nothing keeps the fifteen seconds.
+  await Z.authGet("/auth/quota", { attempts: 1 });
+  assert.equal(seen[seen.length - 1].ms, undefined);
+
+  // And the page passes those options at both catalogue call sites — a helper
+  // nobody calls is not a fix.
+  const list = read(path.join(WEB, "assets/js/list.js"));
+  assert.match(list, /timeout:\s*Zafar\.LIST_TIMEOUT_MS/);
+  assert.match(
+    list,
+    /authGetMeta\(pageURL\(section, entry\.nextOffset\), catalogueOpts\(/,
+    "the papers page asks with the catalogue deadline"
+  );
+  assert.match(
+    list,
+    /authGet\("\/drive\/categories\?section=" \+ encodeURIComponent\(wanted\), catalogueOpts\(\)\)/,
+    "so do the folders"
+  );
+
+  // The retry: a timeout is tried again, once, and the second answer is used.
+  let attempts = 0;
+  const answer = await Z._withRetry(
+    () => {
+      attempts += 1;
+      if (attempts === 1) {
+        const timeout = new Error("This is taking too long. Check your connection and try again.");
+        timeout.timeout = true;
+        return Promise.reject(timeout);
+      }
+      return Promise.resolve("second answer");
+    },
+    { attempts: 2, delay: 5 }
+  );
+  assert.equal(answer, "second answer");
+  assert.equal(attempts, 2, "one retry, not a loop");
+
+  // A refusal is an answer: never repeated.
+  let refused = 0;
+  await Z._withRetry(
+    () => {
+      refused += 1;
+      const err = new Error("Not Found");
+      err.status = 404;
+      return Promise.reject(err);
+    },
+    { attempts: 3, delay: 5 }
+  ).catch(() => {});
+  assert.equal(refused, 1, "a 404 is not retried");
+
+  // A platform hiccup is worth one more try; a dead session is not — retrying
+  // a 401 would just be three logouts in a row.
+  assert.equal(Z._retryable({ status: 503 }), true);
+  assert.equal(Z._retryable({ status: 502 }), true);
+  assert.equal(Z._retryable({ timeout: true }), true);
+  assert.equal(Z._retryable({ status: 401 }), false);
+  assert.equal(Z._retryable({ status: 403 }), false);
+
+  // While the retry is pending the page says so, rather than leaving a still
+  // skeleton that reads as a dead page.
+  const i18n = read(path.join(WEB, "assets/js/i18n.js"));
+  assert.match(i18n, /loadingSlow: "Still loading/);
+  dom.window.close();
+});
+
 /* ---------- 9b. Primary is a shelf inside Past Papers ---------- */
 
 test("Primary swaps the shelf, not the allowance", async () => {

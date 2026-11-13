@@ -650,7 +650,7 @@ var ZafarList = (function () {
       }
       renderCatChips();
 
-      Zafar.authGet("/drive/categories?section=" + encodeURIComponent(wanted))
+      Zafar.authGet("/drive/categories?section=" + encodeURIComponent(wanted), catalogueOpts())
         .then(function (names) {
           // The student switched again while this was in the air.
           if (wanted !== state.section) return;
@@ -860,6 +860,19 @@ var ZafarList = (function () {
       }
     }
 
+    // Catalogue requests get their own patience: the server may be building
+    // its Drive tree for the first time (each Drive call is allowed twenty
+    // seconds on its own), so fifteen seconds — the app's normal deadline —
+    // could abort a scan that was about to answer. One retry then covers the
+    // interrupted scan, which is quick the second time round.
+    function catalogueOpts(onRetry) {
+      return {
+        timeout: Zafar.LIST_TIMEOUT_MS,
+        attempts: 2,
+        onRetry: onRetry,
+      };
+    }
+
     function hasMore() {
       return sectionList().some(function (section) {
         var entry = pages[pageKey(section)];
@@ -883,7 +896,12 @@ var ZafarList = (function () {
       entry.loading = true;
       syncMore();
 
-      Zafar.authGetMeta(pageURL(section, entry.nextOffset)).then(
+      Zafar.authGetMeta(pageURL(section, entry.nextOffset), catalogueOpts(function () {
+        // A second attempt is about to start. Say so rather than leave a
+        // still skeleton looking like a dead page — the first visit can start a
+        // full Drive scan on the server.
+        if (shell.count) shell.count.textContent = t("list.loadingSlow");
+      })).then(
         function (answer) {
           entry.loading = false;
           if (mine !== loadSeq) return finished(null);
