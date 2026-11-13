@@ -209,7 +209,7 @@ var ZafarList = (function () {
           '<div class="form-field">' +
             '<label for="report-note">' + t("support.reportNote") +
               ' <span class="form-optional">' + t("support.requestOptional") + "</span></label>" +
-            '<textarea class="form-textarea" id="report-note" rows="2" maxlength="1000" placeholder="' +
+            '<textarea class="form-textarea" id="report-note" rows="2" maxlength="2000" placeholder="' +
               Zafar.escapeHTML(t("support.reportNotePh")) + '"></textarea>' +
           "</div>" +
           '<p class="form-error" role="alert" data-report-error hidden></p>' +

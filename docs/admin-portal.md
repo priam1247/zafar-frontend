@@ -153,18 +153,37 @@ sends no file name either.
 | "I need a paper that isn't here" | Help & FAQ → *Request a paper, book or notes* (`/help.html#request`) | `POST /requests` `{section, title, note?}` |
 | "This file is broken" | the alert button on the file's own catalogue card → dialog | `POST /reports` `{file_id, reason, note?}` |
 
-- `section` is one of the library's folder keys — `papers`, `primary`, `books`,
-  `notes`, `marking-keys` — so a request lands where the file will live.
+Both routes are mounted at the **root of the API** (`routers/intake.py`), not
+under `/admin`, and both require the ordinary student bearer token.
+
+- `section` is a `Literal` of the library's folder keys — `papers`, `primary`,
+  `books`, `notes`, `marking-keys` — so a request lands where the file will live.
+  Anything else is a `422`.
+- `title` is capped at **160** characters and `note` at **2000**; the form's
+  `maxlength` is the API's own number, so the typing stops rather than the send
+  failing. Both models are `extra="forbid"`: an unexpected key is a `422`.
 - `file_id` comes from the card, because that is the only place it exists. A
   typed-in name would be a guess, and the API looks the name up in the live
-  library anyway.
-- `reason` is one of five plain sentences ("The download does not work", "Pages
-  are missing or blank", …). The queue prints it as sent, so the vocabulary is
-  whatever the frontend and the API agree on — it is not an enum on the client.
-- `note` is free text and is optional; when there is none, the field is left out
-  of the JSON rather than sent empty.
-- Both endpoints answer `201` and `Cache-Control: no-store`, and both are
-  rate-limited per account. A `429` carries `Retry-After`, and the app turns it
-  into "Try again in 2 minutes" rather than repeating the server's sentence.
+  library anyway — `file_name` is rejected if a client sends it.
+- `reason` is free text (≤160) — the queue prints it as sent. The five sentences
+  in `i18n.js → support.reportReasons` are the vocabulary in practice, not an
+  enum on either side.
+- `note` is optional and trimmed; a blank note is stored as none, and the client
+  leaves the field out of the JSON rather than sending an empty string.
+- **Rate limits, per account, not per IP:** 3 requests and 5 reports per 10
+  minutes. A `429` carries `Retry-After` and `X-Error-Code: rate_limited`; the
+  app says "Try again in 2 minutes" rather than repeating the server's sentence.
+- Both answer `201` with `Cache-Control: no-store` (set both in the router and
+  in the `security_headers` middleware).
+- Error codes the app maps: `report_file_missing` (404 — the file was removed
+  from the library since the list loaded; the app says so and asks for a refresh
+  instead of a retry), `report_validation_unavailable` (503), `rate_limited`
+  (429), plus `email_not_verified` / `user_suspended` (403).
 - A `401` never shows an error: it sends the student to sign in, because a
   submission has to belong to an account.
+- Every submission is attributed to the account that sent it —
+  `_actor_email()` writes the account's email (or `user:<id>` for a legacy row
+  with none), never anything from the request body.
+- Known gap on the server, not the client: the `api_error_events` recorder in
+  `main.py` still watches only `/auth/`, `/drive/` and `/admin/`, so a 5xx on
+  the intake is invisible in the portal's Operations panel.

@@ -217,9 +217,12 @@ var Zafar = {
     if (typeof navigator !== "undefined" && navigator.onLine === false) return t("support.errOffline");
     if (!err || !err.status) return t("support.errServer");
     if (err.status === 429) return t("support.errTooMany", this.waitPhrase(err.retryAfter));
-    // Two 403s name their own cause; the rest stay general rather than guess.
-    if ((err.code || "") === "email_not_verified") return t("support.errUnverified");
-    if ((err.code || "") === "user_suspended") return t("support.errSuspended");
+    // Causes that name themselves. These are read from the machine code, never
+    // from the status alone: 404 also means "this route is not deployed yet".
+    var code = err.code || "";
+    if (code === "report_file_missing") return t("support.errFileGone");
+    if (code === "email_not_verified") return t("support.errUnverified");
+    if (code === "user_suspended") return t("support.errSuspended");
     if (err.status === 401 || err.status === 403) return t("support.errForbidden");
     if (err.status === 400 || err.status === 422) return t("support.errRefused");
     return t("support.errServer");

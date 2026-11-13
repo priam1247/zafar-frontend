@@ -116,13 +116,15 @@
             "</div>" +
             '<div class="form-field">' +
               '<label for="request-title">' + t("support.requestWhat") + "</label>" +
-              '<input class="form-input" id="request-title" type="text" maxlength="200" ' +
+              // maxlength matches the API's own cap (Field(max_length=160)):
+              // stopping the typing is kinder than a 422 after it.
+              '<input class="form-input" id="request-title" type="text" maxlength="160" ' +
                 'autocomplete="off" placeholder="' + Zafar.escapeHTML(t("support.requestWhatPh")) + '">' +
             "</div>" +
             '<div class="form-field">' +
               '<label for="request-note">' + t("support.requestNote") +
                 ' <span class="form-optional">' + t("support.requestOptional") + "</span></label>" +
-              '<textarea class="form-textarea" id="request-note" rows="3" maxlength="1000" placeholder="' +
+              '<textarea class="form-textarea" id="request-note" rows="3" maxlength="2000" placeholder="' +
                 Zafar.escapeHTML(t("support.requestNotePh")) + '"></textarea>' +
             "</div>" +
             '<p class="form-error" role="alert" data-request-error hidden></p>' +
