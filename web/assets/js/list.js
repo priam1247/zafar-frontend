@@ -154,34 +154,39 @@ var ZafarList = (function () {
   // pageSection is the shelf the card is on. A download is charged to that
   // shelf's allowance, so the card carries it into the request.
   //
-  // One row: a tile, the title over its facts, and the one action. The title
-  // gets two lines and no more; the facts are one muted line, "15.4 MB · PDF",
-  // with the category beside them when the library has one to name (JCE,
-  // MSCE, a subject) and nothing when it would only repeat the section.
+  // Two zones. The top says what the file is: a tile, the title (two lines,
+  // wrapping rather than truncating a long name) and a chip only when the
+  // library names something worth knowing — Junior, JCE, a subject. A
+  // hairline, then the facts and the one action: "15.4 MB · PDF" on the left,
+  // Download on the right.
   function cardHTML(doc, pageSection) {
     var t = ZafarI18n.t;
     var section = doc._section || pageSection || "";
     var title = Zafar.escapeHTML(doc.name.replace(/\.pdf$/i, ""));
     var filename = /\.pdf$/i.test(doc.name) ? doc.name : doc.name + ".pdf";
     var category = (doc.category || "").trim();
+    var saved = !!downloaded[String(doc.id)];
+    var tags = (category ? '<span class="item-cat">' + Zafar.escapeHTML(category) + "</span>" : "") +
+      (saved ? '<span class="item-dl">' + t("list.downloaded") + "</span>" : "");
     return (
       '<article class="item" data-id="' + Zafar.escapeHTML(doc.id) + '">' +
-        '<span class="glyph-tile">' + svg("file", 18) + "</span>" +
-        '<div class="item-body">' +
-          '<h3 class="item-title">' + title +
-            (featured.indexOf(doc.id) !== -1 ? '<span class="item-featured">Featured</span>' : "") + "</h3>" +
-          '<p class="item-meta">' +
-            '<span class="item-size">' + Zafar.escapeHTML(Zafar.formatSize(doc.size_bytes)) + " \u00b7 PDF</span>" +
-            (category ? '<span class="item-cat">' + Zafar.escapeHTML(category) + "</span>" : "") +
-            (downloaded[String(doc.id)] ? '<span class="item-dl">' + t("list.downloaded") + "</span>" : "") +
-          "</p>" +
+        '<div class="item-top">' +
+          '<span class="glyph-tile">' + svg("file", 20) + "</span>" +
+          '<div class="item-body">' +
+            '<h3 class="item-title">' + title +
+              (featured.indexOf(doc.id) !== -1 ? '<span class="item-featured">Featured</span>' : "") + "</h3>" +
+            (tags ? '<p class="item-tags">' + tags + "</p>" : "") +
+          "</div>" +
         "</div>" +
-        '<button class="btn btn-primary btn-sm" data-download="' + Zafar.escapeHTML(doc.id) +
-          '" data-filename="' + Zafar.escapeHTML(filename) +
-          (section ? '" data-section="' + Zafar.escapeHTML(section) : "") +
-          '" aria-label="' + t("list.download") + " " + Zafar.escapeHTML(filename) + '">' +
-          svg("download", 16) + '<span class="btn-label">' + t("list.download") + "</span>" +
-          '<span class="btn-progress" aria-hidden="true"></span></button>' +
+        '<div class="item-foot">' +
+          '<span class="item-meta">' + Zafar.escapeHTML(Zafar.formatSize(doc.size_bytes)) + " \u00b7 PDF</span>" +
+          '<button class="btn btn-primary" data-download="' + Zafar.escapeHTML(doc.id) +
+            '" data-filename="' + Zafar.escapeHTML(filename) +
+            (section ? '" data-section="' + Zafar.escapeHTML(section) : "") +
+            '" aria-label="' + t("list.download") + " " + Zafar.escapeHTML(filename) + '">' +
+            svg("download", 16) + '<span class="btn-label">' + t("list.download") + "</span>" +
+            '<span class="btn-progress" aria-hidden="true"></span></button>' +
+        "</div>" +
       "</article>"
     );
   }
@@ -189,13 +194,19 @@ var ZafarList = (function () {
   // The card a download just landed on says so, without waiting for a repaint.
   function markDownloaded(card, id) {
     downloaded[String(id)] = true;
-    if (!card) return;
-    var meta = card.querySelector(".item-meta");
-    if (!meta || meta.querySelector(".item-dl")) return;
+    if (!card || card.querySelector(".item-dl")) return;
+    var body = card.querySelector(".item-body");
+    if (!body) return;
+    var tags = body.querySelector(".item-tags");
+    if (!tags) {
+      tags = document.createElement("p");
+      tags.className = "item-tags";
+      body.appendChild(tags);
+    }
     var badge = document.createElement("span");
     badge.className = "item-dl";
     badge.textContent = t("list.downloaded");
-    meta.appendChild(badge);
+    tags.appendChild(badge);
   }
 
   function init(cfg, shell) {

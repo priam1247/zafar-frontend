@@ -1494,7 +1494,28 @@ test("the header is two rows: the bar, then the section and its allowance", asyn
   const circle = cssRule("app.css", ".bar-circle");
   assert.match(circle, /width:\s*40px/);
   assert.match(circle, /height:\s*40px/);
+  // 10px between the four things in row one, so the avatar clears the
+  // hamburger instead of sitting on top of it.
+  assert.match(row, /gap:\s*10px/);
+  // The avatar is a fixed circle that cannot be squeezed by a long name, and
+  // it has no pill behind the group it sits in.
+  const avatar = cssRule("app.css", ".avatar");
+  assert.match(avatar, /flex:\s*none/);
+  assert.match(avatar, /width:\s*36px/);
+  assert.match(avatar, /height:\s*36px/);
+  assert.match(avatar, /border-radius:\s*(999px|50%)/);
   assert.match(cssRule("app.css", ".bar-row-title"), /align-items:\s*baseline/);
+  // Header padding: 12px top and bottom, 16px at the sides.
+  const barCss = cssRule("app.css", ".app-bar");
+  assert.match(barCss, /position:\s*sticky/);
+  assert.match(barCss, /top:\s*0/);
+  assert.match(barCss, /calc\(12px \+ env\(safe-area-inset-top\)\)/);
+  assert.match(barCss, /12px\s+calc\(16px/);
+  // The pill is one of the things that must stay small.
+  const pill = cssRule("app.css", ".quota");
+  assert.match(pill, /height:\s*28px/);
+  assert.match(pill, /font-size:\s*13px/);
+  assert.match(pill, /padding:\s*0 10px/);
 });
 
 test("the favorites and downloads addresses lead to Books, not to a 404", async () => {
@@ -1588,19 +1609,175 @@ test("nothing is dragged off the side of a 360px phone", () => {
   for (const selector of [".content", ".sheet", ".item", ".item-body", ".item-meta", ".cat-chips", ".bar-row"]) {
     assert.match(cssRule("app.css", selector), /min-width:\s*0/, selector + " needs min-width: 0");
   }
-  // The chips scroll; they are not merely hidden.
+  // The chips scroll; they are not merely hidden, and they have no negative
+  // margins to hide in — that was what let them sit over the row below.
   const chips = cssRule("app.css", ".cat-chips");
   assert.match(chips, /overflow-x:\s*auto/);
   assert.doesNotMatch(chips, /overflow-x:\s*hidden/);
+  assert.doesNotMatch(chips, /margin/, "the scroller has no negative margins");
+  assert.match(chips, /height:\s*32px/, "the scroller has its own height");
+  // The base sheet is the 360px case: no small-phone block may quietly undo
+  // the geomety checked here.
+  const css = read(path.join(WEB, "assets/css/app.css"));
+  for (const block of css.match(/@media \(max-width: \d+px\) \{[\s\S]*?\n\}/g) || []) {
+    assert.doesNotMatch(block, /\.(item|cat-chips|sheet|app-bar|search|select|quota)\b/,
+      "a small-phone override undoes the layout: " + block.slice(0, 60));
+  }
   // …and fade out at the right edge, so the cut-off is legible.
   assert.match(chips, /mask-image:[^;]*linear-gradient\(to right/);
   // One padding scale, and 16px of it at both sides.
   assert.match(cssRule("app.css", ".sheet"), /16px/);
   assert.match(cssRule("app.css", ".app-bar"), /calc\(16px/);
-  // A card is compact: 84px floor, five of them above the tabs.
+  // The title may wrap anywhere and stops at two lines.
+  const title = cssRule("app.css", ".item-title");
+  assert.match(title, /-webkit-line-clamp:\s*2/);
+  assert.match(title, /overflow-wrap:\s*anywhere/);
+  // Nothing in the list is taller than 44px except a card.
+  for (const [selector, height] of [
+    [".search", "44px"],
+    [".cat-chip", "32px"],
+    [".select", "32px"],
+    [".quota", "28px"],
+  ]) {
+    assert.match(cssRule("app.css", selector), new RegExp("height:\\s*" + height), selector);
+  }
+});
+
+test("a card is two zones: what it is, then the facts and the button", async () => {
+  const dom = await libraryPage("/books.html");
+  await wait(900);
+  const d = dom.window.document;
+  const card = d.querySelector(".item");
+
+  // Top zone: tile + title. The chip only when the library has something to
+  // name, which here it does ("Senior").
+  const top = card.querySelector(".item-top");
+  const foot = card.querySelector(".item-foot");
+  assert.ok(top && foot, "two zones");
+  assert.deepEqual([...top.children].map((n) => n.className), ["glyph-tile", "item-body"]);
+  assert.equal(top.querySelector(".glyph-tile").querySelector("svg").getAttribute("width"), "20");
+  assert.equal(top.querySelector(".item-title").textContent, "Mathematics Form 3");
+  assert.equal(top.querySelector(".item-cat").textContent, "Senior");
+  assert.equal(top.querySelector(".item-cat").getAttribute("class"), "item-cat");
+
+  // Footer: the facts, then the action. The old "PDF document" line and the
+  // "Document" chip are not coming back.
+  assert.equal(foot.querySelector(".item-meta").textContent, "2 KB · PDF");
+  assert.equal(card.textContent.includes("PDF document"), false);
+  assert.equal(card.textContent.includes("Document"), false);
+  const btn = foot.querySelector("[data-download]");
+  assert.equal(btn.querySelector(".btn-label").textContent, "Download");
+  assert.equal(btn.querySelector("svg").getAttribute("width"), "16");
+  dom.window.close();
+
+  // A card with no category carries no chip at all.
+  const bare = await openPage("/notes.html", {
+    storage: { zafar_token: token("student") },
+    fetch: (input) => {
+      const u = new URL(String(input && input.url ? input.url : input), origin + "/");
+      if (/\/site-config$/.test(u.pathname)) return reply({ featured: [] });
+      if (/\/admin\/whoami/.test(u.pathname)) return reply({}, 403);
+      if (/\/auth\/quota/.test(u.pathname)) return reply(QUOTA);
+      if (/\/drive\/categories/.test(u.pathname)) return reply(["Senior"]);
+      if (/\/drive\/papers/.test(u.pathname)) {
+        return reply([{ id: "n1", name: "agriculture_archivers_book_3.pdf", size_bytes: 16148070 }], 200, {
+          "X-Total-Count": "1",
+        });
+      }
+      return reply({});
+    },
+  });
+  await wait(900);
+  const bd = bare.window.document;
+  assert.equal(bd.querySelector(".item-cat"), null, "no category, no chip");
+  assert.equal(bd.querySelector(".item-meta").textContent, "15.4 MB · PDF");
+  // A long name with no spaces wraps; it is not cut off.
+  assert.equal(bd.querySelector(".item-title").textContent, "agriculture_archivers_book_3");
+  bare.window.close();
+
+  // The styles that make it work.
   const item = cssRule("app.css", ".item");
-  assert.match(item, /min-height:\s*84px/);
-  assert.match(cssRule("app.css", ".item-title"), /-webkit-line-clamp:\s*2/);
+  assert.match(item, /padding:\s*12px/);
+  assert.match(item, /border-radius:\s*16px/);
+  assert.match(item, /background:\s*#FFFFFF/);
+  assert.match(item, /border:\s*1px solid/);
+  assert.match(cssRule("app.css", ".grid"), /gap:\s*10px/);
+  const tile = cssRule("app.css", ".glyph-tile");
+  assert.match(tile, /width:\s*40px/);
+  assert.match(tile, /height:\s*40px/);
+  assert.match(tile, /border-radius:\s*10px/);
+  const title = cssRule("app.css", ".item-title");
+  assert.match(title, /font-size:\s*15px/);
+  assert.match(title, /font-weight:\s*600/);
+  assert.match(title, /-webkit-line-clamp:\s*2/);
+  assert.match(title, /overflow-wrap:\s*anywhere/);
+  const chip = cssRule("app.css", ".item-cat,\n.item-dl");
+  assert.match(chip, /height:\s*24px/);
+  assert.match(chip, /font-size:\s*12px/);
+  // 1px divider between the zones.
+  const footCss = cssRule("app.css", ".item-foot");
+  assert.match(footCss, /border-top:\s*1px solid/);
+  assert.match(cssRule("app.css", ".item-meta"), /font-size:\s*13px/);
+
+  // The button is 36px tall and still a 44px target: the last 4px on each
+  // side come from a hit area, not from the box.
+  const button = cssRule("app.css", ".item .btn");
+  assert.match(button, /height:\s*36px/);
+  assert.match(button, /padding:\s*0 14px/);
+  assert.match(button, /border-radius:\s*18px/);
+  assert.match(button, /font-size:\s*14px/);
+  assert.match(button, /font-weight:\s*600/);
+  assert.match(cssRule("app.css", ".item .btn::after"), /height:\s*44px/);
+  // …and nothing clips it back down to the 36px box.
+  assert.doesNotMatch(cssRule("app.css", ".btn[data-download]"), /overflow:\s*hidden/);
+});
+
+test("the list sits under the bar, not beneath it", async () => {
+  const dom = await libraryPage("/books.html");
+  await wait(900);
+  const d = dom.window.document;
+
+  // Sticky, in normal flow: the sheet is the bar's sibling, so no padding or
+  // negative margin has to be guessed to keep the search field visible.
+  const bar = d.querySelector(".app-bar");
+  const sheet = d.querySelector(".sheet");
+  assert.equal(bar.nextElementSibling, sheet, "the sheet follows the bar in the DOM");
+  assert.equal(d.querySelector(".content").closest(".sheet"), sheet);
+  assert.equal(sheet.querySelector("[data-search]") !== null, true, "the search field is in the sheet");
+
+  const sheetCss = cssRule("app.css", ".sheet");
+  assert.match(sheetCss, /^\s*padding:\s*12px/m, "12px between the bar and the search field");
+  assert.doesNotMatch(sheetCss, /margin-top:\s*-|margin:\s*-/, "no negative margin pulling it up");
+  assert.match(cssRule("app.css", ".content"), /display:\s*flex/);
+  // The bar is sticky and nothing is fixed except the tabs.
+  assert.match(cssRule("app.css", ".app-bar"), /position:\s*sticky/);
+});
+
+test("no beige under the tab bar, and the labels are a readable size", async () => {
+  // The page under the nav is white, so the safe-area strip is white too.
+  assert.match(cssRule("app.css", "html"), /background:\s*#FFFFFF/);
+  assert.match(cssRule("app.css", "body"), /background:\s*#FFFFFF/);
+  // …while the sheet keeps the warm surface a student reads on.
+  assert.match(cssRule("app.css", ".sheet"), /background:\s*var\(--sheet\)/);
+
+  const tabbar = cssRule("app.css", ".tabbar");
+  assert.match(tabbar, /padding(-bottom)?:[^;]*env\(safe-area-inset-bottom\)/);
+  assert.match(tabbar, /border-top:\s*1px solid/);
+  assert.match(cssRule("app.css", ".tab"), /font-size:\s*12px/);
+
+  // Every app page lets the viewport reach the notch and the home bar.
+  for (const page of ["books.html", "dashboard.html", "notes.html", "marking-keys.html", "settings.html", "help.html"]) {
+    assert.match(headOf(page), /name="viewport" content="[^"]*viewport-fit=cover/, page);
+  }
+
+  // Icons stay 24×24 in the bar itself.
+  const dom = await libraryPage("/books.html");
+  await wait(900);
+  for (const glyph of dom.window.document.querySelectorAll(".tabbar .tab svg")) {
+    assert.equal(glyph.getAttribute("width"), "24");
+    assert.equal(glyph.getAttribute("height"), "24");
+  }
+  dom.window.close();
 });
 
 test("the tab bar carries its own safe-area padding", () => {
