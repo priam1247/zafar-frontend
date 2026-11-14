@@ -9,11 +9,11 @@
 var ZafarI18n = (function () {
   var T = {
     nav: {
-      library: "Library", pastPapers: "Past Papers",
+      pastPapers: "Past Papers",
       books: "Books", notes: "Notes", markingKeys: "Marking Keys",
       myDownloads: "My Downloads", settings: "Settings", admin: "Admin portal",
-      support: "Support", help: "Help & FAQ",
-      studyLibrary: "Study library", logOut: "Log out",
+      help: "Help & FAQ",
+      studyLibrary: "Study library",
     },
 
     downloads: {
@@ -204,7 +204,6 @@ var ZafarI18n = (function () {
       backOnline: "Back online",
       downloadStarted: "Download started",
       downloadFailed: "Could not download the file — try again",
-      downloadStartFailed: "Could not start download",
       saved: "Saved",
       preparing: "Preparing…",
       download: "Download",
@@ -272,10 +271,8 @@ var ZafarI18n = (function () {
     },
 
     /* ---------- What a student can send us ----------
-       Asking for a file that is not here yet: POST /requests, sent from the
-       Help page. Reports (POST /reports) have no entry point in the app at the
-       moment — the "!" control on each card was removed, and a report has to
-       carry the id of a real file, which only the card could supply. */
+       One form: asking for a file that is not here yet, POST /requests, from
+       the Help page. */
     support: {
       requestTitle: "Request a paper, book or notes",
       requestBody:
@@ -302,42 +299,15 @@ var ZafarI18n = (function () {
       requestDone: "An editor will see it in the queue. You do not have to do anything else.",
       requestAgain: "Send another request",
 
-      reportOpen: "Report a problem with this file",
-      reportTitle: "Report a problem",
-      reportBody: "Tell us what is wrong and an editor will check this file.",
-      reportReason: "What is wrong?",
-      // The last one cannot stand on its own: an editor needs the note when the
-      // reason is "something else", so the form asks for it before sending.
-      reportOther: "Something else",
-      reportReasons: [
-        "The download does not work",
-        "The file will not open",
-        "This is the wrong file",
-        "Pages are missing or blank",
-        "Something else",
-      ],
-      reportNote: "More detail",
-      reportNotePh: "e.g. page 4 is blank, or the link stops halfway",
-      reportSend: "Send report",
-      reportSending: "Sending\u2026",
-      reportDoneTitle: "Report sent",
-      reportDone: "Thank you \u2014 an editor will check this file.",
-      reportClose: "Close",
-      reportCancel: "Cancel",
-
-      // What can go wrong sending either of the two. The API's own sentence
-      // never goes on screen: it is written for whoever reads the logs.
+      // What can go wrong sending it. The API's own sentence never goes on
+      // screen: it is written for whoever reads the logs.
       errFill: "Fill in what is asked for first.",
-      errReportDetail: "Say what is wrong in the detail box, then send.",
       errTooMany: function (wait) {
         return wait
           ? "That is a lot of requests just now. Try again in " + wait + "."
           : "That is a lot of requests just now. Try again in a minute.";
       },
       errOffline: "You are offline. Connect to the internet and try again.",
-      // The catalogue can be older than the library: the file was removed
-      // between the list loading and the report being sent.
-      errFileGone: "That file is no longer in the library, so there is nothing to report. Refresh the page to see what is there now.",
       errUnverified: "Verify your email address first \u2014 the code was sent when you registered.",
       errSuspended: "This account is suspended, so it cannot send anything.",
       errForbidden: "This account cannot send that at the moment.",

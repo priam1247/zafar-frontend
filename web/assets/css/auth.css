@@ -28,7 +28,6 @@
 
   /* Mint reads only on the teal panel — it is invisible on cream. */
   --mint: #CFEBE1;
-  --mint-rgb: 207, 235, 225;
 
   /* Amber is reserved for errors and notices. */
   --warn: #B26A14;
@@ -51,19 +50,13 @@
      under the floor for 16px text, so it is a shade darker. */
   --placeholder: #5D7275;
   /* The accent is a highlight, never a requirement: one word in the footer.
-     #F4A300 is too light to carry text, so text uses --accent-ink. */
-  --accent: #F4A300;
+     #F4A300 is too light to carry text, so that word uses --accent-ink. */
   --accent-ink: #8A5A00;
 
   --line: rgba(var(--brand-rgb), .15);
   --line-2: rgba(var(--brand-rgb), .30);
 
   --on: #FAF5E9;
-  --on-72: rgba(250, 245, 233, .72);
-  --on-45: rgba(250, 245, 233, .45);
-  --on-16: rgba(250, 245, 233, .16);
-  --on-30: rgba(250, 245, 233, .30);
-  --on-56: rgba(250, 245, 233, .56);
 
   --ease: cubic-bezier(.22, .8, .3, 1);
 }

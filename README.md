@@ -572,14 +572,15 @@ and the limit is per account — 3 requests per 10 minutes. The `429` arrives
 with `Retry-After` and the page says "Try again in 2 minutes" instead of
 repeating the server's sentence.
 
-**Reports have no entry point at the moment.** `POST /reports` is live on the
-backend and `Zafar.submitReport` still binds it, but the app no longer offers
-it: the alert button on each card was removed by request, together with its
-dialog, and a report has to carry the id of a real file — which only the card
-could supply. There is no honest way to ask a student for one by typing it. If
-reporting comes back it should come back as a "Something wrong with this file?"
-row inside **My Downloads**, where the id is already stored, or as a picker on
-the Help page. The portal side of the queue is in `docs/admin-portal.md`.
+**Reports have no entry point, and no client either.** `POST /reports` is live
+on the backend, but the app no longer offers reporting: the alert button on
+each card was removed by request, together with its dialog, and a report has to
+carry the id of a real file — which only the card could supply. There is no
+honest way to ask a student for one by typing it, so the client binding and its
+strings were deleted rather than left idle. If reporting comes back it should
+come back as a "Something wrong with this file?" row inside **My Downloads**,
+where the id is already stored, or as a picker on the Help page. The portal
+side of the queue is in `docs/admin-portal.md`.
 
 ## Downloads
 

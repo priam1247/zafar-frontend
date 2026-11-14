@@ -1186,5 +1186,5 @@ var ZafarList = (function () {
     load();
   }
 
-  return { init: init, cardHTML: cardHTML, skeletonHTML: skeletonHTML };
+  return { init: init };
 })();

@@ -24,7 +24,6 @@
   --brand-rgb: 0, 109, 124;
 
   --mint: #CFEBE1;
-  --mint-rgb: 207, 235, 225;
 
   --warn: #B26A14;
   --warn-wash: #FBF0DC;
@@ -34,8 +33,8 @@
   --field: rgba(var(--brand-rgb), .06);
 
   /* Text colours that pass AA on the sheet, measured rather than estimated:
-     the teal alphas in use elsewhere (--t-70 ≈ 3.3:1) are fine for a chip's
-     border and not fine for a sentence. --ink-70 is 6.9:1 and --muted 6.1:1. */
+     teal at 70% is only ≈3.3:1, fine for a chip's border and not fine for a
+     sentence. --ink-70 is 6.9:1 and --muted 6.1:1. */
   --placeholder: #5D7275; /* 5.0:1 */
   --muted: #4B666A;       /* 6.1:1 */
 
@@ -50,13 +49,9 @@
   --ink-30: rgba(16, 20, 19, .30);
 
   --t-80: rgba(var(--brand-rgb), .80);
-  --t-70: rgba(var(--brand-rgb), .70);
-  --t-60: rgba(var(--brand-rgb), .60);
-  --t-45: rgba(var(--brand-rgb), .45);
 
   --on: #FAF5E9;
   --on-72: rgba(250, 245, 233, .72);
-  --on-56: rgba(250, 245, 233, .56);
   --on-45: rgba(250, 245, 233, .45);
   --on-30: rgba(250, 245, 233, .30);
   --on-16: rgba(250, 245, 233, .16);
@@ -91,16 +86,6 @@ a { color: inherit; }
 
 :focus-visible { outline: 2px solid currentColor; outline-offset: 2px; border-radius: 8px; }
 ::selection { background: var(--mint); color: var(--brand); }
-
-.sr-only {
-  position: absolute;
-  width: 1px; height: 1px;
-  padding: 0; margin: -1px;
-  overflow: hidden;
-  clip: rect(0 0 0 0);
-  white-space: nowrap;
-  border: 0;
-}
 
 /* ============================================================
    Frame
@@ -523,15 +508,6 @@ a { color: inherit; }
   margin: 4px 0 0;
   font-size: 12.5px;
   line-height: 1.5;
-  color: var(--brand);
-}
-
-.notice-cta {
-  margin-top: 10px;
-  height: 32px;
-  padding: 0 13px;
-  font-size: 11.5px;
-  border-color: rgba(178, 106, 20, .38);
   color: var(--brand);
 }
 
@@ -1136,7 +1112,7 @@ a { color: inherit; }
 }
 
 /* ============================================================
-   Forms a student fills in — a request, a report
+   The form a student fills in — a request
 
    The rest of the app has no free-text fields, so this is the one place
    with labels above inputs. Two rules it keeps from the sign-in screen:

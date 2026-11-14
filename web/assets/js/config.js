@@ -170,22 +170,29 @@ var Zafar = {
     return word ? word.slice(0, 1).toUpperCase() : "S";
   },
 
-  // Recent downloads are per-account, not per-device: two
-  // accounts sharing a browser must never see each other's data. The JWT's
-  // "sub" claim (the account's generated username, e.g. "john2") is decoded
-  // client-side and used purely as a storage key namespace — never as an
-  // auth decision, and never shown to anyone.
-  _currentUserSuffix: function () {
-    var token = this.getToken();
-    if (!token) return "anon";
+  /* ---------- What the token already told us -------------------------
+     A JWT's middle segment, decoded and parsed. Never an auth decision — the
+     server verifies the signature — only what the token carries: the account's
+     subject (a generated username, e.g. "john2", used purely as a storage-key
+     namespace) and, after Google sign-in, the name and address. Returns null
+     for anything that is not a readable token. */
+  jwtPayload: function (token) {
     try {
-      var payload = token.split(".")[1].replace(/-/g, "+").replace(/_/g, "/");
+      var payload = String(token).split(".")[1].replace(/-/g, "+").replace(/_/g, "/");
       while (payload.length % 4) payload += "=";
-      return JSON.parse(atob(payload)).sub || "anon";
+      return JSON.parse(decodeURIComponent(escape(atob(payload))));
     } catch (e) {
-      return "anon";
+      return null;
     }
   },
+
+  // Recent downloads are per-account, not per-device: two accounts sharing a
+  // browser must never see each other's data.
+  _currentUserSuffix: function () {
+    var claims = this.jwtPayload(this.getToken() || "");
+    return (claims && claims.sub) || "anon";
+  },
+
   // One-time migration: the first version of this app stored downloads under
   // one shared key for every account on the device. Each key is looked at once
   // per page, not on every read. (Bookmarks are gone; a phone still holding
@@ -250,10 +257,11 @@ var Zafar = {
     return mins === 1 ? "a minute" : mins + " minutes";
   },
 
-  // What to tell a student when a form did not send. The API's own sentence
-  // is written for whoever reads the logs, so it stays off the screen; the
-  // status and the machine code are what this maps from. Anything unrecognised
-  // gets the plain "that did not reach the library", never a guess at a cause.
+  // What to tell a student when the request form did not send. The API's own
+  // sentence is written for whoever reads the logs, so it stays off the screen;
+  // the status and the machine code are what this maps from. Anything
+  // unrecognised gets the plain "that did not reach the library", never a guess
+  // at a cause.
   submitMessage: function (err) {
     var t = ZafarI18n.t;
     if (typeof navigator !== "undefined" && navigator.onLine === false) return t("support.errOffline");
@@ -262,7 +270,6 @@ var Zafar = {
     // Causes that name themselves. These are read from the machine code, never
     // from the status alone: 404 also means "this route is not deployed yet".
     var code = err.code || "";
-    if (code === "report_file_missing") return t("support.errFileGone");
     if (code === "email_not_verified") return t("support.errUnverified");
     if (code === "user_suspended") return t("support.errSuspended");
     if (err.status === 401 || err.status === 403) return t("support.errForbidden");
@@ -270,15 +277,8 @@ var Zafar = {
     return t("support.errServer");
   },
 
-  // Send one of the two student submissions. Both are authenticated posts with
-  // a bearer token: the API attributes them to the signed-in account and takes
-  // the file name from the live library, so no name or email is sent from here.
-  submitReport: function (fileId, reason, note) {
-    var body = { file_id: fileId, reason: reason };
-    if (note) body.note = note;
-    return this.authPostJSON("/reports", body);
-  },
-
+  // Send a request for a file the library does not have. An authenticated
+  // post: the API attributes it to the signed-in account.
   submitRequest: function (section, title, note) {
     var body = { section: section, title: title };
     if (note) body.note = note;
