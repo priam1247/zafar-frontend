@@ -1518,7 +1518,6 @@ a { color: inherit; }
 
 /* Published defaults, not the server's numbers: muted so the note that says so
    is not the only cue. */
-.limit-rows.is-default b { color: var(--muted); }
 
 .limits-note {
   margin: 6px 0 0;
