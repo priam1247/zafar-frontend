@@ -62,7 +62,8 @@
   --on-16: rgba(250, 245, 233, .16);
 
   --shell: 470px;
-  --bar: 62px;
+  /* The tab bar's own height; the header is content-sized. */
+  --bar: 68px;
   --ease: cubic-bezier(.22, .8, .3, 1);
 }
 
@@ -119,160 +120,204 @@ a { color: inherit; }
 }
 
 /* ============================================================
-   Bar — brand, title, running count
+   Bar — avatar and greeting, page path, allowance, Help
+
+   Two lines and no empty band above them: the person's name, then
+   "Library / Books" with the allowance beside it. It gets a few pixels
+   shorter once the list starts scrolling, so reading costs less chrome.
    ============================================================ */
 
 .app-bar {
   position: sticky;
   top: 0;
   z-index: 30;
-  /* The top inset only exists on a notched phone in standalone mode, where
-     viewport-fit=cover lets the page run under the status bar. Zero elsewhere. */
-  /* All four insets: viewport-fit=cover puts the page under the sensor
-     housing in landscape too, where it is the left and right edges that
-     matter. Zero on a screen without a notch. */
-  padding: calc(12px + env(safe-area-inset-top)) calc(18px + env(safe-area-inset-right)) 13px
-    calc(18px + env(safe-area-inset-left));
+  padding: calc(6px + env(safe-area-inset-top)) calc(14px + env(safe-area-inset-right)) 9px
+    calc(14px + env(safe-area-inset-left));
   background: var(--brand);
   color: var(--on);
+  transition: padding .2s var(--ease);
 }
 
-.bar-top {
+/* Who is here, and the way into the drawer. A button, not a link: it opens a
+   dialog. 44px tall so a thumb hits it first time. */
+.me {
   display: flex;
   align-items: center;
   gap: 10px;
-}
-
-.wordmark {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 12px;
-  font-weight: 700;
-  /* "STUDYMW" is two letters longer than the old name: less tracking keeps the
-     Help and Log out buttons on the same line at 360px. */
-  letter-spacing: .13em;
-  text-decoration: none;
+  min-height: 44px;
+  padding: 2px 4px 2px 2px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
   color: var(--on);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
 }
+.me:active { background: var(--on-16); }
 
-.wordmark .glyph {
-  width: 26px;
-  height: 26px;
-  border-radius: 8px;
+.avatar {
+  flex: none;
+  width: 36px;
+  height: 36px;
   display: grid;
   place-items: center;
+  border-radius: 999px;
+  /* Teal on teal would vanish; the initials sit on mint, the same tile the
+     brand mark uses, with ink on it (14:1). */
   background: var(--mint);
-  color: var(--ink);
+  color: var(--brand-deep);
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: .02em;
+  text-transform: uppercase;
+  transition: width .2s var(--ease), height .2s var(--ease);
+}
+
+.avatar-lg { width: 52px; height: 52px; font-size: 17px; }
+
+.me-hi {
+  min-width: 0;
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: -.01em;
+  color: var(--on);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 52vw;
 }
 
 .bar-actions {
   margin-left: auto;
   display: flex;
+  align-items: center;
   gap: 7px;
 }
 
 .bar-btn {
-  width: 34px;
-  height: 34px;
+  width: 44px;
+  height: 44px;
   display: grid;
   place-items: center;
   border-radius: 999px;
   border: 1px solid var(--on-16);
   background: transparent;
-  color: var(--on-72);
+  color: var(--on);
   text-decoration: none;
   cursor: pointer;
-  transition: color .18s var(--ease), border-color .18s var(--ease);
+  transition: background .18s var(--ease), border-color .18s var(--ease);
 }
-.bar-btn:hover { color: var(--on); border-color: var(--on-30); }
+.bar-btn:hover,
+.bar-btn:active { background: var(--on-16); border-color: var(--on-30); }
 
-/* Help carries its word, not just a glyph — one less thing to guess at. */
-.bar-btn-wide {
-  width: auto;
+/* "Library / Books" on one line, with the page name carrying the weight. */
+.app-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 2px;
+  padding-left: 2px;
+}
+
+.page-path {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  min-width: 0;
+}
+
+.crumb {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--on-72);
+  white-space: nowrap;
+}
+
+.sep { color: var(--on-45); font-size: 12px; }
+
+.app-title {
+  margin: 0;
+  font-size: 19px;
+  font-weight: 700;
+  line-height: 1.15;
+  letter-spacing: -.028em;
+  color: var(--on);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  transition: font-size .2s var(--ease);
+}
+
+/* Slimmer once the list is moving. */
+.app-bar.is-slim { padding-top: calc(2px + env(safe-area-inset-top)); padding-bottom: 6px; }
+.app-bar.is-slim .avatar { width: 30px; height: 30px; font-size: 11px; }
+.app-bar.is-slim .app-title { font-size: 17px; }
+.app-bar.is-slim .me { min-height: 38px; }
+
+/* ---------- The allowance pill ----------
+   "3 books left today" on the Books tab, and its own noun on the others, from
+   the server's numbers. Teal while it is comfortable, amber at one, muted red
+   at none. */
+
+.quota {
+  flex: none;
+  max-width: 54%;
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding: 0 13px 0 11px;
-  font-size: 12.5px;
-  font-weight: 600;
-  letter-spacing: .01em;
-  /* Opaque, not 72%: this is normal-size text on teal, and the translucent
-     cream only reached about 3.5:1 — under AA for a label you are meant to
-     read. The icon inherits it. */
-  color: var(--on);
-}
-
-.app-head {
-  display: flex;
-  align-items: flex-end;
-  justify-content: space-between;
-  gap: 12px;
-  margin-top: 9px;
-}
-
-.app-head-text { min-width: 0; }
-
-.crumb {
-  font-size: 9.5px;
+  min-height: 30px;
+  padding: 4px 11px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--mint);
+  color: var(--brand-deep);
+  font: inherit;
+  font-size: 12px;
   font-weight: 650;
-  letter-spacing: .18em;
-  text-transform: uppercase;
-  color: var(--on-45);
+  letter-spacing: .002em;
+  white-space: nowrap;
+  cursor: pointer;
 }
 
-.app-title {
-  margin: 4px 0 0;
-  font-size: 27px;
-  font-weight: 640;
-  line-height: 1.05;
-  letter-spacing: -.035em;
-  color: var(--on);
+.quota-dot {
+  width: 7px;
+  height: 7px;
+  flex: none;
+  border-radius: 999px;
+  background: currentColor;
 }
 
-/* The running count sits at the top of the sheet, where it is a caption for
-   the list rather than a second title. The bar above it holds only the crumb,
-   the title and the allowance. */
+.quota [data-quota-text] { overflow: hidden; text-overflow: ellipsis; }
+
+/* One left: amber. Zero: muted red, and it says when it comes back. */
+.quota.is-low {
+  background: var(--warn-wash);
+  color: #6E4108; /* 7.7:1 on the wash */
+}
+.quota.is-out {
+  background: #FBE7E4;
+  color: #8C2F22; /* 7.6:1 on that wash */
+  /* "0 books left · resets at midnight" is the longest thing the pill ever
+     says, and it is the one time the words matter most. It gets the room, and
+     the page title gives up its own. */
+  max-width: 74%;
+  font-size: 11.5px;
+}
+
+/* The count at the top of the sheet: a caption for the list. */
 .list-meta {
   display: flex;
   align-items: center;
   gap: 8px;
-  margin: -6px 0 10px;
+  margin: 0 0 10px;
 }
 
 .list-meta .count {
   border-color: var(--line);
-  color: var(--t-80);
+  color: var(--muted);
 }
-
-/* Daily allowance — sits in the header beside the title, where it stays
-   visible while the catalogue scrolls. */
-.quota {
-  flex: none;
-  /* The chip now names its section ("No marking keys left"), which is longer
-     than a bare count. Cap it at half the bar so a 320px screen keeps the
-     title readable, and let the text ellipsis rather than push. */
-  min-width: 0;
-  max-width: 52%;
-  /* Level with the title: the head is bottom-aligned, so chip and title end
-     together instead of the chip floating over empty teal. */
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  height: 25px;
-  padding: 0 11px;
-  border-radius: 999px;
-  background: var(--mint);
-  color: var(--brand);
-  font-size: 11.5px;
-  font-weight: 650;
-  letter-spacing: .005em;
-  white-space: nowrap;
-}
-.quota [data-quota-text] { overflow: hidden; text-overflow: ellipsis; }
-.quota svg { flex: none; color: var(--ink); }
-.quota.is-warn { background: var(--warn-wash); color: var(--warn); }
-.quota.is-warn svg { color: var(--warn); }
 
 .count {
   display: inline-flex;
@@ -281,12 +326,145 @@ a { color: inherit; }
   padding: 4px 11px;
   border-radius: 999px;
   background: transparent;
-  border: 1px solid var(--on-16);
-  color: var(--on-72);
+  border: 1px solid var(--line);
+  color: var(--muted);
   font-size: 11.5px;
   font-weight: 600;
   letter-spacing: .01em;
 }
+
+/* ============================================================
+   Drawer — the menu, over the page
+   ============================================================ */
+
+.drawer {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+}
+
+.drawer-scrim {
+  position: absolute;
+  inset: 0;
+  background: rgba(16, 20, 19, .42);
+  opacity: 0;
+  transition: opacity .22s var(--ease);
+}
+
+.drawer-panel {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: min(84vw, 320px);
+  display: flex;
+  flex-direction: column;
+  padding: calc(18px + env(safe-area-inset-top)) 14px calc(16px + env(safe-area-inset-bottom));
+  background: var(--sheet);
+  box-shadow: 12px 0 40px rgba(16, 20, 19, .18);
+  transform: translateX(-100%);
+  transition: transform .22s var(--ease);
+  overflow-y: auto;
+  /* The swipe-to-close gesture must not also scroll the page behind it. */
+  touch-action: pan-y;
+}
+
+.drawer.is-open .drawer-scrim { opacity: 1; }
+.drawer.is-open .drawer-panel { transform: none; }
+
+.drawer-profile {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 4px 6px 16px;
+  border-bottom: 1px solid var(--line);
+}
+
+.drawer-who { min-width: 0; }
+
+.drawer-who h2 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: -.02em;
+  color: var(--brand);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.drawer-who p {
+  margin: 2px 0 0;
+  font-size: 12.5px;
+  color: var(--muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.drawer-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 12px 0;
+}
+
+.drawer-link {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 48px;
+  padding: 0 10px;
+  border-radius: 12px;
+  color: var(--ink);
+  text-decoration: none;
+  font-size: 15px;
+  font-weight: 600;
+}
+.drawer-link svg { color: var(--muted); flex: none; }
+.drawer-link:active { background: var(--field); }
+.drawer-link.active { background: var(--mint); color: var(--brand-deep); }
+.drawer-link.active svg { color: var(--brand-deep); }
+
+.drawer-role {
+  margin-left: 8px;
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: var(--field);
+  color: var(--muted);
+  font-size: 10.5px;
+  font-style: normal;
+  font-weight: 700;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+}
+
+.drawer-foot { margin-top: auto; padding-top: 12px; border-top: 1px solid var(--line); }
+
+/* Soft red: it is an exit, not a danger to a student's work. */
+/* The one destructive action in the app, and it is a confirmation, so it is
+   allowed to be a solid, unmistakable red. */
+.btn-danger {
+  background: #9B2C2C;
+  color: #FFFFFF;
+  border-color: #9B2C2C;
+}
+.btn-danger:hover { background: #84231F; border-color: #84231F; }
+
+.btn-danger-soft {
+  width: 100%;
+  min-height: 48px;
+  justify-content: flex-start;
+  gap: 12px;
+  padding: 0 12px;
+  border-radius: 12px;
+  background: #FBE7E4;
+  color: #8C2F22;
+  border: 0;
+  font-size: 15px;
+  font-weight: 650;
+}
+.btn-danger-soft svg { color: #8C2F22; }
 
 /* ============================================================
    Sheet
@@ -296,10 +474,10 @@ a { color: inherit; }
   flex: 1;
   min-width: 0;
   /* Room for the fixed tabs so the last card can still be scrolled clear. */
-  padding: 18px calc(16px + env(safe-area-inset-right))
+  padding: 14px calc(16px + env(safe-area-inset-right))
     calc(var(--bar) + 20px + env(safe-area-inset-bottom))
     calc(16px + env(safe-area-inset-left));
-  border-radius: 24px 24px 0 0;
+  border-radius: 16px 16px 0 0;
   background: var(--sheet);
 }
 
@@ -375,8 +553,8 @@ a { color: inherit; }
   align-items: center;
   gap: 10px;
   height: 48px;
-  padding: 0 15px;
-  border-radius: 999px;
+  padding: 0 16px;
+  border-radius: 16px;
   background: var(--field);
   border: 1px solid transparent;
   color: var(--ink-45);
@@ -410,8 +588,8 @@ a { color: inherit; }
 }
 
 .view-btn {
-  width: 34px;
-  height: 34px;
+  width: 44px;
+  height: 44px;
   display: grid;
   place-items: center;
   border: 1px solid transparent;
@@ -435,6 +613,11 @@ a { color: inherit; }
 .cat-chips {
   display: flex;
   gap: 8px;
+  /* A left-to-right fade over the last 28px: on a phone the row runs off the
+     edge, and this is the cheapest honest way to say "keep going" without an
+     arrow taking up a chip's width. */
+  -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 30px), transparent);
+  mask-image: linear-gradient(to right, #000 calc(100% - 30px), transparent);
   margin-right: calc(-16px - env(safe-area-inset-right));
   margin-left: calc(-16px - env(safe-area-inset-left));
   padding-right: calc(16px + env(safe-area-inset-right));
@@ -449,8 +632,9 @@ a { color: inherit; }
 
 .cat-chip {
   flex: 0 0 auto;
-  height: 34px;
-  padding: 0 15px;
+  /* 44px: the pill is the target, not the text inside it. */
+  height: 44px;
+  padding: 0 18px;
   border: 1px solid var(--line);
   border-radius: 999px;
   background: transparent;
@@ -478,7 +662,7 @@ a { color: inherit; }
 }
 
 .switch-btn {
-  height: 34px;
+  height: 44px;
   padding: 0 14px;
   border: 0;
   border-radius: 999px;
@@ -530,8 +714,9 @@ a { color: inherit; }
 .chip {
   display: inline-flex;
   align-items: center;
-  gap: 7px;
-  padding: 6px 7px 6px 12px;
+  gap: 3px;
+  min-height: 44px;
+  padding: 0 6px 0 14px;
   border-radius: 999px;
   background: var(--mint);
   color: var(--brand);
@@ -541,8 +726,8 @@ a { color: inherit; }
 }
 
 .chip button {
-  width: 19px;
-  height: 19px;
+  width: 28px;
+  height: 28px;
   display: grid;
   place-items: center;
   border: 0;
@@ -617,15 +802,19 @@ a { color: inherit; }
 .item {
   display: flex;
   flex-direction: column;
-  gap: 13px;
+  gap: 12px;
   min-width: 0;
   padding: 14px;
   border: 1px solid var(--line);
-  border-radius: 18px;
-  background: var(--sheet);
-  transition: border-color .18s var(--ease);
+  border-radius: 16px;
+  background: #FFFFFF;
+  /* One soft shadow, the same on every card: enough to lift it off the warm
+     paper, not enough to look like a floating panel. */
+  box-shadow: 0 1px 2px rgba(16, 20, 19, .04), 0 6px 18px rgba(16, 20, 19, .05);
+  transition: border-color .18s var(--ease), box-shadow .18s var(--ease);
 }
-.item:hover { border-color: var(--line-2); }
+.item:hover { border-color: var(--line-2); box-shadow: 0 2px 4px rgba(16, 20, 19, .05), 0 10px 24px rgba(16, 20, 19, .07); }
+.item:active { transform: none; }
 
 .item-top {
   display: flex;
@@ -674,23 +863,6 @@ a { color: inherit; }
   letter-spacing: .01em;
 }
 
-.fav-btn {
-  width: 34px;
-  height: 34px;
-  flex: none;
-  display: grid;
-  place-items: center;
-  border: 1px solid transparent;
-  border-radius: 999px;
-  background: transparent;
-  color: var(--ink-45);
-  cursor: pointer;
-  transition: color .18s var(--ease), background .18s var(--ease);
-}
-.fav-btn:hover { color: var(--ink); background: var(--field); }
-.fav-btn.on { color: var(--ink); background: var(--mint); }
-.fav-btn.bounce svg { animation: pop .32s var(--ease); }
-
 .item-foot {
   display: flex;
   align-items: center;
@@ -715,14 +887,48 @@ a { color: inherit; }
 
 .item-foot .btn { margin-left: auto; }
 
+/* While a file is being fetched the button says so, and the bar under its
+   label fills — a phone on a slow connection needs to see movement, not a
+   spinner that could equally be a stuck page. */
+.btn[data-download] { position: relative; overflow: hidden; min-width: 104px; }
+
+.btn-progress {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  height: 3px;
+  width: 0;
+  background: currentColor;
+  opacity: .55;
+  transition: width .2s linear;
+}
+
+.btn.is-loading { cursor: progress; }
+
+.btn.is-done {
+  background: var(--mint);
+  color: var(--brand-deep);
+  border-color: transparent;
+}
+
+/* The allowance is spent: the button still exists, so the reason is one tap
+   away, but it cannot charge a slot that isn't there. */
+.btn[aria-disabled="true"] {
+  background: var(--field);
+  color: var(--muted);
+  border-color: var(--line);
+  box-shadow: none;
+  cursor: not-allowed;
+}
+
 /* ---------- List view ---------- */
 
 .grid.list-view .item {
   flex-direction: row;
   align-items: center;
   gap: 9px;
-  padding: 11px 12px;
-  border-radius: 14px;
+  padding: 8px 12px;
+  border-radius: 16px;
 }
 .grid.list-view .item-top { flex: 1; align-items: center; gap: 11px; }
 .grid.list-view .glyph-tile { width: 34px; height: 34px; border-radius: 10px; }
@@ -730,33 +936,8 @@ a { color: inherit; }
 .grid.list-view .item-cat { display: none; }
 .grid.list-view .item-foot { padding: 0; border: 0; gap: 0; }
 .grid.list-view .file-meta { display: none; }
-.grid.list-view .btn { height: 34px; width: 34px; padding: 0; }
+.grid.list-view .btn { height: 44px; width: 44px; padding: 0; }
 .grid.list-view .btn .btn-label { display: none; }
-.grid.list-view .fav-btn { width: 32px; height: 32px; }
-
-/* ---------- Favorites: grouped by section ---------- */
-
-.group-title {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin: 20px 0 0;
-  font-size: 9.5px;
-  font-weight: 650;
-  letter-spacing: .18em;
-  text-transform: uppercase;
-  color: var(--muted);
-}
-.group-title:first-child { margin-top: 0; }
-
-.group-count {
-  padding: 1px 7px;
-  border-radius: 999px;
-  background: var(--field);
-  color: var(--muted);
-  font-size: 10px;
-  letter-spacing: 0;
-}
 
 /* ============================================================
    Skeleton
@@ -833,8 +1014,9 @@ a { color: inherit; }
   align-items: center;
   justify-content: center;
   gap: 7px;
-  height: 38px;
-  padding: 0 17px;
+  /* 44px: the smallest thing a thumb can hit reliably. */
+  height: 44px;
+  padding: 0 18px;
   border: 1px solid transparent;
   border-radius: 999px;
   background: transparent;
@@ -859,7 +1041,7 @@ a { color: inherit; }
 }
 .btn-ghost:hover { border-color: var(--brand); }
 
-.btn-sm { height: 36px; padding: 0 15px; font-size: 12px; }
+.btn-sm { height: 40px; padding: 0 16px; font-size: 12.5px; }
 
 .btn.is-loading { background: var(--brand-deep); }
 .btn.is-done { background: var(--mint); color: var(--brand); }
@@ -1104,17 +1286,31 @@ a { color: inherit; }
   color: var(--brand);
 }
 
-.modal-card .file-being-reported {
-  margin: 0 0 14px;
-  font-size: 13.5px;
-  line-height: 1.45;
+.modal-card-sm { max-width: 400px; }
+
+.modal-lede {
+  margin: 0 0 10px;
+  font-size: 14px;
+  line-height: 1.5;
   color: var(--ink-70);
 }
 
-/* The alert glyph is the way into the report dialog. It is not a toggle with a
-   filled state to fall back on, so it sits darker than the heart beside it
-   (6.9:1 as a glyph, well past the 3:1 floor for a non-text control). */
-.report-btn { color: var(--ink-70); }
+.modal-fine {
+  margin: 0 0 4px;
+  font-size: 12.5px;
+  line-height: 1.45;
+  color: var(--muted);
+}
+
+/* One button per row, full width, in the sheets: the bottom 44px of a phone
+   is the easiest place to reach, and a stacked pair is hard to mistap. */
+.modal-card .form-actions {
+  display: flex;
+  flex-direction: column-reverse;
+  gap: 8px;
+  margin-top: 14px;
+}
+.modal-card .form-actions .btn { width: 100%; min-height: 48px; }
 
 @keyframes sheet-up { from { transform: translateY(14px); opacity: .6; } to { transform: none; opacity: 1; } }
 
@@ -1152,7 +1348,11 @@ a { color: inherit; }
 .toast.show { opacity: 1; transform: translate(-50%, 0); }
 
 /* ============================================================
-   Tabs
+   Tabs — four sections, solid white, 24px icons
+
+   No blur and no translucent white: the bar is one flat #fff surface with a
+   hairline on top, so the icons stay crisp and the labels stay legible over
+   whatever card is scrolling underneath.
    ============================================================ */
 
 .tabbar {
@@ -1167,12 +1367,13 @@ a { color: inherit; }
   width: 100%;
   max-width: var(--shell);
   display: grid;
-  grid-template-columns: repeat(5, 1fr);
-  gap: 2px;
-  padding: 7px calc(6px + env(safe-area-inset-right)) calc(7px + env(safe-area-inset-bottom))
-    calc(6px + env(safe-area-inset-left));
+  /* Four now, so "Marking Keys" has the room to stay on one line. */
+  grid-template-columns: repeat(4, 1fr);
+  gap: 0;
+  padding: 6px calc(4px + env(safe-area-inset-right)) calc(6px + env(safe-area-inset-bottom))
+    calc(4px + env(safe-area-inset-left));
   border-top: 1px solid var(--line);
-  background: var(--sheet);
+  background: #FFFFFF;
 }
 
 .tab {
@@ -1180,48 +1381,50 @@ a { color: inherit; }
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 4px;
-  padding: 4px 0 2px;
+  justify-content: center;
+  gap: 3px;
+  /* The whole column is the target, and it is 56px tall before the inset. */
+  min-height: 56px;
+  padding: 5px 2px 4px;
+  border-radius: 14px;
   text-decoration: none;
-  /* Labels are text, so they stay teal — a shade stronger than before so they
-     hold their own next to the darker icons. */
-  color: var(--t-70);
-  font-size: 10px;
+  /* Inactive: solid muted teal-grey, not teal at 70% — an opacity wash is
+     what made these look soft and blurry. */
+  color: var(--muted);
+  font-size: 10.5px;
   font-weight: 600;
-  letter-spacing: .01em;
-  transition: color .18s var(--ease);
+  letter-spacing: .005em;
+  line-height: 1.2;
+  transition: color .18s var(--ease), background .18s var(--ease);
 }
-.tab:hover { color: var(--brand); }
-.tab.active { color: var(--brand); }
 
 .tab-ic {
-  width: 40px;
-  height: 26px;
+  width: 44px;
+  height: 30px;
   display: grid;
   place-items: center;
   border-radius: 999px;
-  color: var(--ink-45);
+  color: inherit;
   transition: background .18s var(--ease), color .18s var(--ease);
 }
-.tab:hover .tab-ic { color: var(--ink-70); }
-.tab.active .tab-ic { background: var(--mint); color: var(--ink); }
 
-.tab .pill {
-  position: absolute;
-  top: 1px;
-  left: calc(50% + 5px);
-  min-width: 15px;
-  height: 15px;
-  padding: 0 4px;
-  display: none;
-  align-items: center;
-  justify-content: center;
-  border-radius: 999px;
-  background: var(--brand);
-  color: var(--on);
-  font-size: 9.5px;
-  font-weight: 700;
-  letter-spacing: 0;
+/* The active tab is a filled pill behind a 24px icon, with the label a step
+   bolder — state you can read from arm's length. */
+.tab.active { color: var(--brand-deep); }
+.tab.active .tab-ic { background: var(--mint); color: var(--brand-deep); }
+.tab.active .tab-label { font-weight: 700; }
+
+.tab-label {
+  display: block;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@media (max-width: 340px) {
+  .tab { font-size: 10px; }
+  .tab-label { letter-spacing: -.01em; }
 }
 
 /* ============================================================
@@ -1344,9 +1547,108 @@ a { color: inherit; }
 
 .panel {
   border: 1px solid var(--line);
-  border-radius: 18px;
-  background: var(--sheet);
+  border-radius: 16px;
+  background: #FFFFFF;
+  box-shadow: 0 1px 2px rgba(16, 20, 19, .04), 0 6px 18px rgba(16, 20, 19, .05);
+  padding: 16px;
   overflow: hidden;
+}
+
+/* Settings: a label and a value per row, stacked so a long email wraps under
+   its label instead of squeezing it. */
+.panel-title {
+  margin: 0 0 10px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.kv {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 9px 0;
+  border-bottom: 1px solid var(--line);
+  font-size: 14px;
+  color: var(--muted);
+}
+.kv:last-of-type { border-bottom: 0; }
+.kv b {
+  min-width: 0;
+  text-align: right;
+  font-weight: 650;
+  font-size: 14px;
+  color: var(--ink);
+  overflow-wrap: anywhere;
+}
+
+.panel-note {
+  margin: 8px 0 0;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--muted);
+}
+
+.panel-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 14px;
+}
+.panel-actions .btn { flex: 1 1 auto; }
+
+/* My Downloads: one row per document, the who/what on the left and the way
+   back on the right. */
+.saved-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.saved-row {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: #FFFFFF;
+  box-shadow: 0 1px 2px rgba(16, 20, 19, .04);
+}
+
+.saved-text { flex: 1; min-width: 0; display: block; }
+
+.saved-title {
+  display: block;
+  font-size: 14px;
+  font-weight: 620;
+  line-height: 1.3;
+  color: var(--brand);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.saved-meta {
+  display: block;
+  margin-top: 2px;
+  font-size: 11.5px;
+  color: var(--muted);
+}
+
+.saved-row .btn { flex: none; }
+
+.saved-note {
+  margin: 14px 0 10px;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--muted);
 }
 
 .contact-card {

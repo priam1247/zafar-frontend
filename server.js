@@ -121,12 +121,24 @@ const DEMO_SCRIPT = `<script>
   } else if (!readToken() || isDemoToken(readToken())) {
     // Never overwrite a real session that is already stored.
     try { localStorage.setItem(TOKEN_KEY, DEMO_TOKEN); } catch (e) {}
+    // The greeting and the drawer are built from this, and the real app fills
+    // it from the sign-in. A demo without it would show "Student" everywhere
+    // and hide the very thing the review is looking at.
+    try {
+      localStorage.setItem("zafar_me", JSON.stringify({
+        name: "Chisomo Banda",
+        email: "chisomo.banda@gmail.com",
+      }));
+    } catch (e) {}
   }
 
   // Logging out has to end the demo — otherwise the cookie reseeds a demo
   // token on the way to login.html and the session comes back by itself.
   document.addEventListener("click", function (e) {
-    if (e.target && e.target.closest && e.target.closest("[data-logout]")) clearDemo();
+    if (!e.target || !e.target.closest) return;
+    // The drawer's confirmation and the Settings page's button are the two
+    // ways out now; the old single header button is gone.
+    if (e.target.closest("[data-logout-confirm]") || e.target.closest("[data-logout-here]")) clearDemo();
   }, true);
 
   // ---- sample catalogue --------------------------------------------------

@@ -77,9 +77,9 @@
       "url": "marking-keys.html"
     },
     {
-      "name": "Favorites",
-      "short_name": "Saved",
-      "url": "favorites.html"
+      "name": "My Downloads",
+      "short_name": "Downloads",
+      "url": "downloads.html"
     }
   ]
 }

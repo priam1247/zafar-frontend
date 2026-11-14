@@ -256,11 +256,16 @@ var ZafarAdmin = (function () {
     var head_ = "<tr>" + columns.map(function (c) {
       return '<th' + (c.num ? ' class="num"' : "") + ">" + esc(c.label) + "</th>";
     }).join("") + "</tr>";
+    // Every cell carries its column's label. On a desk that is invisible —
+    // the header row is right there — but on a phone each row becomes its own
+    // card (see admin.css) and the label is what stops "granted" from being
+    // just a floating word.
     var body = rows.length
       ? rows.map(function (row) {
           return "<tr>" + columns.map(function (c) {
             var cell = c.render ? c.render(row) : esc(row[c.key]);
-            return "<td" + (c.num ? ' class="num"' : "") + ">" + cell + "</td>";
+            return "<td" + (c.num ? ' class="num"' : "") +
+              ' data-label="' + esc(c.label) + '">' + cell + "</td>";
           }).join("") + "</tr>";
         }).join("")
       : '<tr class="empty-row"><td colspan="' + columns.length + '">' + esc(emptyText || "Nothing yet.") + "</td></tr>";

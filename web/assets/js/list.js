@@ -1,6 +1,6 @@
 /* ============================================================
    StudyMW — document list page
-   Shared by Past Papers, Books, Notes, Marking Keys and Favorites.
+   Shared by Books, Past Papers, Notes and Marking Keys.
    Each page script just calls ZafarList.init({...}) with its section and
    (if downloads count against a daily limit) which quota field to read.
    ============================================================ */
@@ -28,16 +28,16 @@ var ZafarList = (function () {
     var t = ZafarI18n.t;
     var activeCat = (new URLSearchParams(location.search).get("category")) || "";
     return (
-      // Favorites has no allowance of its own, so it gets no notice: there is
-      // nothing to explain there that isn't a link back to the page you are on.
+      // The explanation of a spent allowance, in the page, where a student
+      // who has scrolled past the pill will still meet it. No other page to
+      // send them to: the allowance is this section's, and the pill above
+      // already says how much is left.
       (cfg.quotaKey
         ? '<div class="notice" data-notice hidden>' +
             '<span class="notice-glyph">' + svg("alert", 17) + "</span>" +
             '<div class="notice-text">' +
               '<h2 class="notice-title" data-notice-title></h2>' +
               "<p data-notice-body></p>" +
-              '<a class="btn btn-ghost btn-sm notice-cta" href="favorites.html">' +
-                t("list.openFavorites") + "</a>" +
             "</div>" +
           "</div>"
         : "") +
@@ -52,7 +52,8 @@ var ZafarList = (function () {
       '<div class="toolbar">' +
         '<label class="search">' + svg("search", 18) +
           '<input type="search" data-search placeholder="' +
-          Zafar.escapeHTML(cfg.searchPlaceholder || t("list.allCategories")) + '" aria-label="Search">' +
+          Zafar.escapeHTML(cfg.searchPlaceholder || t("list.searchPlaceholder")) +
+          '" aria-label="' + Zafar.escapeHTML(t("list.searchPlaceholderAria")) + '" enterkeyhint="search">' +
         "</label>" +
         '<div class="view-toggle" role="group" aria-label="View">' +
           '<button type="button" class="view-btn" data-view="grid" aria-label="Grid view" aria-pressed="true">' + svg("grid", 16) + "</button>" +
@@ -129,16 +130,13 @@ var ZafarList = (function () {
   // mean inventing file names, so this shows the truth: "this one is featured".
   var featured = [];
 
-  // pageSection is the fallback for a list that came from one section: on
-  // Favorites the documents arrive from several, and each one carries the
-  // section it came from, so a saved note spends the notes allowance rather
-  // than the papers one it happened to be listed under.
+  // pageSection is the shelf the card is on. A download is charged to that
+  // shelf's allowance, so the card carries it into the request.
   function cardHTML(doc, pageSection) {
     var t = ZafarI18n.t;
     var section = doc._section || pageSection || "";
     var title = Zafar.escapeHTML(doc.name.replace(/\.pdf$/i, ""));
     var filename = /\.pdf$/i.test(doc.name) ? doc.name : doc.name + ".pdf";
-    var saved = Zafar.getBookmarks().indexOf(doc.id) !== -1;
     return (
       '<article class="item" data-id="' + Zafar.escapeHTML(doc.id) + '">' +
         '<div class="item-top">' +
@@ -148,15 +146,6 @@ var ZafarList = (function () {
               (featured.indexOf(doc.id) !== -1 ? '<span class="item-featured">Featured</span>' : "") + "</h3>" +
             '<span class="item-cat">' + Zafar.escapeHTML(doc.category || t("list.document")) + "</span>" +
           "</div>" +
-          // Reports start here, not on the Help page: a report has to carry the
-          // id of a real file, and this card is the only place that knows it.
-          '<button class="fav-btn report-btn" data-report="' + Zafar.escapeHTML(doc.id) + '"' +
-            ' data-name="' + Zafar.escapeHTML(doc.name) + '"' +
-            ' aria-label="' + Zafar.escapeHTML(t("support.reportOpen") + ": " + doc.name) + '"' +
-            ' aria-haspopup="dialog">' + svg("alert", 17) + "</button>" +
-          '<button class="fav-btn' + (saved ? " on" : "") + '" data-fav="' + Zafar.escapeHTML(doc.id) +
-            '" aria-pressed="' + saved + '" aria-label="' +
-            (saved ? "Remove from favorites" : "Save to favorites") + '">' + svg("heart", 17) + "</button>" +
         "</div>" +
         '<div class="item-foot">' +
           '<div class="file-meta">' +
@@ -166,203 +155,12 @@ var ZafarList = (function () {
           '<button class="btn btn-primary btn-sm" data-download="' + Zafar.escapeHTML(doc.id) +
             '" data-filename="' + Zafar.escapeHTML(filename) +
             (section ? '" data-section="' + Zafar.escapeHTML(section) : "") +
-            '" aria-label="' + t("list.download") + '">' +
-            svg("download", 14) + '<span class="btn-label">' + t("list.download") + "</span></button>" +
+            '" aria-label="' + t("list.download") + " " + Zafar.escapeHTML(filename) + '">' +
+            svg("download", 16) + '<span class="btn-label">' + t("list.download") + "</span>" +
+            '<span class="btn-progress" aria-hidden="true"></span></button>' +
         "</div>" +
       "</article>"
     );
-  }
-
-  /* ---------- Reporting a broken file ----------
-     POST /reports takes {file_id, reason, note?} with the bearer token. The
-     API looks the file up in the live library and takes the name from there,
-     so this dialog never sends a name or an email: a client that could supply
-     either could lie about both.
-
-     It is a dialog and not a page because the report starts on the card, and
-     leaving the catalogue to file it would lose the list — and the scroll
-     position — of someone who only meant to flag one file. */
-  function mountReportDialog(shell) {
-    var t = ZafarI18n.t;
-    var existing = document.querySelector("[data-report-modal]");
-    if (existing) existing.remove();
-
-    var wrap = document.createElement("div");
-    wrap.className = "modal";
-    wrap.setAttribute("data-report-modal", "");
-    wrap.hidden = true;
-    wrap.innerHTML =
-      '<div class="modal-scrim" data-report-close></div>' +
-      '<div class="modal-card" role="dialog" aria-modal="true" ' +
-          'aria-labelledby="report-heading" aria-describedby="report-file">' +
-        '<h2 id="report-heading">' + t("support.reportTitle") + "</h2>" +
-        '<p class="file-being-reported" id="report-file" data-report-file></p>' +
-        '<form data-report-form novalidate>' +
-          '<div class="form-field">' +
-            '<label for="report-reason">' + t("support.reportReason") + "</label>" +
-            '<select class="form-select" id="report-reason">' +
-              t("support.reportReasons").map(function (reason) {
-                return '<option value="' + Zafar.escapeHTML(reason) + '">' + Zafar.escapeHTML(reason) + "</option>";
-              }).join("") +
-            "</select>" +
-          "</div>" +
-          '<div class="form-field">' +
-            '<label for="report-note">' + t("support.reportNote") +
-              ' <span class="form-optional">' + t("support.requestOptional") + "</span></label>" +
-            '<textarea class="form-textarea" id="report-note" rows="2" maxlength="2000" placeholder="' +
-              Zafar.escapeHTML(t("support.reportNotePh")) + '"></textarea>' +
-          "</div>" +
-          '<p class="form-error" role="alert" data-report-error hidden></p>' +
-          '<div class="form-actions">' +
-            '<button class="btn btn-primary" type="submit" data-report-send>' + t("support.reportSend") + "</button>" +
-            '<button class="btn btn-ghost" type="button" data-report-close>' + t("support.reportCancel") + "</button>" +
-          "</div>" +
-        "</form>" +
-        '<div class="form-done" data-report-done hidden>' +
-          '<span class="done-glyph">' + svg("check", 18) + "</span>" +
-          "<h3>" + t("support.reportDoneTitle") + "</h3>" +
-          "<p>" + t("support.reportDone") + "</p>" +
-          '<button class="btn btn-ghost" type="button" data-report-close>' + t("support.reportClose") + "</button>" +
-        "</div>" +
-      "</div>";
-    document.body.appendChild(wrap);
-
-    var card = wrap.querySelector(".modal-card");
-    var form = wrap.querySelector("[data-report-form]");
-    var done = wrap.querySelector("[data-report-done]");
-    var fileLine = wrap.querySelector("[data-report-file]");
-    var errorLine = wrap.querySelector("[data-report-error]");
-    var select = wrap.querySelector("#report-reason");
-    var note = wrap.querySelector("#report-note");
-    var send = wrap.querySelector("[data-report-send]");
-    var current = null;   // { id, name, trigger }
-    var sending = false;
-
-    function focusables() {
-      return Array.prototype.slice
-        .call(card.querySelectorAll("button, select, textarea, [href]"))
-        .filter(function (node) {
-          return !node.disabled && !node.hidden && node.closest("[hidden]") === null;
-        });
-    }
-
-    function onKey(e) {
-      if (e.key === "Escape") {
-        e.preventDefault();
-        close();
-        return;
-      }
-      if (e.key !== "Tab") return;
-      // Keep Tab inside the dialog: behind it is a live catalogue, and a
-      // keyboard user who lands there has no way to tell what is on top.
-      var nodes = focusables();
-      if (!nodes.length) return;
-      var first = nodes[0];
-      var last = nodes[nodes.length - 1];
-      if (e.shiftKey && document.activeElement === first) {
-        e.preventDefault();
-        last.focus();
-      } else if (!e.shiftKey && document.activeElement === last) {
-        e.preventDefault();
-        first.focus();
-      }
-    }
-
-    // The page behind a fixed sheet still scrolls on a phone, which reads as
-    // the dialog sliding around. Freeze it while the sheet is up, and put back
-    // whatever was there before rather than assuming it was empty.
-    var bodyOverflow = null;
-
-    function open(button) {
-      current = {
-        id: button.getAttribute("data-report"),
-        name: button.getAttribute("data-name") || "",
-        trigger: button,
-      };
-      // The file's own name, carried on the button. The API takes the name
-      // from the library, not from here; this is only so the person can see
-      // which file they are about to report.
-      fileLine.textContent = current.name ? current.name + ". " + t("support.reportBody") : t("support.reportBody");
-
-      form.hidden = false;
-      done.hidden = true;
-      errorLine.hidden = true;
-      errorLine.textContent = "";
-      select.value = t("support.reportReasons")[0];
-      note.value = "";
-      send.disabled = false;
-      send.textContent = t("support.reportSend");
-      sending = false;
-
-      wrap.hidden = false;
-      bodyOverflow = document.body.style.overflow;
-      document.body.style.overflow = "hidden";
-      document.addEventListener("keydown", onKey);
-      select.focus();
-    }
-
-    function close() {
-      wrap.hidden = true;
-      if (bodyOverflow !== null) {
-        document.body.style.overflow = bodyOverflow;
-        bodyOverflow = null;
-      }
-      document.removeEventListener("keydown", onKey);
-      var trigger = current && current.trigger;
-      current = null;
-      if (trigger && trigger.focus) trigger.focus();
-    }
-
-    wrap.addEventListener("click", function (e) {
-      if (e.target.closest("[data-report-close]")) close();
-    });
-
-    form.addEventListener("submit", function (e) {
-      e.preventDefault();
-      if (sending || !current) return;
-
-      var reason = select.value;
-      var detail = (note.value || "").trim();
-      if (!reason) {
-        errorLine.textContent = t("support.errFill");
-        errorLine.hidden = false;
-        select.focus();
-        return;
-      }
-      // "Something else" with no detail is a row an editor cannot act on.
-      if (reason === t("support.reportOther") && !detail) {
-        errorLine.textContent = t("support.errReportDetail");
-        errorLine.hidden = false;
-        note.focus();
-        return;
-      }
-
-      sending = true;
-      send.disabled = true;
-      send.textContent = t("support.reportSending");
-      errorLine.hidden = true;
-
-      Zafar.submitReport(current.id, reason, detail).then(
-        function () {
-          sending = false;
-          form.hidden = true;
-          done.hidden = false;
-          var again = done.querySelector("button");
-          if (again) again.focus();
-        },
-        function (err) {
-          // The 401 case never arrives here: authPostJSON sends the person to
-          // sign in instead, because a report needs an account to belong to.
-          sending = false;
-          send.disabled = false;
-          send.textContent = t("support.reportSend");
-          errorLine.textContent = Zafar.submitMessage(err);
-          errorLine.hidden = false;
-        }
-      );
-    });
-
-    return { open: open, close: close };
   }
 
   function init(cfg, shell) {
@@ -447,35 +245,6 @@ var ZafarList = (function () {
     });
     applyView();
 
-    /* ---------- Favorites: group by section ---------- */
-    var SECTION_LABELS = {
-      papers: "Past Papers",
-      primary: "Primary",
-      books: "Books",
-      notes: "Notes",
-      "marking-keys": "Marking Keys",
-    };
-    function groupedBySection(docs) {
-      var groups = {};
-      docs.forEach(function (d) {
-        var key = d._section || "other";
-        if (!groups[key]) groups[key] = [];
-        groups[key].push(d);
-      });
-      var keys = Object.keys(SECTION_LABELS).filter(function (k) { return groups[k]; });
-      Object.keys(groups).forEach(function (k) {
-        if (!SECTION_LABELS[k]) keys.push(k);
-      });
-      return keys.map(function (key) {
-        var label = SECTION_LABELS[key] || key;
-        return '<h3 class="group-title">' + Zafar.escapeHTML(label) +
-          '<span class="group-count">' + groups[key].length + "</span></h3>" +
-          '<div class="grid">' + groups[key].map(function (d) {
-            return cardHTML(d, key);
-          }).join("") + "</div>";
-      }).join("");
-    }
-
     /* ---------- Daily allowances — one per section ----------------------------
        The server keeps four buckets, each on its own UTC day: papers 10, books
        3, notes 3, marking keys 10 by default. QUOTA_FIELD maps this page's
@@ -541,6 +310,30 @@ var ZafarList = (function () {
       };
     }
 
+    // What one unit of this allowance is called: "1 book", "2 books", "1
+    // marking key". Singular and plural come from the same table, so the
+    // sentence stays grammatical when only one is left.
+    function noun(count) {
+      var key = count === 1 ? "list.unitOne." : "list.unit.";
+      return t(key + cfg.quotaKey);
+    }
+
+    // "3 left" is a counter. "3 books left today" is an answer — what the
+    // thing is, how many, and when it comes back. The number is always the
+    // server's; nothing here knows what the limit should be.
+    function pillCopy(count) {
+      if (count === 0) return t("list.noneLeft", cfg.quotaKey);
+      return t("list.leftToday", count, cfg.quotaKey);
+    }
+
+    // The sheet behind the pill: the whole rule, in two sentences.
+    function quotaSheetCopy() {
+      return {
+        body: t("shell.quotaBody", left, cap, noun(left)),
+        reset: t("shell.quotaReset"),
+      };
+    }
+
     function renderLimit() {
       if (!el.limit) return;
 
@@ -558,21 +351,40 @@ var ZafarList = (function () {
       // allowance we cannot measure.
       if (left === null || !(cap > 0)) {
         el.limit.hidden = true;
+        setDownloadsEnabled(true);
         return;
       }
 
       var allowed = left > 0;
       el.limit.hidden = false;
-      el.limit.classList.toggle("is-warn", !allowed);
-      el.limitText.textContent = allowed
-        ? t("list.downloadsLeft", left, cap)
-        : t("list.limitReached", cfg.quotaKey);
-      el.limit.setAttribute(
-        "aria-label",
-        allowed
-          ? t("list.downloadsLeftLabel", left, cfg.quotaKey)
-          : t("list.limitReached", cfg.quotaKey)
-      );
+      // Teal while comfortable, amber at one, muted red at none.
+      el.limit.classList.toggle("is-low", left === 1);
+      el.limit.classList.toggle("is-out", left === 0);
+      el.limitText.textContent = pillCopy(left);
+      el.limit.setAttribute("aria-label", pillCopy(left) + ". " + t("shell.quotaReset"));
+      if (shell.setQuotaSheet) shell.setQuotaSheet(quotaSheetCopy());
+
+      // At zero every Download button on the page stops accepting taps, but
+      // keeps its place and its size: hiding them would move the page under a
+      // thumb that was already reaching for one.
+      setDownloadsEnabled(allowed);
+    }
+
+    // "Limit reached" replaces the label, once, on every card. `aria-disabled`
+    // rather than `disabled`: a disabled button is skipped by a screen reader
+    // and refuses the tap that would explain why.
+    function setDownloadsEnabled(enabled) {
+      if (!cfg.quotaKey) return;
+      el.grid.querySelectorAll("[data-download]").forEach(function (btn) {
+        if (btn.dataset.pending === "true") return;
+        btn.setAttribute("aria-disabled", String(!enabled));
+        var label = btn.querySelector(".btn-label");
+        if (label) {
+          label.textContent = enabled ? t("list.download") : t("list.limitReached");
+        }
+        if (!enabled) btn.setAttribute("title", t("list.limitReached"));
+        else btn.removeAttribute("title");
+      });
     }
 
     function revealNotice() {
@@ -625,62 +437,10 @@ var ZafarList = (function () {
         .catch(function () {
           if (!el.limit || quotaDirty) return;
           el.limit.hidden = false;
-          el.limit.classList.add("is-warn");
+          el.limit.classList.remove("is-low", "is-out");
           el.limitText.textContent = t("list.limitUnavailable");
         });
     }
-
-    /* ---------- Favorites ---------- */
-    // Take one card out of the grid and keep the rest of the page honest: the
-    // count, the group heading if that group is now empty, and the empty state
-    // if nothing is left.
-    function dropCard(card) {
-      if (!card) return;
-      var group = card.closest(".grid");
-      card.remove();
-      renderedCount = Math.max(0, renderedCount - 1);
-      updateCount(renderedCount);
-      if (group && !group.querySelector(".item")) {
-        var heading = group.previousElementSibling;
-        if (heading && heading.classList.contains("group-title")) heading.remove();
-        group.remove();
-      }
-      if (!renderedCount) {
-        el.empty.querySelector("h3").textContent = t("list.noFavoritesTitle");
-        el.empty.querySelector("p").innerHTML = t("list.noFavoritesBody");
-        show("empty");
-      }
-    }
-
-    /* ---------- Reporting: the card button opens the dialog ---------- */
-    var reportDialog = mountReportDialog(shell);
-    el.grid.addEventListener("click", function (e) {
-      var btn = e.target.closest("[data-report]");
-      if (!btn) return;
-      reportDialog.open(btn);
-    });
-
-    el.grid.addEventListener("click", function (e) {
-      var btn = e.target.closest("[data-fav]");
-      if (!btn) return;
-      var id = btn.dataset.fav;
-      var list = Zafar.getBookmarks();
-      var on = btn.classList.toggle("on");
-      btn.setAttribute("aria-pressed", String(on));
-      if (on) {
-        if (list.indexOf(id) === -1) list.push(id);
-      } else {
-        list = list.filter(function (b) { return b !== id; });
-      }
-      Zafar.setBookmarks(list);
-      btn.classList.add("bounce");
-      setTimeout(function () { btn.classList.remove("bounce"); }, 320);
-      shell.showToast(on ? t("list.savedToFavorites") : t("list.removedFromFavorites"), "heart");
-      // On the Favorites page, un-saving drops the card from view here rather
-      // than reloading: the answer is already on screen, and a reload would
-      // ask the server for all four sections again just to hide one card.
-      if (cfg.favoritesOnly && !on) dropCard(btn.closest(".item"));
-    });
 
     /* ---------- Downloads ---------- */
     /* The list response never carries a download URL — a permanent link
@@ -696,6 +456,18 @@ var ZafarList = (function () {
       e.preventDefault();
       if (btn.dataset.pending === "true") return;
       if (!navigator.onLine) return shell.showToast(t("list.noInternet"), "offline");
+
+      // A card that came up in "Limit reached" is still a way to ask why. It
+      // opens the same sheet the pill does, so the answer is where the
+      // question was, and one re-check happens inside it.
+      if (btn.getAttribute("aria-disabled") === "true") {
+        if (shell.quota) shell.quota.click();
+        if (!quotaChecking) {
+          quotaChecking = true;
+          refreshQuota().then(function () { quotaChecking = false; });
+        }
+        return;
+      }
 
       if (cfg.quotaKey && left !== null && left <= 0) {
         // Whatever the stored zero says, the server has the last word: an
@@ -719,7 +491,7 @@ var ZafarList = (function () {
           // including the notice already on screen.
           if (el.limit) {
             el.limit.hidden = false;
-            el.limit.classList.add("is-warn");
+            el.limit.classList.remove("is-low", "is-out");
             el.limitText.textContent = t("list.limitUnavailable");
             el.limit.setAttribute("aria-label", t("list.limitUnavailable"));
           }
@@ -749,31 +521,57 @@ var ZafarList = (function () {
       btn.classList.add("is-loading");
       btn.innerHTML =
         '<span class="btn-spinner" aria-hidden="true"></span>' +
-        '<span class="btn-label">' + t("list.preparing") + "</span>";
+        '<span class="btn-label">' + t("list.preparing") + "</span>" +
+        '<span class="btn-progress" aria-hidden="true"></span>';
+
+      var bar = btn.querySelector(".btn-progress");
+      var label = btn.querySelector(".btn-label");
+      var progressTimer = null;
+      var share = 0.15;
+
+      function stopProgress() {
+        if (progressTimer) clearInterval(progressTimer);
+        progressTimer = null;
+      }
+
+      // The two halves of a download are different waits: asking the server
+      // for a signed link (quick, or a refusal), then pulling the file (as
+      // slow as the connection is). The bar fills for both, and says which
+      // half it is in, because "Preparing" for thirty seconds reads as stuck.
+      function setProgress(value, text) {
+        share = value;
+        if (bar) bar.style.width = Math.round(value * 100) + "%";
+        if (text && label) label.textContent = text;
+        btn.setAttribute("aria-label", text || t("list.preparing"));
+      }
 
       function restore() {
+        stopProgress();
         downloadBusy = false;
         btn.dataset.pending = "false";
         btn.removeAttribute("aria-disabled");
         btn.disabled = false;
         btn.classList.remove("is-loading", "is-done");
         btn.innerHTML = original;
+        // The page may have run out of allowance while this one was in flight.
+        if (cfg.quotaKey && left !== null && left <= 0) setDownloadsEnabled(false);
       }
 
       function markSaved() {
+        stopProgress();
         // The file is on the phone: the next one may start even while this
         // button is still showing "Saved".
         downloadBusy = false;
         btn.classList.remove("is-loading");
         btn.classList.add("is-done");
         btn.innerHTML =
-          svg("check", 15) + '<span class="btn-label">' + t("list.saved") + "</span>";
+          svg("check", 16) + '<span class="btn-label">' + t("list.saved") + "</span>";
+        btn.setAttribute("aria-label", t("list.saved"));
         setTimeout(restore, 1800);
       }
 
-      // The card knows which section its document came from; Favorites has no
-      // section of its own, so without it a saved note would be charged to
-      // papers.
+      // The card knows which shelf its document came from, and the download
+      // is charged to that shelf's allowance.
       var section = btn.dataset.section || state.section;
       var card = btn.closest(".item");
       // Remembered only once the file is actually on the phone — a reservation
@@ -782,6 +580,9 @@ var ZafarList = (function () {
         id: id,
         name: card ? card.querySelector(".item-title").textContent : btn.dataset.filename,
         category: card ? card.querySelector(".item-cat").textContent : "",
+        // Kept with the row so My Downloads can send the student back to the
+        // shelf it came from rather than guessing at Books.
+        section: section,
       };
       Zafar.authPostJSON(
         "/drive/download/" + encodeURIComponent(id) + "?section=" + encodeURIComponent(section)
@@ -799,6 +600,16 @@ var ZafarList = (function () {
           }
 
           shell.showToast(t("list.downloadStarted"), "download");
+          // 15% for the signed link, then a bar that creeps while the bytes
+          // come. It is deliberately not a percentage of the file: the
+          // download rides on a signed URL whose length this page has not been
+          // told, and a made-up percentage that stalls at 99 is worse than an
+          // honest "working". Every path out of here stops the timer.
+          setProgress(0.15, t("list.downloading"));
+          progressTimer = setInterval(function () {
+            share += (0.85 - share) * 0.12;
+            setProgress(share, t("list.downloading"));
+          }, 400);
           return Zafar._fetch(data.url, {}, Zafar.FILE_TIMEOUT_MS)
             .then(function (resp) {
               if (!resp.ok) throw new Error("Download failed (" + resp.status + ")");
@@ -832,8 +643,7 @@ var ZafarList = (function () {
           restore();
           if (err && err.status === 429) {
             // The server just refused, so zero is the honest count for this
-            // bucket until the next tap re-checks it. Favorites has no
-            // allowance of its own: it gets the toast and nothing else.
+            // bucket until the next tap re-checks it.
             if (cfg.quotaKey) {
               quotaDirty = true;
               left = 0;
@@ -972,7 +782,7 @@ var ZafarList = (function () {
     function show(which) {
       current = which;
       el.skeleton.style.display = which === "loading" ? "grid" : "none";
-      el.grid.style.display = which === "grid" ? (cfg.favoritesOnly ? "" : "grid") : "none";
+      el.grid.style.display = which === "grid" ? "grid" : "none";
       el.empty.classList.toggle("show", which === "empty");
       el.error.classList.toggle("show", which === "error");
       el.offline.classList.toggle("show", which === "offline");
@@ -1041,8 +851,8 @@ var ZafarList = (function () {
     }
 
     // The whole answer's size, but only if every section this view reads has
-    // reported one. Favorites reads five sections, and one missing number
-    // cannot be added to the others.
+    // reported one. A view that reads two shelves cannot add a number it does
+    // not have to the one it does.
     function totalAcross() {
       var sum = 0;
       var every = sectionList().every(function (section) {
@@ -1058,20 +868,6 @@ var ZafarList = (function () {
     // removing a favourite — so they can never disagree.
     function updateCount(n) {
       var done = !failure && !hasMore();
-      if (cfg.favoritesOnly) {
-        // The saved list itself lives on the phone, so its size is known
-        // exactly — no page has to arrive for it. With a filter on, the answer
-        // is "saved documents that match", which can only be counted as pages
-        // of each section are read, so that one may say "+".
-        if (!state.q && !state.category) {
-          shell.count.textContent = t("list.savedCount", Zafar.getBookmarks().length);
-          return;
-        }
-        shell.count.textContent = done
-          ? t("list.savedCount", n)
-          : t("list.savedAtLeast", n);
-        return;
-      }
       var total = totalAcross();
       if (total !== null) {
         shell.count.textContent = t("list.results", groupCount(total));
@@ -1137,8 +933,9 @@ var ZafarList = (function () {
           rows.forEach(function (doc) {
             if (!doc || !doc.id || entry.ids[doc.id]) return;
             entry.ids[doc.id] = true;
-            // So Favorites can group a document and charge its download to the
-            // right section without the backend sending one.
+            // The list response is a page of documents, not of shelves, so the
+            // shelf is written on each one here: it is what the card's download
+            // is charged to.
             doc._section = section;
             entry.rows.push(doc);
             fresh += 1;
@@ -1202,7 +999,7 @@ var ZafarList = (function () {
       });
     }
 
-    // One more page for every section that still has one. Favorites asks five
+    // One more page for every section that still has one. A view may read more
     // sections, so this waits for all of them before repainting once.
     function loadMore() {
       if (busy()) return;
@@ -1259,14 +1056,10 @@ var ZafarList = (function () {
       }
 
       // Part of the answer never arrived. "Nothing here" is a claim we cannot
-      // make when a section we asked about did not answer — and on Favorites
-      // that section may be where the saved documents are.
+      // make when a section we asked about did not answer: that section may be
+      // where the rest of the list is.
       var partial = !!failure;
 
-      if (cfg.favoritesOnly) {
-        var saved = Zafar.getBookmarks();
-        docs = docs.filter(function (d) { return saved.indexOf(d.id) !== -1; });
-      }
       docs = docs.slice().sort(SORTS[state.sort] || SORTS["name-asc"]);
       renderedCount = docs.length;
 
@@ -1286,10 +1079,7 @@ var ZafarList = (function () {
           if (el.more) el.more.hidden = true;
           return;
         }
-        if (cfg.favoritesOnly && !state.q && !state.category) {
-          h.textContent = t("list.noFavoritesTitle");
-          p.innerHTML = t("list.noFavoritesBody");
-        } else if (state.category || state.q) {
+        if (state.category || state.q) {
           h.textContent = t("list.noMatchesTitle");
           p.textContent = t("list.noMatchesBody");
         } else {
@@ -1301,15 +1091,12 @@ var ZafarList = (function () {
         return;
       }
 
-      if (cfg.favoritesOnly) {
-        el.grid.classList.add("grouped");
-        el.grid.innerHTML = groupedBySection(docs);
-      } else {
-        el.grid.classList.remove("grouped");
-        el.grid.innerHTML = docs.map(function (d) {
-          return cardHTML(d, state.section);
-        }).join("");
-      }
+      el.grid.innerHTML = docs.map(function (d) {
+        return cardHTML(d, state.section);
+      }).join("");
+      // A page can arrive while the allowance is spent: its new buttons must
+      // come up already in their "Limit reached" state.
+      if (cfg.quotaKey && left !== null && left <= 0) setDownloadsEnabled(false);
       show("grid");
       syncMore();
 
