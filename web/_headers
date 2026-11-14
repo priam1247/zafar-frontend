@@ -12,6 +12,14 @@
   Referrer-Policy: strict-origin-when-cross-origin
   Content-Security-Policy: frame-ancestors 'none'; object-src 'none'; base-uri 'self'
 
+# Scripts and styles are the app's behaviour: a phone that keeps yesterday's
+# copy keeps yesterday's bugs, however new the HTML above it is. Revalidate on
+# every visit (a 304 costs one round trip, not the file).
+/assets/js/*
+  Cache-Control: no-cache
+/assets/css/*
+  Cache-Control: no-cache
+
 # The icons are static and their names are stable. A day of caching keeps the
 # tab strip and the install prompt quick without freezing a changed mark for
 # weeks; the PNGs and the SVG share one age so they never disagree.

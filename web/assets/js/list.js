@@ -526,6 +526,19 @@ var ZafarList = (function () {
           el.limit.classList.remove("is-low", "is-out");
           el.limitText.textContent = t("list.limitUnavailable");
         });
+
+      // A confirmation an earlier visit could not deliver is a download the
+      // count does not know about yet. Send those first, then read the count:
+      // the number on screen should include everything already on this phone.
+      Zafar.flushConfirms().then(function (sent) {
+        if (sent) refreshQuota();
+      });
+
+      // A number that stopped being true while the phone was in a pocket is
+      // the same as a wrong number: ask again when the page comes back.
+      document.addEventListener("visibilitychange", function () {
+        if (document.visibilityState === "visible") refreshQuota();
+      });
     }
 
     /* ---------- Downloads ---------- */
@@ -738,7 +751,11 @@ var ZafarList = (function () {
               // Then read the count back: what a *reservation* does to the
               // number is the server's business, and a pill that does not move
               // after a download is worse than one that moves late.
-              Zafar.authPostJSON("/drive/confirm/" + data.download_id)
+              // The id is written down *before* the request, so a confirmation
+              // that never leaves the phone is not lost: the next visit sends
+              // it again.
+              Zafar.queueConfirm(data.download_id);
+              Zafar.confirmDownload(data.download_id)
                 .catch(function () {})
                 .then(function () {
                   if (cfg.quotaKey) refreshQuota();

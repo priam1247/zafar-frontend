@@ -2027,7 +2027,11 @@ function downloadPage(path, conf) {
         return reply({ url: origin + "/file.pdf", download_id: 9, quota: opts.after || QUOTA });
       }
       if (/\/drive\/confirm\//.test(u.pathname)) {
-        if (opts.counters) opts.counters.confirm = (opts.counters.confirm || 0) + 1;
+        if (opts.counters) {
+          opts.counters.confirm = (opts.counters.confirm || 0) + 1;
+          (opts.counters.ids = opts.counters.ids || []).push(u.pathname.split("/").pop());
+        }
+        if (opts.confirmStatus) return reply({ detail: "no" }, opts.confirmStatus);
         return reply({ status: "confirmed" });
       }
       if (/\/file\.pdf$/.test(u.pathname)) {
@@ -2138,6 +2142,79 @@ test("a file that fails on the way still asks the server what it is owed", async
 
   assert.match(toastText(d), /Could not download the file/, toastText(d));
   assert.ok(counters.quota > before, "the page re-read the allowance after the failure");
+  dom.window.close();
+});
+
+test("the number in the pill is the server's, whatever it says", async () => {
+  // The complaint this answers: "I downloaded two, why does it still say three?"
+  // There is no number in this app to be stale on its own — every value below
+  // is invented by the test's fake server and drawn unchanged, on every shelf.
+  const shelves = [
+    ["/books.html", "books", "book"],
+    ["/dashboard.html", "papers", "paper"],
+    ["/notes.html", "notes", "note"],
+    ["/marking-keys.html", "marking_keys", "marking key"],
+  ];
+  for (const [page, field, noun] of shelves) {
+    for (const left of [0, 1, 7]) {
+      const quota = Object.assign({}, QUOTA, { [field + "_left"]: left, [field + "_limit"]: left + 4 });
+      const dom = await downloadPage(page, { quota });
+      await wait(900);
+      const pill = dom.window.document.querySelector("[data-quota-text]").textContent;
+      if (left === 0) {
+        assert.equal(pill, "0 " + noun + "s left · resets at midnight", page);
+      } else {
+        assert.equal(pill, left + " " + noun + (left === 1 ? "" : "s") + " left today", page);
+      }
+      dom.window.close();
+    }
+  }
+
+  // And no page ships a number of its own to fall back on.
+  for (const file of ["config.js", "list.js", "shell.js", "i18n.js"]) {
+    const source = read(path.join(WEB, "assets/js", file));
+    assert.doesNotMatch(source, /DAILY_LIMITS/, file + " carries a limit table");
+    for (const field of ["papers", "books", "notes", "marking_keys"]) {
+      assert.doesNotMatch(
+        source,
+        new RegExp(field + "_left\\s*[:=]\\s*\\d"),
+        file + " invents a " + field + " count"
+      );
+    }
+  }
+});
+
+test("a confirmation the phone could not send is sent on the next visit", async () => {
+  // Confirming is what makes a download count for the rest of the day. When it
+  // does not leave the phone, the reservation expires and the allowance climbs
+  // back — which is exactly "I downloaded two and it still says three".
+  const counters = { confirm: 0, ids: [], quota: 0 };
+  const dom = await downloadPage("/notes.html", {
+    storage: { zafar_pending_confirms_student: "[71,72]" },
+    counters,
+  });
+  await wait(900);
+
+  assert.deepEqual(counters.ids.sort(), ["71", "72"], "both waiting confirmations were sent");
+  assert.equal(dom.window.localStorage.getItem("zafar_pending_confirms_student"), "[]",
+    "and forgotten once the server answered");
+  // The count was read back after them, so the pill includes those two.
+  assert.ok(counters.quota > 1, "the allowance was re-read after the confirmations");
+  dom.window.close();
+});
+
+test("a confirmation the server refuses is not retried for ever", async () => {
+  const counters = { confirm: 0, ids: [], quota: 0 };
+  const dom = await downloadPage("/notes.html", {
+    storage: { zafar_pending_confirms_student: "[404]" },
+    confirmStatus: 404,
+    counters,
+  });
+  await wait(900);
+
+  assert.equal(counters.confirm, 1, "asked once");
+  assert.equal(dom.window.localStorage.getItem("zafar_pending_confirms_student"), "[]",
+    "a 4xx is an answer: the id is dropped, not retried all day");
   dom.window.close();
 });
 
@@ -2863,5 +2940,14 @@ test("_headers closes the obvious doors", () => {
     "frame-ancestors 'none'",
   ]) {
     assert.ok(headers.includes(rule), "_headers is missing: " + rule);
+  }
+  // A deploy must reach the phone. The JavaScript carries the behaviour, so a
+  // cached copy of it keeps yesterday's bugs alive behind new HTML.
+  for (const dir of ["/assets/js/*", "/assets/css/*"]) {
+    assert.match(
+      headers,
+      new RegExp(dir.replace(/[*/]/g, "\\$&") + "\\n  Cache-Control: no-cache"),
+      dir + " may be cached across a deploy"
+    );
   }
 });
