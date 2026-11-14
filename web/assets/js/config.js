@@ -84,9 +84,11 @@ var SUPPORT_WHATSAPP = "";
 
 var Zafar = {
   TOKEN_KEY: "zafar_token",
-  BOOKMARKS_KEY: "zafar_bookmarks",
+  ME_KEY: "zafar_me",
   RECENT_DOWNLOADS_KEY: "zafar_recent_downloads",
-  RECENT_DOWNLOADS_MAX: 20,
+  RECENT_DOWNLOADS_MAX: 40,
+  // Where signing in lands. The library opens on Books.
+  HOME: "books.html",
   /* ---------- Token -------------------------------------------------- */
   // Remember Me on  -> localStorage (survives closing the browser)
   // Remember Me off -> sessionStorage (cleared when the tab closes)
@@ -105,9 +107,70 @@ var Zafar = {
   clearToken: function () {
     localStorage.removeItem(this.TOKEN_KEY);
     sessionStorage.removeItem(this.TOKEN_KEY);
+    localStorage.removeItem(this.ME_KEY);
   },
 
-  // Bookmarks / recent downloads are per-account, not per-device: two
+  // One way out, used by the sidebar. What the app remembers about the person
+  // (their name for the greeting, and which account is admin) goes with the
+  // token, or the next account on this phone inherits it.
+  signOut: function () {
+    this.clearToken();
+    try { sessionStorage.removeItem("zafar_admin_role"); } catch (e) {}
+    try { sessionStorage.removeItem("zafar_site_config"); } catch (e) {}
+  },
+
+  /* ---------- Who is signed in ---------------------------------------
+     The API has no student profile route (GET /admin/whoami is admins only),
+     so the greeting is built from what the sign-in itself already told us:
+     the email from the form, or the name and email inside the Google ID token
+     the browser just received. It is display only — never an authorization
+     decision, which the token's own claims and the API's role check settle. */
+  setMe: function (info) {
+    if (!info) return;
+    var current = this.getMe();
+    var next = {
+      email: info.email || current.email || "",
+      name: info.name || current.name || "",
+    };
+    try { localStorage.setItem(this.ME_KEY, JSON.stringify(next)); } catch (e) {}
+  },
+  getMe: function () {
+    try {
+      return JSON.parse(localStorage.getItem(this.ME_KEY) || "{}") || {};
+    } catch (e) {
+      return {};
+    }
+  },
+  // "Priam" from "Priam Zafar", or from priam@gmail.com when there is no name:
+  // the local part, tidied — "priam1247" reads as "Priam".
+  firstName: function () {
+    var me = this.getMe();
+    if (me.name) return String(me.name).trim().split(/\s+/)[0];
+    var local = String(me.email || "").split("@")[0];
+    var cleaned = local.replace(/[._-]+/g, " ").replace(/[0-9]+$/, "").trim();
+    if (!cleaned) return "";
+    return cleaned.charAt(0).toUpperCase() + cleaned.slice(1).split(" ")[0].toLowerCase();
+  },
+  fullName: function () {
+    var me = this.getMe();
+    if (me.name) return String(me.name).trim();
+    var first = this.firstName();
+    return first || "Student";
+  },
+  initials: function () {
+    var me = this.getMe();
+    var source = (me.name || "").trim();
+    if (source) {
+      var parts = source.split(/\s+/).filter(Boolean);
+      var first = parts[0] ? parts[0][0] : "";
+      var last = parts.length > 1 ? parts[parts.length - 1][0] : "";
+      return (first + last).toUpperCase();
+    }
+    var word = this.firstName();
+    return word ? word.slice(0, 1).toUpperCase() : "S";
+  },
+
+  // Recent downloads are per-account, not per-device: two
   // accounts sharing a browser must never see each other's data. The JWT's
   // "sub" claim (the account's generated username, e.g. "john2") is decoded
   // client-side and used purely as a storage key namespace — never as an
@@ -123,9 +186,10 @@ var Zafar = {
       return "anon";
     }
   },
-  // One-time migration: the first version of this app stored bookmarks and
-  // downloads under one shared key for every account on the device. Each key
-  // is looked at once per page, not on every read.
+  // One-time migration: the first version of this app stored downloads under
+  // one shared key for every account on the device. Each key is looked at once
+  // per page, not on every read. (Bookmarks are gone; a phone still holding
+  // the old list simply never reads that key again.)
   _migrated: {},
   _migrateLegacyKey: function (legacyKey, scopedKey) {
     if (this._migrated[legacyKey]) return;
@@ -137,29 +201,6 @@ var Zafar = {
     localStorage.removeItem(legacyKey);
   },
 
-  /* ---------- Favorites ---------------------------------------------- */
-  getBookmarks: function () {
-    var scopedKey = this.BOOKMARKS_KEY + "_" + this._currentUserSuffix();
-    this._migrateLegacyKey(this.BOOKMARKS_KEY, scopedKey);
-    try {
-      return JSON.parse(localStorage.getItem(scopedKey) || "[]");
-    } catch (e) {
-      return [];
-    }
-  },
-  setBookmarks: function (ids) {
-    var scopedKey = this.BOOKMARKS_KEY + "_" + this._currentUserSuffix();
-    localStorage.setItem(scopedKey, JSON.stringify(ids));
-    this.updateFavCountPill();
-  },
-  updateFavCountPill: function () {
-    var count = this.getBookmarks().length;
-    document.querySelectorAll("[data-fav-count]").forEach(function (pill) {
-      pill.textContent = String(count);
-      pill.style.display = count > 0 ? "inline-flex" : "none";
-    });
-  },
-
   /* ---------- Recent downloads (local history) ------------------------ */
   recordDownload: function (item) {
     var list = this.getRecentDownloads();
@@ -167,6 +208,7 @@ var Zafar = {
       id: item.id || "",
       name: item.name || "Document",
       category: item.category || "",
+      section: item.section || "",
       at: new Date().toISOString(),
     });
     if (list.length > this.RECENT_DOWNLOADS_MAX) list = list.slice(0, this.RECENT_DOWNLOADS_MAX);

@@ -14,13 +14,16 @@ web/                     static frontend (no build step, no framework)
   books.html             textbooks
   notes.html             summary notes
   marking-keys.html      marking keys
-  favorites.html         saved documents, across every section
+  downloads.html         what has been downloaded on this phone
+  settings.html          the account, the data kept here, password reset
   help.html              FAQ, and the form that asks for a missing file
+  admin.html             the owner/editor portal (noindex, not linked publicly)
   favicon.ico            the tab icon, three sizes in one file
   robots.txt             what a crawler may read: the icons, not the shelves
   assets/img/icon-*.png  the mark at every size a browser or a search engine
                          asks for (drawn by tools/make-icons.py)
   assets/css/app.css     the signed-in app — same system as auth.css
+  assets/css/admin.css   the portal, phone-first: rows become cards under 720px
   assets/css/auth.css    the authentication screen — self-contained, so the
                          app stylesheet can be re-skinned without touching it
   assets/fonts/…         Instrument Sans, 29 KB variable (the only webfont)
@@ -28,17 +31,17 @@ web/                     static frontend (no build step, no framework)
   assets/img/icon-*.png  the same mark rasterised for a home screen: 192, 512,
                          a 512 maskable, and a 180 apple-touch icon
   manifest.webmanifest   name, colours and icons for "Add to Home Screen"
-  assets/js/config.js    API client, token storage, favorites, formatting
+  assets/js/config.js    API client, token storage, the signed-in profile, formatting
   assets/js/i18n.js      the English string table for the signed-in app
-  assets/js/shell.js     top bar + bottom tabs + toasts
+  assets/js/shell.js     bar + drawer + four tabs + allowance sheet + toasts
   assets/js/list.js      the shared document-list page
   assets/js/auth.js      sign in / create account / verify
 server.js                zero-dependency static server for local development
 worker.js                Cloudflare Worker that signs + streams Drive downloads
 ```
 
-The bar and the bottom tabs are rendered once from `shell.js`, and every list
-page (papers, books, notes, marking keys, favorites) is one call to
+The bar, the drawer and the bottom tabs are rendered once from `shell.js`, and
+every list page (books, past papers, notes, marking keys) is one call to
 `ZafarList.init({...})` — so a change to a card or a filter lands everywhere.
 Likewise `auth.js` builds the whole sign-in screen, and `login.html`,
 `register.html` and `verify.html` are 20-line shells that differ only in which
@@ -85,13 +88,51 @@ so a shade that "looks fine" on a desk cannot quietly become 4:1 in daylight.
 The one amber thing on the page is the word FREE in the footer: an accent is for
 a highlight, not for anything a student needs in order to sign in.
 
-**The signed-in app** (`app.css`) is the same system, built the same way. A
-teal bar carries the wordmark, the page title, the day's download allowance and
-a running count; the white sheet carries the catalogue; five tabs pinned to the
-bottom hold the sections (Past Papers, Books, Notes, Marking Keys, Favorites).
-There is no sidebar and no drawer — categories are chips that scroll sideways
-on the list pages, and Help sits in the bar with its word on it next to an
-icon-only Log out.
+**The signed-in app** (`app.css`) is the same system, built the same way, and
+it is the same on a phone as on a desk: the column keeps its 470px width and
+centres itself. The bar is two lines and nothing else — an avatar with *Hi,
+Priam* beside it on the left, Help on the right, then *Library / Books* with the
+day's allowance beside it. Tapping the avatar opens the drawer: a profile card
+(full name, the address you signed in with), the four sections, **My
+Downloads**, **Settings**, **Help**, and **Log out** in soft red at the bottom
+behind a confirmation. The drawer closes on the overlay, on Escape, on a link,
+and on a rightward swipe of the panel itself.
+
+The bar shrinks by a few pixels once the list is scrolling — not a fixed height
+that jumps: the padding, the avatar and the title each step down, so reading
+costs less chrome. There is no band above it in the installed app either; the
+only space up there is `env(safe-area-inset-top)`, which is zero unless the
+phone has a notch.
+
+**Four tabs, solid white, 24px icons.** Books, Past Papers, Notes, Marking Keys
+— in that order, Books first, because that is where signing in lands. Four is
+what lets *Marking Keys* stay on one line at 360px. The bar is `#FFF` with one
+hairline on top and no blur or translucent wash behind it (that wash is what
+made the icons look soft), every icon is exactly 24×24 on the same 24-unit grid
+with `shape-rendering="geometricPrecision"`, inactive icons are solid `--muted`
+teal-grey rather than teal at 70%, and the active tab is a filled mint pill with
+a bolder label. Each tab is a 56px-tall target plus
+`env(safe-area-inset-bottom)` of padding, so it clears the gesture bar.
+
+**Favorites is gone.** The tab, the heart on each card and the count are
+removed. A file a student wants again is in **My Downloads** in the drawer —
+the list the app already kept per account on the phone — which links back to
+the shelf each document came from. `favorites.html` no longer exists; nothing
+in the app can reach it.
+
+**My Downloads** (`downloads.html`) is that list, in full: newest first, with
+the folder it came from, the day, and a *Find it again* button that opens the
+shelf it belongs to with the title already in the search box. It is kept in
+`localStorage` under the account's own namespace, so two people sharing a
+handset never see each other's, and clearing it deletes the list, not the
+files. The page says so.
+
+**Settings** (`settings.html`) holds only what is true: the name and address
+the sign-in established (the API has no student profile route, so these are
+display values from the form or from Google's ID token, never an authorization
+decision), how many downloads the phone is remembering, a way to clear that,
+and a link to the password reset flow. There are no invented toggles: a
+preference the backend cannot store is a lie with a switch on it.
 
 **Two ways in.** The sign-in card leads with *Continue with Google* — one tap
 instead of typing an address and a password on a phone — then an `or` rule, then
@@ -134,9 +175,9 @@ the same subject, not a sixth section. Secondary asks the server for
 allowance (`quotaKey` stays `papers`), so Primary never opens a second bucket
 to spend. Switching reloads the folder chips for that shelf and starts again at
 the first page, because a Secondary folder would filter Primary to nothing. The
-choice is written to `?section=` so a link or the back button returns to it, and
-Favorites reads `primary` as well, so a saved Primary paper is listed under
-*Primary* and downloaded with `section=primary`.
+choice is written to `?section=` so a link or the back button returns to it,
+and a card on the Primary shelf downloads with `section=primary`, so the papers
+allowance is charged once and correctly.
 
 **The catalogue is read one page at a time.** The first request asks for
 `limit=50&offset=0` — the backend's default page — and nothing else is fetched
@@ -147,8 +188,8 @@ replaced. A page shorter than 50 is the end of the shelf; a full page that
 brings no new ids means the server ignored `offset`, so the page stops there
 rather than asking forever. Changing the switch, the search or the category
 throws the offsets and the rows away and starts at `offset=0` again. Answers
-are kept for one minute per exact view (`section|category|q`), so starring a
-favourite or repeating a search costs no request.
+are kept for one minute per exact view (`section|category|q`), so going back to
+the same search costs no request.
 
 **The count is the library's, not the page's.** Fifty cards on screen must not
 mean "50 results", so the size of the whole answer arrives beside the page in an
@@ -158,18 +199,45 @@ arrive. It is the count **after** the section, category and `q` filters and
 **before** the page is cut out of the answer, so it also follows a search. The
 same header lets the page know it has reached the end without spending a request
 on an empty page. Until a backend sends it, the count grows with the pages and
-is written `50+` — a floor, never a claim that the list ends at fifty. Favorites
-counts its own saved list, which lives on the phone, so `12 saved` is exact with
-no page needed; with a search or a category on it counts what it has read and
-says `12+ saved`. The backend change this needs is written out in
+is written `50+` — a floor, never a claim that the list ends at fifty. The
+backend change this needs is written out in
 `docs/backend-prompt-results-total.md`.
 
-Glyphs are near-black ink (`--ink`) on the light surfaces — files, hearts,
-search, tabs — while teal is kept for text, headers and the filled download
-button. Each page carries a one-line description under its title.
+Glyphs are one family — the same 24-unit grid and 1.8 stroke in the bar, the
+drawer, the cards and the states — and every size is a whole pixel, because a
+23.5px icon lands on a half pixel and the phone blurs it to hide it. Cards are
+16px radius on white with one soft shadow, 16px of padding and 12px between
+parts; teal is the only accent, the neutrals are warm, and every control is at
+least 44px in its smaller dimension.
 
-The allowance chip sits beside the title so it stays visible while the
-catalogue scrolls. Each section has its **own** allowance, and the chip reports
+The allowance pill sits beside the page title so it stays visible while the
+catalogue scrolls, and it reads as a sentence rather than a counter: **3 books
+left today**, **1 note left today**, **0 marking keys left · resets at
+midnight**. The number is always the server's — `left` and `limit` both come
+from `/auth/quota`, and a page that is told neither shows no pill at all rather
+than quoting a policy the backend may not keep. Three or two left is teal, one
+is amber, none is muted red; tapping the pill opens a small sheet that says how
+many you get a day, how many are left, and that the allowance starts again at
+**02:00 in Malawi (00:00 UTC)**.
+
+At zero the pill is not the only signal: every *Download* button on the page
+becomes *Limit reached* and stops accepting taps — `aria-disabled`, not
+`disabled`, so a screen reader still finds it and a tap still opens the sheet
+that explains why. The buttons keep their size and place; hiding them would
+move the page under a thumb already reaching for one. The same check runs
+before the request whenever the stored count says zero, because an unconfirmed
+reservation or the refill can have freed a place since the answer arrived.
+
+**Re-downloads still cost a place.** The requirement was that downloading a
+file you already have should not count against the limit. The backend cannot do
+that today: `/drive/download/{id}` inserts a `download_logs` row after counting
+today's rows for `(user_id, category)` with no `file_id` in the condition, so a
+second copy of the same book is charged exactly like the first. The app
+therefore charges it, and counts it, honestly — a client-side "already
+downloaded" exemption would desynchronise the pill from the server's own
+numbers. Making it free is a backend change (add `file_id NOT IN (...)` to the
+counting condition, or dedupe on confirm); until then the app says what is
+true. Each section has its **own** allowance, and the chip reports
 the one for the page you are on: **10 papers, 3 books, 3 notes, 10 marking
 keys** a day, each on its own UTC day. `QUOTA_FIELD` in `config.js` maps a page
 to the field prefix its numbers live under — the `marking-keys` section reads
@@ -200,16 +268,14 @@ not five minutes after we hear about it, so no local timer can know when the
 answer changed: whenever the stored count says zero, the next tap asks
 `/auth/quota` again and proceeds if the server has moved on. If that check
 cannot reach the server, the page says so ("couldn't check your downloads") and
-does not dress the failure up as a refusal. Favorites has no allowance of its
-own, so a refusal there is a toast and nothing else — no amber chip, and no
-notice whose button leads back to the page you are on. It still spends the
-right one: every card carries the section its document came from, so a saved
-note is charged to notes rather than to the papers the page is nominally
-about.
+does not dress the failure up as a refusal. Every card carries the shelf it
+came from, so its download is charged to that shelf's allowance — a Primary
+paper to papers, a note to notes — never to whichever page happens to be
+nominally on screen.
 
-Cards keep the same discipline as the auth screen: one hairline, no shadow, a
-mint tile for the file mark, the title, a category chip, then size and a single
-pill CTA. List view collapses the same card to one row. States (empty, error,
+Cards keep the same discipline as the auth screen — one accent, one hairline,
+one shadow — with a mint tile for the file mark, the title, a category chip,
+then size and a single pill CTA. List view collapses the same card to one row. States (empty, error,
 offline) and the skeleton loader are shared, so every section fails the same
 way and loads the same way.
 
@@ -402,11 +468,21 @@ users and their sign-in method, the numbers, the queue of "this paper is
 missing" and "this file is broken", site settings, roles and the audit log, and
 the operational state of the deployment — storage, backups, exports.
 
+**It is built for a phone first**, like everything else here: the people who run
+StudyMW do it on the same handset the students use. The bar and the section tabs
+are sticky, the tabs scroll sideways with a fade at the edge instead of being
+squeezed to five unreadable words, and below 720px every table row becomes its
+own card — the column name sits beside the value, taken from the cell's own
+`data-label`, so adding a column needs no new CSS. Nothing depends on hover;
+every control is at least 44px; the dense KPI grid folds to two columns.
+
 It is `noindex` in its own `<meta>`, `Disallow: /admin` in `robots.txt`, and
 `_headers` sends `X-Robots-Tag` for anything that asks anyway. There is no link
 to it on any student page: the bar shows an **Admin** button only after
 `GET /admin/whoami` has answered with a role for the account that is signed in,
-which is one request per browser session and a `403` for everyone else.
+which is one request per browser session and a `403` for everyone else. That
+button lives in the drawer, next to Help — the bar has exactly one button and it
+is Help.
 
 ### Getting in the first time
 
@@ -479,30 +555,25 @@ so the backend can be built against it without another round of guessing.
 
 ## What students can send back
 
-Two forms, and they are deliberately different things:
+**A request** — "this paper is not in the library". The Help page
+(`help.html#request`) posts `POST /requests` with the library folder the file
+belongs in (`papers`, `primary`, `books`, `notes`, `marking-keys`), a title and
+an optional note. The FAQ answer that mentions missing papers links straight to
+the form. It carries the ordinary student bearer token: the submission belongs
+to the account that sent it, and a `401` sends the student to sign in rather
+than showing an error. The caps match the API's own (`title` 160, `note` 2000),
+and the limit is per account — 3 requests per 10 minutes. The `429` arrives
+with `Retry-After` and the page says "Try again in 2 minutes" instead of
+repeating the server's sentence.
 
-- **A request** — "this paper is not in the library". The Help page
-  (`help.html#request`) posts `POST /requests` with the library folder the file
-  belongs in (`papers`, `primary`, `books`, `notes`, `marking-keys`), a title and
-  an optional note. The FAQ answer that mentions missing papers links straight
-  to the form.
-- **A report** — "this file is broken". Every catalogue card carries an alert
-  button that opens a small dialog on the same page, then posts `POST /reports`
-  with the file's own id, one of five reasons and an optional note. It starts at
-  the card because a report has to name a real file, and the id exists nowhere
-  else on the page; the API looks the file name up in the live library itself,
-  so no name, email or id the client invents can reach the queue. "Something
-  else" cannot be sent without a note, or the row is useless to an editor.
-
-Both carry the ordinary student bearer token: the submission belongs to the
-account that sent it, and a `401` sends the student to sign in rather than
-showing an error. Caps match the API's own (`title` 160, `note` 2000, both
-`extra="forbid"`), and the rate limits are per account — 3 requests and 5
-reports per 10 minutes. The `429` arrives with `Retry-After` and the page says
-"Try again in 2 minutes" instead of repeating the server's sentence. A report
-for a file the library no longer has comes back `404 report_file_missing`, and
-the dialog asks for a refresh rather than a pointless retry. The portal side of
-both queues is in `docs/admin-portal.md`.
+**Reports have no entry point at the moment.** `POST /reports` is live on the
+backend and `Zafar.submitReport` still binds it, but the app no longer offers
+it: the alert button on each card was removed by request, together with its
+dialog, and a report has to carry the id of a real file — which only the card
+could supply. There is no honest way to ask a student for one by typing it. If
+reporting comes back it should come back as a "Something wrong with this file?"
+row inside **My Downloads**, where the id is already stored, or as a picker on
+the Help page. The portal side of the queue is in `docs/admin-portal.md`.
 
 ## Downloads
 

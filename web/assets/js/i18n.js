@@ -11,8 +11,64 @@ var ZafarI18n = (function () {
     nav: {
       library: "Library", pastPapers: "Past Papers",
       books: "Books", notes: "Notes", markingKeys: "Marking Keys",
-favorites: "Favorites", support: "Support", help: "Help & FAQ",
+      myDownloads: "My Downloads", settings: "Settings", admin: "Admin portal",
+      support: "Support", help: "Help & FAQ",
       studyLibrary: "Study library", logOut: "Log out",
+    },
+
+    downloads: {
+      count: function (n) { return n + (n === 1 ? " document" : " documents"); },
+      emptyTitle: "Nothing downloaded yet",
+      emptyBody: "Every document you download on this phone is listed here, so you can find it again quickly.",
+      browseBooks: "Browse Books",
+      find: "Find it again",
+      note: "This list is kept on this phone, for this account only. Clearing it does not delete the files you already have.",
+      clear: "Clear this list",
+      cleared: "List cleared",
+    },
+
+    settings: {
+      subtitle: "Your account",
+      account: "Account",
+      name: "Name",
+      email: "Signed in as",
+      emailUnknown: "Not known on this phone",
+      accountNote: "Your name and address come from how you signed in. To use a different account, log out and sign in again.",
+      data: "Kept on this phone",
+      history: "Download history",
+      dataNote: "StudyMW keeps no library pages offline. The only thing stored here is the list of files you have downloaded, used by My Downloads.",
+      clearHistory: "Clear history",
+      password: "Password",
+      passwordNote: "Send yourself a reset link from the sign-in page. It arrives by email and works for fifteen minutes.",
+      resetPassword: "Reset my password",
+      about: "About StudyMW",
+      aboutNote: "MSCE and JCE past papers, marking keys, textbooks and notes for Malawi secondary school learners.",
+    },
+
+    /* ---------- The frame around every page ---------- */
+    shell: {
+      greeting: function (name) { return "Hi, " + name; },
+      greetingNobody: "Hi there",
+      student: "Student",
+      noEmail: "Signed in",
+      menu: "Menu",
+      sections: "Sections",
+      logOut: "Log out",
+      logOutTitle: "Log out?",
+      logOutBody: "You will need your password, and the code from your authenticator if you have one, to sign back in.",
+      cancel: "Cancel",
+      gotIt: "Got it",
+      // The allowance pill and the sheet behind it. The numbers and the noun
+      // are filled in per section by the list page, from /auth/quota.
+      quotaTitle: "Your daily allowance",
+      quotaReset: "Every allowance starts again at 02:00 in Malawi (00:00 UTC).",
+      quotaBody: function (left, cap, noun) {
+        if (left === 0) {
+          return "You get " + cap + " " + noun + " a day, and today's are used up.";
+        }
+        return "You get " + cap + " " + noun + " a day. Today you have " + left + " left. " +
+          "A download uses one, and an interrupted one gives it back within a few minutes.";
+      },
     },
     pages: {
       papers:    { title: "Past Papers", crumb: "Library", itemLabel: "paper",
@@ -20,16 +76,12 @@ favorites: "Favorites", support: "Support", help: "Help & FAQ",
                    levels: [
                      { key: "papers", label: "Secondary" },
                      { key: "primary", label: "Primary" },
-                   ],
-                   searchPlaceholder: "Search past papers by subject or year…" },
-      books:     { title: "Books", crumb: "Library", itemLabel: "book",
-                   searchPlaceholder: "Search textbooks by title or form…" },
-      notes:     { title: "Notes", crumb: "Library", itemLabel: "note",
-                   searchPlaceholder: "Search notes by subject…" },
-      keys:      { title: "Marking Keys", crumb: "Library", itemLabel: "marking key",
-                   searchPlaceholder: "Search marking keys by subject or year…" },
-      favorites: { title: "Favorites", crumb: "Yours", itemLabel: "favorite",
-                   searchPlaceholder: "Search your favorites…" },
+                   ] },
+      books:     { title: "Books", crumb: "Library", itemLabel: "book" },
+      notes:     { title: "Notes", crumb: "Library", itemLabel: "note" },
+      keys:      { title: "Marking Keys", crumb: "Library", itemLabel: "marking key" },
+      downloads: { title: "My Downloads", crumb: "Yours" },
+      settings:  { title: "Settings", crumb: "Yours" },
       help:      { title: "Help & FAQ", crumb: "Support" },
     },
     list: {
@@ -47,7 +99,33 @@ favorites: "Favorites", support: "Support", help: "Help & FAQ",
       },
       sortNameAsc: "Name A–Z", sortNameDesc: "Name Z–A",
       sortSizeDesc: "Largest first", sortSizeAsc: "Smallest first",
-      downloadsLeft: function (left, cap) { return left + " of " + cap + " left"; },
+      // The pill in the bar and the sentence it shortens. "3 books left
+      // today" answers what, how many and when — "3 of 3 left" answers none of
+      // those. The noun comes from the section's own table.
+      leftToday: function (count, section) {
+        var name = count === 1 ? T.list.unitOne[section] : T.list.unit[section];
+        return count + " " + (name || "downloads") + " left today";
+      },
+      noneLeft: function (section) {
+        var name = T.list.unit[section];
+        return "0" + " " + (name || "downloads") + " left · resets at midnight";
+      },
+      // Singular and plural of one downloaded thing, per section.
+      unit: {
+        papers: "papers",
+        books: "books",
+        notes: "notes",
+        "marking-keys": "marking keys",
+      },
+      unitOne: {
+        papers: "paper",
+        books: "book",
+        notes: "note",
+        "marking-keys": "marking key",
+      },
+      searchPlaceholder: "Search…",
+      searchPlaceholderAria: "Search the library",
+      downloading: "Downloading…",
       // Four independent allowances — papers, books, notes, marking keys — so
       // the notice names the one that ran out and says what is still there in
       // the others. Nothing says "tomorrow": the refill is 00:00 UTC, which is
@@ -89,16 +167,9 @@ favorites: "Favorites", support: "Support", help: "Help & FAQ",
         notes: "note",
         "marking-keys": "marking key",
       },
-      openFavorites: "Open Favorites",
-      // The chip is narrow: name the section, but in three or four words.
-      limitReached: function (section) {
-        var name = T.list.sectionName[section];
-        return name ? "No " + name + " left" : "No downloads left";
-      },
-      downloadsLeftLabel: function (left, section) {
-        var name = left === 1 ? T.list.sectionOne[section] : T.list.sectionName[section];
-        return "You can download " + left + " more " + (name || "files") + " today.";
-      },
+      // The button's label once the allowance is spent. Short enough for a
+      // 104px button, plain enough to be understood without the pill.
+      limitReached: "Limit reached",
       limitUnavailable: "Limit unavailable",
       // The check itself failed: say that, rather than report a refusal the
       // server never gave.
@@ -106,7 +177,7 @@ favorites: "Favorites", support: "Support", help: "Help & FAQ",
       partialResults: "Some sections couldn't load",
       partialTitle: "Some sections didn't load",
       partialBody: "Part of the library couldn't be reached, so this list may be missing " +
-        "documents — including saved ones. Try again in a moment.",
+        "documents. Try again in a moment.",
       sortLabel: "Sort",
       clearAll: "Clear all",
       clearSearch: "Clear search",
@@ -114,27 +185,21 @@ favorites: "Favorites", support: "Support", help: "Help & FAQ",
       loadError: "Something went wrong reaching the library.",
       tryAgain: "Try again",
       offlineTitle: "You're offline",
-      offlineBody: "Check your connection and try again — saved favorites still work.",
+      offlineBody: "Check your connection and try again.",
       noMatchesTitle: "No matches",
       noMatchesBody: "Nothing matches these filters — try clearing the search or category.",
       emptySectionTitle: "Nothing here yet",
       emptySectionBody: function (item) { return "No " + item + "s have been published to this section."; },
-      noFavoritesTitle: "No favorites yet",
-      noFavoritesBody: "Tap the heart on any document to keep it here for quick access.",
       results: function (n) { return n + " result" + (Number(n) === 1 ? "" : "s"); },
-      savedCount: function (n) { return n + " saved"; },
       // Until the server sends the size of the whole answer, the page can only
       // say how many it has: "50+" is a floor, "50 results" would be a lie.
       resultsAtLeast: function (n) { return n + "+ result" + (Number(n) === 1 ? "" : "s"); },
-      savedAtLeast: function (n) { return n + "+ saved"; },
       loading: "Loading…",
       // Shown when the catalogue is being retried: a first visit can start a
       // full scan of the library on the server, and silence for that long
       // reads as a broken page.
       loadingSlow: "Still loading — the first visit takes a moment.",
       offline: "Offline",
-      savedToFavorites: "Saved to favorites",
-      removedFromFavorites: "Removed from favorites",
       noInternet: "No internet connection",
       backOnline: "Back online",
       downloadStarted: "Download started",
@@ -183,16 +248,18 @@ favorites: "Favorites", support: "Support", help: "Help & FAQ",
              "few downloads each day, counted <b>separately for each section</b> — the " +
              "<b>Daily downloads</b> table above shows the numbers. Downloading a paper never uses " +
              "up a book, and a note never uses up a paper.</p>" +
-             "<p>If one section is finished, tap the heart to save what you need in Favorites, then " +
-             "come back later. The other sections still have their own downloads. Every limit starts " +
-             "again at <b>02:00 in Malawi</b> (00:00 UTC).</p>" },
+             "<p>When one section is finished, the pill at the top of that page says how many are " +
+             "left, and tapping it explains when they come back. The other sections still have their " +
+             "own downloads. Every limit starts again at <b>02:00 in Malawi</b> (00:00 UTC).</p>" },
         { id: "download", q: "A download didn't start — what now?",
           a: "<p>Downloads are prepared on demand: the app asks the server for a short-lived signed link, then " +
              "fetches the file and hands it to your browser. If that link expires before the file finishes, just " +
              "press <b>Download</b> again — an unfinished download doesn't count against your daily limit.</p>" },
-        { id: "favorites", q: "Where are my favorites stored?",
-          a: "<p>Favorites are saved against your account name in this browser, so two people sharing a device " +
-             "never see each other's list. Clearing your browser storage clears them.</p>" },
+        { id: "downloads-list", q: "Where do I find something I downloaded before?",
+          a: "<p>Open the menu (tap your name at the top) and choose <b>My Downloads</b>. It lists the " +
+             "documents you have downloaded on this phone, newest first, with a link back to the shelf each " +
+             "one came from. The list is kept on this phone and belongs to your account alone, so two people " +
+             "sharing it never see each other's.</p>" },
         { id: "password", q: "I forgot my password.",
           a: "<p>Self-service reset is coming — the sign-in screen already has the flow, but the server side " +
              "isn't live yet. In the meantime, message the StudyMW admin from the email address on your account " +
@@ -205,10 +272,10 @@ favorites: "Favorites", support: "Support", help: "Help & FAQ",
     },
 
     /* ---------- What a student can send us ----------
-       Two different things, deliberately two forms: asking for a file that is
-       not here yet, and telling us one that is here does not work. The second
-       one starts from the file's own card, because a report has to carry the
-       id of a real file — a typed-in name could be anything. */
+       Asking for a file that is not here yet: POST /requests, sent from the
+       Help page. Reports (POST /reports) have no entry point in the app at the
+       moment — the "!" control on each card was removed, and a report has to
+       carry the id of a real file, which only the card could supply. */
     support: {
       requestTitle: "Request a paper, book or notes",
       requestBody:

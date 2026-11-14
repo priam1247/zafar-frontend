@@ -455,6 +455,22 @@ var ZafarAuth = (function () {
     return googleEnabled(window.GOOGLE_CLIENT_ID);
   }
 
+  // Google hands the browser a signed ID token (a JWT) whose middle segment is
+  // the account it vouched for. Reading it here is not verification — the
+  // server verifies the signature on POST /auth/google — it is only so the app
+  // can greet the student by name afterwards. If the segment will not decode,
+  // the greeting falls back to the address, and then to nothing.
+  function googleProfile(credential) {
+    try {
+      var payload = String(credential).split(".")[1].replace(/-/g, "+").replace(/_/g, "/");
+      while (payload.length % 4) payload += "=";
+      var claims = JSON.parse(decodeURIComponent(escape(atob(payload))));
+      return { name: claims.name || "", email: claims.email || "" };
+    } catch (e) {
+      return {};
+    }
+  }
+
   function googleNote(text, kind) {
     var note = el("googleNote");
     if (!note) return;
@@ -486,7 +502,11 @@ var ZafarAuth = (function () {
         }
         forgetAdminHint();
         Zafar.setToken(data.access_token, remember !== false);
-        location.href = "dashboard.html";
+        // Google's ID token is the only place a student's name exists, and the
+        // greeting has nowhere else to get it. Display only: the role the API
+        // enforces comes from the account, never from this.
+        Zafar.setMe(googleProfile(credential));
+        location.href = Zafar.HOME;
       },
       function (err) {
         if (zone) zone.classList.remove("is-busy");
@@ -863,7 +883,10 @@ var ZafarAuth = (function () {
           .then(function (data) {
             forgetAdminHint();
             Zafar.setToken(data.access_token, el("staySignedIn").checked);
-            location.href = "dashboard.html";
+            // The API returns no profile, so the address from the form is the
+            // one fact we have about who this is.
+            Zafar.setMe({ email: email });
+            location.href = Zafar.HOME;
           })
           .catch(function (err) {
             busy(false, t.continueBtn);
@@ -1111,7 +1134,7 @@ var ZafarAuth = (function () {
       // Already signed in and landing on the sign-in page? Skip the form.
       // register.html stays reachable so a second account can be made.
       if (page === "login" && Zafar.getToken() && !params.get("switch") && !params.get("verified")) {
-        location.replace("dashboard.html");
+        location.replace(Zafar.HOME);
       }
     }
   }

@@ -822,6 +822,11 @@ test("the public config is fetched once per session", async () => {
 
 /* ---------- 8e4. what a student can send us ---------- */
 
+// Only one form now: asking for a file that is missing. The "!" control that
+// reported a broken file lived on each card and was removed by request; with
+// it went the dialog, and the card's own id went with them, which is what a
+// report needs (see README). */
+
 function studentSite(hooks) {
   const extra = hooks || {};
   return openPage(extra.path || "/dashboard.html", {
@@ -845,141 +850,6 @@ function studentSite(hooks) {
     },
   });
 }
-
-test("a broken file is reported from its own card, with its id", async () => {
-  const posts = [];
-  const dom = await studentSite({
-    onPost: (u, init) => {
-      if (!/\/reports$/.test(u.pathname)) return reply({});
-      posts.push({ body: JSON.parse(String(init.body || "{}")), auth: init.headers && init.headers.Authorization });
-      return reply({ id: 1 }, 201);
-    },
-  });
-  await wait(900);
-  const w = dom.window;
-  const d = w.document;
-
-  const trigger = d.querySelector("[data-report]");
-  assert.ok(trigger, "the card offers a way to report it");
-  assert.equal(trigger.getAttribute("data-report"), "p1", "and carries the file's id");
-  assert.match(trigger.getAttribute("aria-label"), /Report a problem with this file: MSCE Chemistry 2024\.pdf/);
-
-  trigger.click();
-  const modal = d.querySelector("[data-report-modal]");
-  assert.equal(modal.hidden, false, "the dialog opens over the list");
-  assert.match(d.querySelector("[data-report-file]").textContent, /MSCE Chemistry 2024\.pdf/,
-    "and names the file being reported");
-  assert.equal(d.activeElement, d.querySelector("#report-reason"), "focus moves into the dialog");
-  assert.equal(d.querySelector("#report-note").getAttribute("maxlength"), "2000",
-    "the note cap is the API's, not a smaller guess");
-  assert.equal(modal.querySelector(".modal-card").getAttribute("aria-modal"), "true");
-
-  d.querySelector("#report-reason").value = "Pages are missing or blank";
-  d.querySelector("#report-note").value = "page 4 is blank";
-  submit(w, d.querySelector("[data-report-form]"));
-  await wait(400);
-
-  assert.equal(posts.length, 1, "one report, not one per click");
-  assert.deepEqual(posts[0].body, {
-    file_id: "p1",
-    reason: "Pages are missing or blank",
-    note: "page 4 is blank",
-  }, "the id and the reason, and only the note that was typed");
-  assert.match(posts[0].auth, /^Bearer /, "sent as the signed-in account");
-
-  assert.equal(d.querySelector("[data-report-done]").hidden, false, "it says it arrived");
-  assert.equal(d.querySelector("[data-report-form]").hidden, true);
-
-  // Closing puts the keyboard back where the person left it.
-  d.querySelector("[data-report-done] [data-report-close]").click();
-  assert.equal(modal.hidden, true);
-  assert.equal(d.activeElement, trigger);
-  assert.equal(posts.length, 1, "closing sends nothing");
-  dom.window.close();
-});
-
-test("\u201csomething else\u201d cannot be sent without saying what", async () => {
-  const posts = [];
-  const dom = await studentSite({
-    onPost: (u, init) => {
-      if (!/\/reports$/.test(u.pathname)) return reply({});
-      posts.push(JSON.parse(String(init.body || "{}")));
-      return reply({ id: 1 }, 201);
-    },
-  });
-  await wait(900);
-  const w = dom.window;
-  const d = w.document;
-
-  d.querySelector("[data-report]").click();
-  d.querySelector("#report-reason").value = "Something else";
-  submit(w, d.querySelector("[data-report-form]"));
-  await wait(300);
-
-  assert.equal(posts.length, 0, "an editor gets no unreadable row");
-  assert.match(d.querySelector("[data-report-error]").textContent, /detail box/i);
-  assert.equal(d.activeElement, d.querySelector("#report-note"), "and the cursor is where the answer goes");
-
-  d.querySelector("#report-note").value = "The file downloads as a photo instead of a PDF";
-  submit(w, d.querySelector("[data-report-form]"));
-  await wait(300);
-
-  assert.equal(posts.length, 1);
-  assert.equal(posts[0].reason, "Something else");
-  assert.equal(posts[0].note, "The file downloads as a photo instead of a PDF");
-  dom.window.close();
-});
-
-test("a report for a file the library no longer has does not say \u201ctry again\u201d", async () => {
-  const dom = await studentSite({
-    onPost: (u) => {
-      if (!/\/reports$/.test(u.pathname)) return reply({});
-      // routers/intake.py: the id is looked up in the live library, and a
-      // removed file is a 404 with its own code, not a transient failure.
-      return reply({ detail: "The reported file is not in the current library" }, 404, {
-        "X-Error-Code": "report_file_missing",
-      });
-    },
-  });
-  await wait(900);
-  const w = dom.window;
-  const d = w.document;
-
-  d.querySelector("[data-report]").click();
-  submit(w, d.querySelector("[data-report-form]"));
-  await wait(400);
-
-  const error = d.querySelector("[data-report-error]").textContent;
-  assert.match(error, /no longer in the library/i, error);
-  assert.match(error, /Refresh the page/i, "and says what to do instead of retrying");
-  assert.doesNotMatch(error, /try again in a moment/i, "a retry would fail the same way");
-  dom.window.close();
-});
-
-test("a report the API refuses says why in words a student can act on", async () => {
-  const dom = await studentSite({
-    onPost: (u) => {
-      if (!/\/reports$/.test(u.pathname)) return reply({});
-      // Per-account rate limit: the backend sends Retry-After with the 429.
-      return reply({ detail: "Too many reports" }, 429, { "Retry-After": "90" });
-    },
-  });
-  await wait(900);
-  const w = dom.window;
-  const d = w.document;
-
-  d.querySelector("[data-report]").click();
-  submit(w, d.querySelector("[data-report-form]"));
-  await wait(400);
-
-  const error = d.querySelector("[data-report-error]");
-  assert.equal(error.hidden, false);
-  assert.match(error.textContent, /Try again in 2 minutes/, error.textContent);
-  assert.doesNotMatch(error.textContent, /Too many reports/, "no server wording on screen");
-  assert.equal(d.querySelector("[data-report-form]").hidden, false, "the form stays, with the answer in it");
-  assert.equal(d.querySelector("[data-report-send]").disabled, false, "and can be sent again");
-  dom.window.close();
-});
 
 test("a request for a missing file goes to the queue, not to an inbox", async () => {
   const posts = [];
@@ -1189,6 +1059,14 @@ test("the users table is real, and suspending posts the right thing", async () =
   assert.match(view, /Suspended/, "so is a suspended account");
   assert.match(view, /1\u20132 of 2/, "and the page count comes from X-Total-Count");
 
+  // On a phone the header row is not beside the values any more: every cell
+  // carries its own column name, which is what the stacked layout shows.
+  const firstRow = d.querySelector("#view table tbody tr");
+  const labels = [...firstRow.querySelectorAll("td")].map((td) => td.getAttribute("data-label"));
+  assert.ok(labels.includes("Account"), "cells carry their column name: " + labels.join(", "));
+  assert.ok(labels.includes("Status"), "including the one that is a badge");
+  assert.equal(labels.length, firstRow.querySelectorAll("td").length);
+
   // Suspend is a POST with a boolean, on the account's own path.
   d.querySelector('[data-action="suspend"][data-id="1"]').dispatchEvent(new dom.window.MouseEvent("click", { bubbles: true }));
   await wait(400);
@@ -1358,7 +1236,8 @@ test("Primary swaps the shelf, not the allowance", async () => {
   assert.match(papers()[0], /section=papers/);
   assert.match(papers()[0], /limit=50/);
   const papersLeft = d.querySelector("[data-quota-text]").textContent;
-  assert.match(papersLeft, /10 of 10/);
+  // The pill names the section and the day, from the server's own numbers.
+  assert.equal(papersLeft, "10 papers left today");
 
   levels()[1].dispatchEvent(new dom.window.MouseEvent("click", { bubbles: true }));
   await wait(700);
@@ -1380,57 +1259,209 @@ test("Primary swaps the shelf, not the allowance", async () => {
   dom.window.close();
 });
 
-/* ---------- 8c. Favorites ---------- */
+/* ---------- 8c. the shell: four tabs, a drawer, and an allowance in words ---------- */
 
-test("Favorites says how many are saved, and reads the Primary shelf too", async () => {
-  const seen = [];
-  const dom = await openPage("/favorites.html", {
-    storage: {
-      zafar_token: token("student"),
-      // The saved list lives on the phone: two ids, one from each shelf.
-      zafar_bookmarks_student: JSON.stringify(["s1", "p1"]),
-    },
-    fetch: (input) => {
+// A signed-in student with a catalogue of one book, so a list page has
+// something to draw without a real backend.
+function libraryPage(path, extra) {
+  const opts = extra || {};
+  return openPage(path, {
+    storage: Object.assign({ zafar_token: token("student") }, opts.storage || {}),
+    fetch: (input, init) => {
       const url = String(input && input.url ? input.url : input);
-      seen.push(url);
       const u = new URL(url, origin + "/");
-      const section = u.searchParams.get("section");
-      if (/\/auth\/quota/.test(u.pathname)) return reply(QUOTA);
+      if (/\/site-config$/.test(u.pathname)) return reply({ featured: [] });
+      if (/\/admin\/whoami/.test(u.pathname)) return reply({ detail: "Admins only" }, 403);
+      if (/\/auth\/quota/.test(u.pathname)) return reply(opts.quota || QUOTA);
+      if (/\/drive\/categories/.test(u.pathname)) return reply(["Senior", "Junior"]);
       if (/\/drive\/papers/.test(u.pathname)) {
-        const rows =
-          section === "primary"
-            ? [{ id: "p1", name: "PSLC Mathematics 2023.pdf", category: "PSLC Maneb", size_bytes: 1000 }]
-            : section === "papers"
-              ? [{ id: "s1", name: "MSCE Biology 2022.pdf", category: "MSCE Maneb", size_bytes: 1000 }]
-              : [{ id: section + "-x", name: "Other.pdf", category: "Cat", size_bytes: 1000 }];
-        return reply(rows, 200, { "X-Total-Count": "1" });
+        return reply(
+          [{ id: "b1", name: "Mathematics Form 3.pdf", category: "Senior", size_bytes: 2048 }],
+          200,
+          { "X-Total-Count": "1" }
+        );
+      }
+      if (opts.onPost && init && init.method === "POST") return opts.onPost(u, init);
+      return reply({});
+    },
+  });
+}
+
+test("the bar has four tabs, in order, and Favorites is not one of them", async () => {
+  const dom = await libraryPage("/books.html");
+  await wait(900);
+  const d = dom.window.document;
+
+  const tabs = [...d.querySelectorAll(".tabbar .tab")];
+  assert.equal(tabs.length, 4, "four sections in the bar");
+  assert.deepEqual(
+    tabs.map((a) => a.querySelector(".tab-label").textContent),
+    ["Books", "Past Papers", "Notes", "Marking Keys"]
+  );
+  assert.deepEqual(
+    tabs.map((a) => a.getAttribute("href")),
+    ["books.html", "dashboard.html", "notes.html", "marking-keys.html"]
+  );
+  // Books is where a student starts, and the bar says so.
+  assert.equal(tabs[0].classList.contains("active"), true);
+  assert.equal(tabs[0].getAttribute("aria-current"), "page");
+  assert.equal(d.querySelector(".app-title").textContent, "Books");
+  assert.equal(d.querySelector(".crumb").textContent, "Library");
+  // Icons are 24×24 and drawn on whole pixels: the blur came from both.
+  for (const glyph of tabs.map((a) => a.querySelector(".tab-ic svg"))) {
+    assert.equal(glyph.getAttribute("width"), "24");
+    assert.equal(glyph.getAttribute("height"), "24");
+    assert.equal(glyph.getAttribute("shape-rendering"), "geometricPrecision");
+  }
+  assert.equal(d.querySelectorAll(".tabbar a[href*='favorites']").length, 0);
+  dom.window.close();
+});
+
+test("the avatar opens a drawer that holds My Downloads, Settings and Log out", async () => {
+  const dom = await libraryPage("/notes.html", { storage: { zafar_me: JSON.stringify({ name: "Priam Zafar", email: "priam@gmail.com" }) } });
+  await wait(700);
+  const w = dom.window;
+  const d = w.document;
+
+  // No Log out in the bar any more: the bar has the name and Help.
+  assert.equal(d.querySelector(".app-bar [data-logout]"), null);
+  assert.equal(d.querySelector(".app-bar .bar-btn").getAttribute("href"), "help.html");
+  assert.equal(d.querySelector("[data-greeting]").textContent, "Hi, Priam");
+  assert.equal(d.querySelector(".avatar").textContent, "PZ");
+
+  const drawer = d.querySelector("[data-drawer]");
+  assert.equal(drawer.hidden, true, "the drawer starts out of the way");
+  d.querySelector("[data-drawer-open]").click();
+  assert.equal(drawer.hidden, false);
+  assert.equal(d.querySelector("[data-drawer-open]").getAttribute("aria-expanded"), "true");
+
+  const links = [...drawer.querySelectorAll(".drawer-link")].map((a) => a.textContent.trim());
+  for (const label of ["Books", "Past Papers", "Notes", "Marking Keys", "My Downloads", "Settings", "Help & FAQ"]) {
+    assert.ok(links.indexOf(label) !== -1, label + " is in the drawer: " + links.join(", "));
+  }
+  assert.equal(drawer.querySelector("[data-email]").textContent, "priam@gmail.com");
+  assert.equal(drawer.querySelector("[data-full-name]").textContent, "Priam Zafar");
+
+  // Log out is soft red, and it asks first.
+  const out = drawer.querySelector("[data-logout-open]");
+  assert.equal(out.classList.contains("btn-danger-soft"), true);
+  out.click();
+  const modal = d.querySelector("[data-logout-modal]");
+  assert.equal(modal.hidden, false, "a confirmation, not an instant exit");
+  assert.match(modal.querySelector("h2").textContent, /Log out\?/);
+
+  // Cancel keeps the session; confirming ends it.
+  modal.querySelector("[data-logout-cancel]").click();
+  assert.equal(modal.hidden, true);
+  assert.ok(w.localStorage.getItem("zafar_token"), "cancelling changes nothing");
+  d.querySelector("[data-drawer-open]").click();
+  d.querySelector("[data-logout-open]").click();
+  d.querySelector("[data-logout-confirm]").click();
+  await wait(60);
+  assert.equal(w.localStorage.getItem("zafar_token"), null, "the token is gone");
+  // jsdom does not navigate, so the assertion stops at the token: clearing it
+  // is what makes the next page's guard send the student to sign-in.
+  assert.equal(w.sessionStorage.getItem("zafar_admin_role"), null, "and the cached role");
+  dom.window.close();
+});
+
+test("the allowance reads as a sentence, and the colour follows the count", async () => {
+  // Three left: teal, no warning.
+  const full = await libraryPage("/books.html");
+  await wait(900);
+  const pill = full.window.document.querySelector("[data-quota]");
+  assert.equal(pill.hidden, false);
+  assert.equal(pill.querySelector("[data-quota-text]").textContent, "3 books left today");
+  assert.equal(pill.classList.contains("is-low"), false);
+  assert.equal(pill.classList.contains("is-out"), false);
+  full.window.close();
+
+  // One left: amber.
+  const one = await libraryPage("/books.html", {
+    quota: Object.assign({}, QUOTA, { books_left: 1 }),
+  });
+  await wait(900);
+  const p1 = one.window.document.querySelector("[data-quota]");
+  assert.equal(p1.querySelector("[data-quota-text]").textContent, "1 book left today");
+  assert.equal(p1.classList.contains("is-low"), true);
+  one.window.close();
+
+  // None left: muted red, it says when it comes back, and every Download
+  // button refuses without disappearing.
+  const none = await libraryPage("/books.html", {
+    quota: Object.assign({}, QUOTA, { books_left: 0 }),
+  });
+  await wait(900);
+  const d = none.window.document;
+  const p0 = d.querySelector("[data-quota]");
+  assert.equal(p0.querySelector("[data-quota-text]").textContent, "0 books left · resets at midnight");
+  assert.equal(p0.classList.contains("is-out"), true);
+  const buttons = [...d.querySelectorAll("[data-download]")];
+  assert.ok(buttons.length > 0, "the cards are still there");
+  for (const btn of buttons) {
+    assert.equal(btn.getAttribute("aria-disabled"), "true");
+    assert.equal(btn.querySelector(".btn-label").textContent, "Limit reached");
+  }
+  none.window.close();
+});
+
+test("the allowance is the server's number, not a constant in the page", async () => {
+  // A pattern no one would hardcode: if the copy is built from the response,
+  // this is what the pill must say.
+  const dom = await libraryPage("/notes.html", {
+    quota: { notes_left: 7, notes_limit: 7 },
+  });
+  await wait(900);
+  const text = dom.window.document.querySelector("[data-quota-text]").textContent;
+  assert.equal(text, "7 notes left today");
+  dom.window.close();
+});
+
+test("no card carries a report control or a heart any more", async () => {
+  const dom = await libraryPage("/books.html");
+  await wait(900);
+  const d = dom.window.document;
+  const card = d.querySelector(".item");
+  assert.ok(card, "a card is on screen");
+  assert.equal(card.querySelector("[data-report]"), null);
+  assert.equal(card.querySelector("[data-fav]"), null);
+  assert.equal(card.querySelector(".fav-btn"), null);
+  assert.equal(d.querySelector("[data-report-modal]"), null);
+  assert.equal(d.querySelector("[data-report-form]"), null);
+  dom.window.close();
+});
+
+test("a download says what it is doing while it runs", async () => {
+  // The two halves: the reservation, then the file. The button carries a bar
+  // and a word through both, so a slow connection never looks like a dead tap.
+  let release = null;
+  const dom = await libraryPage("/books.html", {
+    onPost: (u) => {
+      if (/\/drive\/download\//.test(u.pathname)) {
+        return new Promise((resolve) => {
+          release = () => resolve(reply({ url: origin + "/file.pdf", download_id: "d1", quota: QUOTA }));
+        });
       }
       return reply({});
     },
   });
-  await wait(1300);
-
+  await wait(900);
   const d = dom.window.document;
-  const papers = seen.filter((u) => /\/drive\/papers/.test(u));
-  // Five shelves, each asked for its first page and nothing more.
-  assert.equal(papers.length, 5, "one page per section: " + papers.join(", "));
-  assert.ok(papers.every((u) => /offset=0/.test(u)), "a saved list does not read the shelf");
-  assert.ok(papers.some((u) => /section=primary/.test(u)), "Favorites reads the Primary shelf");
+  const btn = d.querySelector("[data-download]");
+  btn.click();
+  await wait(80);
+  assert.equal(btn.classList.contains("is-loading"), true);
+  assert.match(btn.textContent, /Preparing/, btn.textContent);
+  assert.ok(btn.querySelector(".btn-progress"), "the bar is in the button");
 
-  // Both saved documents are on screen, each under its own shelf.
-  const titles = [...d.querySelectorAll(".item-title")].map((n) => n.textContent).sort();
-  assert.deepEqual(titles, ["MSCE Biology 2022", "PSLC Mathematics 2023"]);
-  const groups = [...d.querySelectorAll(".group-title")].map((h) =>
-    h.textContent.replace(/\d+$/, "").trim()
-  );
-  assert.deepEqual(groups, ["Past Papers", "Primary"]);
-
-  // The number is the saved list's, not the page's.
-  assert.equal(d.querySelector("[data-count]").textContent, "2 saved");
-
-  // A saved Primary file downloads as Primary, so the server charges papers.
-  const primaryCard = [...d.querySelectorAll(".item")].find((c) => /PSLC/.test(c.textContent));
-  assert.equal(primaryCard.querySelector("[data-download]").dataset.section, "primary");
+  // Let the reservation through, and let the whole chain settle before the
+  // window closes: a promise that resolves after close would touch a document
+  // that no longer exists, and that is a failure of the test, not the app.
+  assert.ok(release, "the reservation was sent");
+  release();
+  await wait(400);
+  assert.equal(btn.classList.contains("is-loading"), false, "the button comes back");
+  assert.match(btn.textContent, /Download/, btn.textContent);
   dom.window.close();
 });
 
@@ -1447,7 +1478,8 @@ const PAGES = [
   ["books.html", "/books.html"],
   ["notes.html", "/notes.html"],
   ["marking-keys.html", "/marking-keys.html"],
-  ["favorites.html", "/favorites.html"],
+  ["downloads.html", "/downloads.html"],
+  ["settings.html", "/settings.html"],
 ];
 
 function pngSize(file) {
@@ -1605,7 +1637,14 @@ test("the manifest and robots.txt agree with what is on disk", () => {
   assert.doesNotMatch(robots, /Disallow: \/assets/);
   assert.doesNotMatch(robots, /Disallow: \/favicon\.ico/);
   // The signed-in pages are not: a crawler would only ever see the sign-in screen.
-  for (const page of ["dashboard.html", "books.html", "notes.html", "marking-keys.html", "favorites.html"]) {
+  for (const page of [
+    "dashboard.html",
+    "books.html",
+    "notes.html",
+    "marking-keys.html",
+    "downloads.html",
+    "settings.html",
+  ]) {
     assert.match(robots, new RegExp("^Disallow: /" + page + "$", "m"));
   }
 
