@@ -1996,6 +1996,181 @@ test("a download says what it is doing while it runs", async () => {
   dom.window.close();
 });
 
+/* ---------- 9b. what the card says after the file lands ---------- */
+// A page whose downloads really land: the ticket comes back, the file comes
+// back as bytes, and the one thing a browser does with them (the anchor click
+// that saves the file) is stubbed by openPage. Everything else is the app.
+function downloadPage(path, conf) {
+  const opts = conf || {};
+  return openPage(path, {
+    storage: Object.assign({ zafar_token: token("student") }, opts.storage || {}),
+    beforeParse: opts.beforeParse,
+    fetch: (input, init) => {
+      const url = String(input && input.url ? input.url : input);
+      const u = new URL(url, origin + "/");
+      if (/\/site-config$/.test(u.pathname)) return reply({ featured: [] });
+      if (/\/admin\/whoami/.test(u.pathname)) return reply({ detail: "Admins only" }, 403);
+      if (/\/auth\/quota/.test(u.pathname)) {
+        if (opts.counters) opts.counters.quota = (opts.counters.quota || 0) + 1;
+        return reply(opts.quota || QUOTA);
+      }
+      if (/\/drive\/categories/.test(u.pathname)) return reply(["Senior"]);
+      if (/\/drive\/papers/.test(u.pathname)) {
+        return reply(
+          [{ id: "b1", name: "Mathematics Form 3.pdf", category: "Senior", size_bytes: 2048 }],
+          200,
+          { "X-Total-Count": "1" }
+        );
+      }
+      if (/\/drive\/download\//.test(u.pathname)) {
+        if (opts.ticket) return opts.ticket(u);
+        return reply({ url: origin + "/file.pdf", download_id: 9, quota: opts.after || QUOTA });
+      }
+      if (/\/drive\/confirm\//.test(u.pathname)) {
+        if (opts.counters) opts.counters.confirm = (opts.counters.confirm || 0) + 1;
+        return reply({ status: "confirmed" });
+      }
+      if (/\/file\.pdf$/.test(u.pathname)) {
+        if (opts.file === false) return reply({}, 502);
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          blob: async () => new Blob([new Uint8Array([1, 2, 3])], { type: "application/pdf" }),
+        });
+      }
+      return reply({});
+    },
+  });
+}
+
+function toastText(d) {
+  const node = d.querySelector("[data-toast]");
+  return node ? node.textContent : "";
+}
+
+test("a file that lands is marked downloaded on every shelf, and is never called a failure", async () => {
+  // The whole point: the card says what the phone has. Same code, same words,
+  // four shelves — a download that marks on Notes and not on Past Papers is
+  // the same download lying to two thirds of the library.
+  for (const page of ["/books.html", "/dashboard.html", "/notes.html", "/marking-keys.html"]) {
+    const counters = { confirm: 0, quota: 0 };
+    const dom = await downloadPage(page, { counters });
+    await wait(900);
+    const d = dom.window.document;
+    const card = d.querySelector(".item");
+    const btn = card.querySelector("[data-download]");
+    const quotaBefore = counters.quota;
+    btn.click();
+    await wait(600);
+
+    assert.equal(card.querySelector(".item-dl").textContent, "Downloaded \u2713", page);
+    assert.match(btn.textContent, /Saved/, page + " calls a saved file " + btn.textContent);
+    assert.doesNotMatch(toastText(d), /Could not/, page + " called a saved file a failure");
+    // The file is on the phone, so the backend is told so: an unconfirmed
+    // reservation is one the allowance never gets.
+    assert.equal(counters.confirm, 1, page + " never confirmed the download");
+    // …and the count is read back afterwards, because the answer to the
+    // reservation is not necessarily the count after a download.
+    assert.ok(counters.quota > quotaBefore, page + " never re-read the allowance");
+    // The card keeps saying so when the list is drawn again: the download is
+    // in the phone's own history, under this account, not only in memory.
+    const stored = JSON.parse(dom.window.localStorage.getItem("zafar_recent_downloads_student") || "[]");
+    assert.equal(stored.length, 1, page + " forgot the download");
+    assert.equal(stored[0].id, "b1", page);
+    dom.window.close();
+  }
+});
+
+test("a phone that refuses to store history still marks the file, and never calls it a failure", async () => {
+  // A locked-down browser or a full quota throws on every write. History is a
+  // convenience; it must not be able to turn a saved file into an error, and it
+  // must not be able to keep the badge off the card.
+  const dom = await downloadPage("/notes.html", {
+    beforeParse(win) {
+      Object.getPrototypeOf(win.localStorage).setItem = function () {
+        throw new win.Error("storage denied");
+      };
+    },
+  });
+  await wait(900);
+  const d = dom.window.document;
+  const card = d.querySelector(".item");
+  const btn = card.querySelector("[data-download]");
+  btn.click();
+  await wait(500);
+
+  assert.equal(card.querySelector(".item-dl").textContent, "Downloaded \u2713", "the badge is on the card");
+  assert.match(btn.textContent, /Saved/, btn.textContent);
+  assert.doesNotMatch(toastText(d), /Could not/, "a saved file was reported as a failure");
+  dom.window.close();
+});
+
+test("a download that never started is not dressed up as a saved file", async () => {
+  // No ticket, no file. The card must not claim a download, and the words must
+  // name what actually failed — starting it, not delivering it.
+  const dom = await downloadPage("/notes.html", {
+    ticket: () => Promise.reject(new TypeError("Failed to fetch")),
+  });
+  await wait(900);
+  const d = dom.window.document;
+  const card = d.querySelector(".item");
+  const btn = card.querySelector("[data-download]");
+  btn.click();
+  await wait(500);
+
+  assert.equal(card.querySelector(".item-dl"), null, "nothing was downloaded");
+  assert.match(btn.textContent, /Download/, btn.textContent);
+  assert.match(toastText(d), /Could not start the download/, toastText(d));
+  dom.window.close();
+});
+
+test("a file that fails on the way still asks the server what it is owed", async () => {
+  // The ticket is written before the file moves, so a failure here can leave a
+  // slot spent for the life of the signed link. The pill must show the
+  // server's count, not the count the page happened to be holding.
+  const counters = { quota: 0 };
+  const dom = await downloadPage("/notes.html", { file: false, counters });
+  await wait(900);
+  const d = dom.window.document;
+  const before = counters.quota;
+  d.querySelector("[data-download]").click();
+  await wait(700);
+
+  assert.match(toastText(d), /Could not download the file/, toastText(d));
+  assert.ok(counters.quota > before, "the page re-read the allowance after the failure");
+  dom.window.close();
+});
+
+test("asking for a download ticket gets longer than the app's normal deadline", async () => {
+  // The ticket is a write: the server reserves the slot before it answers. A
+  // browser deadline that cuts it off can spend an allowance for a file that
+  // never arrives, so this one request waits.
+  const dom = await openPage("/login.html", { fetch: () => reply({}) });
+  await wait(300);
+  const Z = dom.window.Zafar;
+  assert.ok(Z.TICKET_TIMEOUT_MS > Z.REQUEST_TIMEOUT_MS, "the ticket deadline is the longer one");
+
+  const seen = [];
+  Z._fetch = function (url, opts, ms) {
+    seen.push(ms);
+    return Promise.resolve({
+      ok: true,
+      status: 200,
+      headers: { get: () => null },
+      json: () => Promise.resolve({}),
+    });
+  };
+  await Z.authPostJSON("/drive/download/abc?section=notes", null, { timeout: Z.TICKET_TIMEOUT_MS });
+  assert.equal(seen[0], Z.TICKET_TIMEOUT_MS);
+  // A plain POST keeps the fifteen seconds it had before.
+  await Z.authPostJSON("/reports", {});
+  assert.equal(seen[1], undefined);
+
+  const list = read(path.join(WEB, "assets/js/list.js"));
+  assert.match(list, /timeout:\s*Zafar\.TICKET_TIMEOUT_MS/, "the page passes it");
+  dom.window.close();
+});
+
 /* ---------- 8d. the mark: files, sizes, and what a crawler reads ---------- */
 
 const SITE = "https://studymw.netlibrary.dpdns.org";

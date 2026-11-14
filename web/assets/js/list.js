@@ -217,7 +217,13 @@ var ZafarList = (function () {
   }
 
   // The card a download just landed on says so, without waiting for a repaint.
+  // `t` lives inside init; this function is outside it, so it brings its own.
+  // (Without this line the whole success path threw on the last step, after the
+  // file was already saved: the badge and "Saved" never appeared, the download
+  // was never confirmed to the backend, and a delivered file was announced as
+  // "Could not download the file".)
   function markDownloaded(card, id) {
+    var t = ZafarI18n.t;
     downloaded[String(id)] = true;
     if (!card || card.querySelector(".item-dl")) return;
     var body = card.querySelector(".item-body");
@@ -665,7 +671,12 @@ var ZafarList = (function () {
         section: section,
       };
       Zafar.authPostJSON(
-        "/drive/download/" + encodeURIComponent(id) + "?section=" + encodeURIComponent(section)
+        "/drive/download/" + encodeURIComponent(id) + "?section=" + encodeURIComponent(section),
+        null,
+        // A ticket is a write, and it is written before it is answered: the
+        // generic 15 s deadline can abort a request the server has already
+        // charged, which is how a download gets billed without ever arriving.
+        { timeout: Zafar.TICKET_TIMEOUT_MS }
       )
         .then(function (data) {
           // The download answer carries all four buckets, so it can replace
@@ -674,8 +685,12 @@ var ZafarList = (function () {
             applyQuota(data.quota, true);
           }
           if (!data.url) {
+            // A ticket with no file behind it: nothing started, so nothing failed.
             restore();
-            shell.showToast(t("list.downloadFailed"), "alert");
+            shell.showToast(t("list.downloadNotStarted"), "alert");
+            // The ticket may still have been written. The server's count is
+            // the only true one; a hidden refresh cannot make it worse.
+            refreshQuota();
             return;
           }
 
@@ -706,18 +721,36 @@ var ZafarList = (function () {
               // Safari cancels a save whose blob is revoked in the same tick as
               // the click. A minute is long enough for the browser to take it.
               setTimeout(function () { URL.revokeObjectURL(url); }, 60000);
-              Zafar.recordDownload(file);
+
+              // From this line the file is on the phone, and nothing below may
+              // say otherwise. The badge goes on the card first, from memory,
+              // and only then into the phone's history: a browser that refuses
+              // to store anything (locked down, or out of room) must still show
+              // the card as downloaded, and must never turn a saved file into
+              // "Could not download the file".
               markDownloaded(card, id);
+              Zafar.recordDownload(file);
               markSaved();
               // Tell the backend the bytes actually arrived, so this counts
               // permanently against today's quota. A reservation that never
               // gets confirmed (network drop, tab closed mid-fetch) ages out
               // on its own instead of burning the allowance for nothing.
-              Zafar.authPostJSON("/drive/confirm/" + data.download_id).catch(function () {});
+              // Then read the count back: what a *reservation* does to the
+              // number is the server's business, and a pill that does not move
+              // after a download is worse than one that moves late.
+              Zafar.authPostJSON("/drive/confirm/" + data.download_id)
+                .catch(function () {})
+                .then(function () {
+                  if (cfg.quotaKey) refreshQuota();
+                });
             })
             .catch(function () {
               restore();
               shell.showToast(t("list.downloadFailed"), "alert");
+              // The ticket was taken even though the bytes never came. It ages
+              // out on the server, but until then the pill must show what the
+              // server actually counts, not what the page last heard.
+              refreshQuota();
             });
         })
         .catch(function (err) {
@@ -739,9 +772,11 @@ var ZafarList = (function () {
             }
             shell.showToast(t("list.notice.title", section), "alert");
           } else {
-            // safeMessage keeps internal 5xx text (folder ids, project names)
-            // off the screen and shows it only for a 4xx the person can fix.
-            shell.showToast(Zafar.safeMessage(err, t("list.downloadFailed")), "alert");
+            // No ticket, so no file: say that, rather than blaming a download
+            // that never started. safeMessage keeps internal 5xx text (folder
+            // ids, project names) off the screen and shows it only for a 4xx
+            // the person can fix.
+            shell.showToast(Zafar.safeMessage(err, t("list.downloadNotStarted")), "alert");
           }
         });
     }
