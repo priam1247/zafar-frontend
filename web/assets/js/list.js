@@ -334,6 +334,12 @@ var ZafarList = (function () {
       };
     }
 
+    // The pill is asked for on Books only. Every section still has its own
+    // allowance and still shows the plain-English notice when it runs out, and
+    // its buttons still stop at zero — the counter is the only part that is
+    // Books-only.
+    var SHOW_PILL = cfg.quotaKey === "books";
+
     function renderLimit() {
       if (!el.limit) return;
 
@@ -348,14 +354,24 @@ var ZafarList = (function () {
       }
 
       // Nothing reported for this bucket: say nothing rather than imply an
-      // allowance we cannot measure.
-      if (left === null || !(cap > 0)) {
+      // allowance we cannot measure — and leave the buttons alone.
+      var known = left !== null && cap > 0;
+      if (!known) {
         el.limit.hidden = true;
         setDownloadsEnabled(true);
         return;
       }
 
       var allowed = left > 0;
+
+      // A section without the pill still stops at zero; it just says so in the
+      // notice and on the buttons.
+      if (!SHOW_PILL) {
+        el.limit.hidden = true;
+        setDownloadsEnabled(allowed);
+        return;
+      }
+
       el.limit.hidden = false;
       // Teal while comfortable, amber at one, muted red at none.
       el.limit.classList.toggle("is-low", left === 1);

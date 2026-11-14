@@ -1235,9 +1235,9 @@ test("Primary swaps the shelf, not the allowance", async () => {
   assert.equal(levels()[0].getAttribute("aria-pressed"), "true", "Secondary first");
   assert.match(papers()[0], /section=papers/);
   assert.match(papers()[0], /limit=50/);
-  const papersLeft = d.querySelector("[data-quota-text]").textContent;
-  // The pill names the section and the day, from the server's own numbers.
-  assert.equal(papersLeft, "10 papers left today");
+  // The allowance pill is Books-only (as asked); Past Papers spends the same
+  // kind of allowance but reports it through the notice and the buttons.
+  assert.equal(d.querySelector("[data-quota]").hidden, true);
 
   levels()[1].dispatchEvent(new dom.window.MouseEvent("click", { bubbles: true }));
   await wait(700);
@@ -1251,8 +1251,9 @@ test("Primary swaps the shelf, not the allowance", async () => {
   assert.match(d.querySelector(".item-title").textContent, /PSLC/);
   // The folders follow the shelf: a Secondary category would filter Primary to nothing.
   assert.match(d.querySelector("[data-cat-chips]").textContent, /PSLC Maneb/);
-  // One bucket for both: the papers numbers, and no second quota request.
-  assert.equal(d.querySelector("[data-quota-text]").textContent, papersLeft);
+  // One bucket for both: one allowance answer for the page, and the pill stays
+  // out of it — the numbers live in config and the notice, not in a Books-only
+  // counter.
   assert.equal(seen.filter((u) => /\/auth\/quota/.test(u)).length, 1, "no second allowance");
   // And the download knows which shelf the file came from.
   assert.equal(d.querySelector("[data-download]").dataset.section, "primary");
@@ -1406,14 +1407,28 @@ test("the allowance reads as a sentence, and the colour follows the count", asyn
 });
 
 test("the allowance is the server's number, not a constant in the page", async () => {
-  // A pattern no one would hardcode: if the copy is built from the response,
-  // this is what the pill must say.
-  const dom = await libraryPage("/notes.html", {
-    quota: { notes_left: 7, notes_limit: 7 },
+  // A number no one would hardcode: if the pill is built from the response,
+  // this is what it must say.
+  const dom = await libraryPage("/books.html", {
+    quota: { books_left: 2, books_limit: 7 },
   });
   await wait(900);
-  const text = dom.window.document.querySelector("[data-quota-text]").textContent;
-  assert.equal(text, "7 notes left today");
+  const d = dom.window.document;
+  assert.equal(d.querySelector("[data-quota-text]").textContent, "2 books left today");
+  dom.window.close();
+});
+
+test("other sections keep their limit without the pill, and still stop at zero", async () => {
+  const dom = await libraryPage("/notes.html", {
+    quota: { notes_left: 0, notes_limit: 3 },
+  });
+  await wait(900);
+  const d = dom.window.document;
+  assert.equal(d.querySelector("[data-quota]").hidden, true, "no pill outside Books");
+  assert.equal(d.querySelector("[data-notice]").hidden, false, "the notice explains it");
+  const btn = d.querySelector("[data-download]");
+  assert.equal(btn.getAttribute("aria-disabled"), "true");
+  assert.equal(btn.querySelector(".btn-label").textContent, "Limit reached");
   dom.window.close();
 });
 
