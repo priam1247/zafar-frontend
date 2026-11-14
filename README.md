@@ -210,15 +210,22 @@ drawer, the cards and the states — and every size is a whole pixel, because a
 parts; teal is the only accent, the neutrals are warm, and every control is at
 least 44px in its smaller dimension.
 
-The allowance pill sits beside the page title so it stays visible while the
-catalogue scrolls, and it reads as a sentence rather than a counter: **3 books
-left today**, **1 note left today**, **0 marking keys left · resets at
-midnight**. The number is always the server's — `left` and `limit` both come
+The allowance pill is the **Books** page's. It sits beside the title so it
+stays visible while the catalogue scrolls, and it reads as a sentence rather
+than a counter: **3 books left today**, **1 book left today**, **0 books
+left · resets at midnight**. The number is always the server's — `left` and `limit` both come
 from `/auth/quota`, and a page that is told neither shows no pill at all rather
 than quoting a policy the backend may not keep. Three or two left is teal, one
 is amber, none is muted red; tapping the pill opens a small sheet that says how
 many you get a day, how many are left, and that the allowance starts again at
 **02:00 in Malawi (00:00 UTC)**.
+
+Every other section has its own allowance too — Past Papers 10 a day, Notes 3,
+Marking Keys 10 — and keeps the same behaviour at zero (the notice, *Limit
+reached* on the buttons, the server re-check on the next tap); only the counter
+is Books-only, which is what was asked for. A section whose numbers the server
+does not report shows no counter and no notice, and its buttons stay as they
+are: saying nothing is the honest option when there is nothing to say.
 
 At zero the pill is not the only signal: every *Download* button on the page
 becomes *Limit reached* and stops accepting taps — `aria-disabled`, not
@@ -237,9 +244,8 @@ therefore charges it, and counts it, honestly — a client-side "already
 downloaded" exemption would desynchronise the pill from the server's own
 numbers. Making it free is a backend change (add `file_id NOT IN (...)` to the
 counting condition, or dedupe on confirm); until then the app says what is
-true. Each section has its **own** allowance, and the chip reports
-the one for the page you are on: **10 papers, 3 books, 3 notes, 10 marking
-keys** a day, each on its own UTC day. `QUOTA_FIELD` in `config.js` maps a page
+true. Each section has its **own** allowance, and the page reports
+the one it spends: **10 papers, 3 books, 3 notes, 10 marking keys** a day, each on its own UTC day. `QUOTA_FIELD` in `config.js` maps a page
 to the field prefix its numbers live under — the `marking-keys` section reads
 `marking_keys_left` / `marking_keys_limit`, with the underscore the API uses.
 Both the count and the ceiling come from that answer, because both are server
