@@ -75,11 +75,6 @@
       "name": "Marking keys",
       "short_name": "Keys",
       "url": "marking-keys.html"
-    },
-    {
-      "name": "My Downloads",
-      "short_name": "Downloads",
-      "url": "downloads.html"
     }
   ]
 }

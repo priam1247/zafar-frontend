@@ -1,0 +1,13 @@
+# Old bookmarks. Favorites was removed in round 6 and its page went with it, so
+# a phone that still has the address is sent to the shelf it meant to open
+# rather than to a 404. One line per spelling: Cloudflare matches the path
+# exactly and does not fall back to the .html file.
+/favorites      /books.html  301
+/favorites/     /books.html  301
+/favorites.html /books.html  301
+
+# My Downloads was removed in round 7. The file it sent a student back to is
+# still the right destination: what was saved on this phone is on the shelves.
+/downloads      /books.html  301
+/downloads/     /books.html  301
+/downloads.html /books.html  301

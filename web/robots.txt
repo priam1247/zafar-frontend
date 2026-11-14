@@ -13,7 +13,6 @@ Disallow: /dashboard.html
 Disallow: /books.html
 Disallow: /notes.html
 Disallow: /marking-keys.html
-Disallow: /downloads.html
 Disallow: /settings.html
 # An internal tool. It answers nothing without an admin session anyway, but a
 # crawler has no business asking.

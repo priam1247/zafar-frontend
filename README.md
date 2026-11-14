@@ -14,7 +14,6 @@ web/                     static frontend (no build step, no framework)
   books.html             textbooks
   notes.html             summary notes
   marking-keys.html      marking keys
-  downloads.html         what has been downloaded on this phone
   settings.html          the account, the data kept here, password reset
   help.html              FAQ, and the form that asks for a missing file
   admin.html             the owner/editor portal (noindex, not linked publicly)
@@ -114,18 +113,13 @@ teal-grey rather than teal at 70%, and the active tab is a filled mint pill with
 a bolder label. Each tab is a 56px-tall target plus
 `env(safe-area-inset-bottom)` of padding, so it clears the gesture bar.
 
-**Favorites is gone.** The tab, the heart on each card and the count are
-removed. A file a student wants again is in **My Downloads** in the drawer —
-the list the app already kept per account on the phone — which links back to
-the shelf each document came from. `favorites.html` no longer exists; nothing
-in the app can reach it.
-
-**My Downloads** (`downloads.html`) is that list, in full: newest first, with
-the folder it came from, the day, and a *Find it again* button that opens the
-shelf it belongs to with the title already in the search box. It is kept in
-`localStorage` under the account's own namespace, so two people sharing a
-handset never see each other's, and clearing it deletes the list, not the
-files. The page says so.
+**Favorites is gone** (the tab, the heart, the count, and `favorites.html`;
+`/favorites` now redirects to Books). **My Downloads is gone too** — the page,
+the drawer row, its strings and its recipe-shortcut. What the app still keeps
+is the bare fact that a file was saved on this phone: the card says
+*Downloaded ✓*, and Settings shows the count and a way to clear it. The list
+lives in `localStorage` under the account's own namespace, so two people
+sharing a handset never see each other's.
 
 **Settings** (`settings.html`) holds only what is true: the name and address
 the sign-in established (the API has no student profile route, so these are
@@ -578,7 +572,7 @@ each card was removed by request, together with its dialog, and a report has to
 carry the id of a real file — which only the card could supply. There is no
 honest way to ask a student for one by typing it, so the client binding and its
 strings were deleted rather than left idle. If reporting comes back it should
-come back as a "Something wrong with this file?" row inside **My Downloads**,
+come back as a "Something wrong with this file?" row on a downloaded card,
 where the id is already stored, or as a picker on the Help page. The portal
 side of the queue is in `docs/admin-portal.md`.
 

@@ -56,7 +56,7 @@
   <script>
     document.addEventListener("DOMContentLoaded", function () {
       var p = ZafarI18n.t("pages.papers");
-      var shell = ZafarShell.init({ active: "papers", title: p.title, crumb: p.crumb });
+      var shell = ZafarShell.init({ active: "papers", title: p.title });
       if (!shell) return; // not signed in — already navigating to login
       ZafarList.init({
         section: "papers",
@@ -65,6 +65,10 @@
         sectionChoices: p.levels,
         quotaKey: "papers",
         itemLabel: p.itemLabel,
+        // The one note on this shelf, and only on this shelf: the library is
+        // MSCE and JCE, and a university student should learn that here rather
+        // than from an empty search.
+        note: "pages.papers.note",
         categories: ["MSCE Maneb", "JCE Maneb", "Mock", "Other Past Papers"],
       }, shell);
     });

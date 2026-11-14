@@ -56,7 +56,7 @@
   <script>
     document.addEventListener("DOMContentLoaded", function () {
       var p = ZafarI18n.t("pages.books");
-      var shell = ZafarShell.init({ active: "books", title: p.title, crumb: p.crumb });
+      var shell = ZafarShell.init({ active: "books", title: p.title });
       if (!shell) return;
       ZafarList.init({
         section: "books",
