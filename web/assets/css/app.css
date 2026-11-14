@@ -66,13 +66,19 @@
 
 html, body { margin: 0; }
 
+/* White to the bottom edge of the viewport. The beige belongs to the sheet a
+   student reads; the strip under the fixed tab bar — and the bounce area past
+   it on iOS — is the page's, and a beige line under a white nav is the thing
+   this stops. */
+html { background: #FFFFFF; }
+
 body {
   font-family: "Instrument Sans", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto,
     "Helvetica Neue", Arial, sans-serif;
   font-size: 15px;
   line-height: 1.5;
   color: var(--brand);
-  background: var(--paper);
+  background: #FFFFFF;
   -webkit-font-smoothing: antialiased;
   -webkit-tap-highlight-color: transparent;
   text-rendering: optimizeLegibility;
@@ -119,7 +125,7 @@ a { color: inherit; }
   position: sticky;
   top: 0;
   z-index: 30;
-  padding: calc(4px + env(safe-area-inset-top)) calc(16px + env(safe-area-inset-right)) 6px
+  padding: calc(12px + env(safe-area-inset-top)) calc(16px + env(safe-area-inset-right)) 12px
     calc(16px + env(safe-area-inset-left));
   background: var(--brand);
   color: var(--on);
@@ -130,7 +136,7 @@ a { color: inherit; }
   display: flex;
   flex-wrap: nowrap;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
   min-width: 0;
 }
 
@@ -172,7 +178,6 @@ a { color: inherit; }
   letter-spacing: .02em;
   text-transform: uppercase;
   cursor: pointer;
-  transition: width .2s var(--ease), height .2s var(--ease);
 }
 
 .avatar-lg { width: 52px; height: 52px; font-size: 17px; }
@@ -197,7 +202,7 @@ a { color: inherit; }
   align-items: baseline;
   justify-content: space-between;
   gap: 10px;
-  margin-top: 2px;
+  margin-top: 6px;
 }
 
 .app-title {
@@ -215,11 +220,11 @@ a { color: inherit; }
   transition: font-size .2s var(--ease);
 }
 
-/* Slimmer once the list is moving. */
-.app-bar.is-slim { padding-top: calc(2px + env(safe-area-inset-top)); padding-bottom: 4px; }
-.app-bar.is-slim .avatar { width: 30px; height: 30px; font-size: 11px; }
-.app-bar.is-slim .bar-circle { width: 34px; height: 34px; }
-.app-bar.is-slim .app-title { font-size: 19px; }
+/* Slimmer once the list is moving. Only the padding and the title move: the
+   avatar and the two circles are fixed sizes, and a control that changes size
+   under a thumb is a control that misses. */
+.app-bar.is-slim { padding-top: calc(6px + env(safe-area-inset-top)); padding-bottom: 6px; }
+.app-bar.is-slim .app-title { font-size: 20px; }
 
 /* ---------- The allowance pill ----------
    "3 books left today" on the Books tab, and its own noun on the others, from
@@ -229,18 +234,17 @@ a { color: inherit; }
 .quota {
   flex: none;
   max-width: 54%;
-  align-self: baseline;
+  height: 28px;
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  min-height: 30px;
-  padding: 4px 11px;
+  padding: 0 10px;
   border: 0;
   border-radius: 999px;
   background: var(--mint);
   color: var(--brand-deep);
   font: inherit;
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 650;
   letter-spacing: .002em;
   white-space: nowrap;
@@ -266,10 +270,10 @@ a { color: inherit; }
   background: #FBE7E4;
   color: #8C2F22; /* 7.6:1 on that wash */
   /* "0 books left · resets at midnight" is the longest thing the pill ever
-     says, and it is the one time the words matter most. It gets the room, and
-     the page title gives up its own. */
+     says, so it gets more of the row — but the same 28px height and 13px type
+     as the others: a pill that changes size changes where the thumb expects
+     it. */
   max-width: 74%;
-  font-size: 11.5px;
 }
 
 /* A caption for the list: a sentence, not a pill. Settings and Help keep one
@@ -285,7 +289,7 @@ a { color: inherit; }
 .count {
   min-width: 0;
   color: var(--muted);
-  font-size: 12.5px;
+  font-size: 13px;
   font-weight: 600;
   letter-spacing: .01em;
   overflow: hidden;
@@ -454,8 +458,10 @@ a { color: inherit; }
   flex: 1;
   min-width: 0;
   overflow-x: clip;
-  /* Room for the fixed tabs so the last card can still be scrolled clear. */
-  padding: 14px calc(16px + env(safe-area-inset-right))
+  /* The bar is sticky and this sheet follows it in normal flow, so the first
+     row of controls can never sit under the bar. 12px of air, then the search
+     field. Room is kept at the bottom for the fixed tabs. */
+  padding: 12px calc(16px + env(safe-area-inset-right))
     calc(var(--bar) + 20px + env(safe-area-inset-bottom))
     calc(16px + env(safe-area-inset-left));
   border-radius: 16px 16px 0 0;
@@ -555,9 +561,9 @@ a { color: inherit; }
   gap: 10px;
   width: 100%;
   min-width: 0;
-  height: 48px;
-  padding: 0 16px;
-  border-radius: 16px;
+  height: 44px;
+  padding: 0 14px;
+  border-radius: 14px;
   background: var(--field);
   border: 1px solid transparent;
   color: var(--ink-45);
@@ -576,7 +582,7 @@ a { color: inherit; }
   background: none;
   outline: none;
   font: inherit;
-  font-size: 16px; /* 16px keeps iOS from zooming the page on focus */
+  font-size: 15px;
   color: var(--brand);
 }
 .search input::placeholder { color: var(--placeholder); /* 5.0:1 */ }
@@ -588,19 +594,20 @@ a { color: inherit; }
 
 .cat-chips {
   display: flex;
+  align-items: center;
+  /* A row with its own height, inside the sheet's padding: no negative
+     margins, no absolute positioning, nothing that can float over the row
+     below it. */
+  height: 32px;
   min-width: 0;
   gap: 8px;
   /* A left-to-right fade over the last 28px: on a phone the row runs off the
      edge, and this is the cheapest honest way to say "keep going" without an
      arrow taking up a chip's width. */
-  -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 30px), transparent);
-  mask-image: linear-gradient(to right, #000 calc(100% - 30px), transparent);
-  margin-right: calc(-16px - env(safe-area-inset-right));
-  margin-left: calc(-16px - env(safe-area-inset-left));
-  padding-right: calc(16px + env(safe-area-inset-right));
-  padding-bottom: 2px;
-  padding-left: calc(16px + env(safe-area-inset-left));
+  -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 28px), transparent);
+  mask-image: linear-gradient(to right, #000 calc(100% - 28px), transparent);
   overflow-x: auto;
+  overflow-y: hidden;
   overscroll-behavior-x: contain;
   scrollbar-width: none;
   -ms-overflow-style: none;
@@ -609,14 +616,13 @@ a { color: inherit; }
 
 .cat-chip {
   flex: 0 0 auto;
-  /* 44px: the pill is the target, not the text inside it. */
-  height: 44px;
-  padding: 0 18px;
+  height: 32px;
+  padding: 0 12px;
   border: 1px solid var(--line);
   border-radius: 999px;
   background: transparent;
   color: var(--muted); /* 6.1:1 — a chip is text, and the teal 70% was 3.3:1 */
-  font-size: 12.5px;
+  font-size: 13px;
   font-weight: 600;
   white-space: nowrap;
   cursor: pointer;
@@ -639,7 +645,7 @@ a { color: inherit; }
 }
 
 .switch-btn {
-  height: 44px;
+  height: 36px;
   padding: 0 14px;
   border: 0;
   border-radius: 999px;
@@ -734,6 +740,8 @@ a { color: inherit; }
   justify-content: space-between;
   gap: 10px;
   min-width: 0;
+  /* Its own 12px clear of the chips above it. */
+  margin-top: 12px;
 }
 
 .results-row .count { flex: 1 1 auto; }
@@ -744,15 +752,15 @@ a { color: inherit; }
   appearance: none;
   -webkit-appearance: none;
   height: 32px;
-  padding: 0 30px 0 13px;
+  padding: 0 28px 0 12px;
   border: 1px solid var(--line);
   border-radius: 999px;
   background-color: transparent;
   background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6' fill='none' stroke='%23101413' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M1 1l4 4 4-4'/%3E%3C/svg%3E");
   background-repeat: no-repeat;
-  background-position: right 12px center;
+  background-position: right 10px center;
   font: inherit;
-  font-size: 12.5px;
+  font-size: 13px;
   font-weight: 600;
   color: var(--brand);
   cursor: pointer;
@@ -760,7 +768,12 @@ a { color: inherit; }
 .select:hover { border-color: var(--line-2); }
 
 /* ============================================================
-   Cards — one row each: tile, title and facts, download
+   Cards — two zones: what it is, then the facts and the one action
+
+   Top: a 40px tile, the title (two lines at most, long file names wrap) and
+   a chip only when it names something. A hairline. Bottom: the size and the
+   type on the left, Download on the right at 36px — the 44px target is the
+   button's, made with a hit area, not with its height.
    ============================================================ */
 
 .grid {
@@ -769,18 +782,14 @@ a { color: inherit; }
      width, and a long single-line title can push the whole track — and the
      cards — past the sheet's right edge. */
   grid-template-columns: minmax(0, 1fr);
-  gap: 8px;
+  gap: 10px;
 }
 
-/* 84px at rest, so five fit above the tabs on a 640px-tall phone. The height
-   is a floor, not a box: a two-line title grows it, and nothing is clipped. */
 .item {
   display: flex;
-  align-items: center;
-  gap: 10px;
+  flex-direction: column;
   min-width: 0;
-  min-height: 84px;
-  padding: 10px 12px;
+  padding: 12px;
   border: 1px solid var(--line);
   border-radius: 16px;
   background: #FFFFFF;
@@ -791,13 +800,20 @@ a { color: inherit; }
 }
 .item:hover { border-color: var(--line-2); box-shadow: 0 2px 4px rgba(16, 20, 19, .05), 0 10px 24px rgba(16, 20, 19, .07); }
 
+.item-top {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  min-width: 0;
+}
+
 .glyph-tile {
-  width: 36px;
-  height: 36px;
+  width: 40px;
+  height: 40px;
   flex: none;
   display: grid;
   place-items: center;
-  border-radius: 11px;
+  border-radius: 10px;
   background: var(--mint);
   color: var(--ink);
 }
@@ -807,68 +823,104 @@ a { color: inherit; }
 .item-title {
   margin: 0;
   min-width: 0;
-  font-size: 13.5px;
-  font-weight: 620;
-  line-height: 1.28;
-  letter-spacing: -.012em;
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1.3;
+  letter-spacing: -.01em;
   color: var(--brand);
   display: -webkit-box;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
+  /* A file name is one long word more often than it is a sentence:
+     "agriculture_archivers_book_3" has to wrap, not run out of the card. */
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
-/* "15.4 MB · PDF", then whatever else the card knows. */
-.item-meta {
+/* The chip line: a category worth naming, and the badge for a file already on
+   this phone. Nothing at all when there is neither. */
+.item-tags {
   display: flex;
   align-items: center;
   gap: 6px;
   min-width: 0;
   margin: 4px 0 0;
-  font-size: 11.5px;
-  line-height: 1.3;
-  color: var(--muted);
 }
 
-.item-size { flex: none; white-space: nowrap; }
-
-/* A category worth naming (JCE, MSCE, a subject). Never "Document": a chip
-   that only repeats the section is a chip in the way. */
-.item-cat {
-  flex: 0 1 auto;
+.item-cat,
+.item-dl {
+  height: 24px;
+  display: inline-flex;
+  align-items: center;
   min-width: 0;
-  padding: 1px 8px;
+  padding: 0 8px;
   border-radius: 999px;
-  border: 1px solid var(--line);
-  color: var(--muted);
-  font-size: 10.5px;
+  font-size: 12px;
   font-weight: 600;
-  letter-spacing: .01em;
+  line-height: 1;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
+.item-cat { flex: 0 1 auto; border: 1px solid var(--line); color: var(--muted); }
+
 /* This file is already on the phone. */
-.item-dl {
-  flex: none;
-  padding: 1px 8px;
-  border-radius: 999px;
-  background: var(--mint);
-  color: var(--brand-deep);
-  font-size: 10.5px;
-  font-weight: 700;
-  white-space: nowrap;
+.item-dl { flex: none; background: var(--mint); color: var(--brand-deep); font-weight: 700; }
+
+.item-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  min-width: 0;
+  margin-top: 6px;
+  padding-top: 6px;
+  border-top: 1px solid var(--line);
 }
 
-/* 44px tall and only as wide as its word: "Download" and "Limit reached"
-   both have to fit beside a two-line title on a 360px phone. */
-.item .btn { flex: none; height: 44px; padding: 0 12px; gap: 5px; }
+.item-meta {
+  min-width: 0;
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.3;
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* 36px tall, never more: the 44px target is a transparent hit area around it,
+   so the card stays compact and the thumb still lands. */
+.item .btn {
+  position: relative;
+  flex: none;
+  height: 36px;
+  padding: 0 14px;
+  border-radius: 18px;
+  font-size: 14px;
+  font-weight: 600;
+  gap: 6px;
+}
+
+.item .btn::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 50%;
+  height: 44px;
+  transform: translateY(-50%);
+}
 
 /* While a file is being fetched the button says so, and the bar under its
    label fills — a phone on a slow connection needs to see movement, not a
-   spinner that could equally be a stuck page. */
-.btn[data-download] { position: relative; overflow: hidden; min-width: 92px; }
+   spinner that could equally be a stuck page.
+   No overflow clip here: the 44px hit area above and below a 36px button is a
+   pseudo-element, and `overflow: hidden` would cut it back down to 36px. The
+   bar keeps its own rounded ends instead. */
+.btn[data-download] { position: relative; min-width: 92px; }
 
 .btn-progress {
   position: absolute;
@@ -878,6 +930,7 @@ a { color: inherit; }
   width: 0;
   background: currentColor;
   opacity: .55;
+  border-radius: 0 0 18px 18px;
   transition: width .2s linear;
 }
 
@@ -911,16 +964,16 @@ a { color: inherit; }
 /* The same box as a card, so nothing moves when the page arrives. */
 .sk-card {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 10px;
-  min-height: 84px;
-  padding: 10px 12px;
+  min-height: 114px;
+  padding: 12px;
   border: 1px solid var(--line);
   border-radius: 16px;
 }
 
-.sk-tile { width: 36px; height: 36px; flex: none; border-radius: 11px; }
-.sk-lines { flex: 1 1 auto; min-width: 0; display: grid; gap: 6px; }
+.sk-tile { width: 40px; height: 40px; flex: none; border-radius: 10px; }
+.sk-lines { flex: 1 1 auto; min-width: 0; display: grid; gap: 6px; padding-top: 4px; }
 
 .sk {
   border-radius: 7px;
@@ -931,7 +984,7 @@ a { color: inherit; }
 
 .sk-title { width: 82%; height: 12px; }
 .sk-meta { width: 48%; height: 10px; }
-.sk-btn { flex: none; width: 92px; height: 44px; border-radius: 999px; }
+.sk-btn { flex: none; width: 108px; height: 36px; border-radius: 18px; }
 
 /* ============================================================
    States
@@ -1353,7 +1406,7 @@ a { color: inherit; }
   /* Inactive: solid muted teal-grey, not teal at 70% — an opacity wash is
      what made these look soft and blurry. */
   color: var(--muted);
-  font-size: 10.5px;
+  font-size: 12px;
   font-weight: 600;
   letter-spacing: .005em;
   line-height: 1.2;
@@ -1385,7 +1438,7 @@ a { color: inherit; }
 }
 
 @media (max-width: 340px) {
-  .tab { font-size: 10px; }
+  .tab { font-size: 11px; }
   .tab-label { letter-spacing: -.01em; }
 }
 
@@ -1660,30 +1713,6 @@ a { color: inherit; }
   font-size: 12px;
   line-height: 1.4;
   color: var(--muted);
-}
-
-/* ============================================================
-   Small phones
-   ============================================================ */
-
-@media (max-width: 380px) {
-  .app-bar {
-    padding: calc(12px + env(safe-area-inset-top)) calc(15px + env(safe-area-inset-right)) 14px
-      calc(15px + env(safe-area-inset-left));
-  }
-  .sheet {
-    padding: 16px calc(13px + env(safe-area-inset-right))
-      calc(var(--bar) + 18px + env(safe-area-inset-bottom))
-      calc(13px + env(safe-area-inset-left));
-  }
-  .cat-chips {
-    margin-right: calc(-13px - env(safe-area-inset-right));
-    margin-left: calc(-13px - env(safe-area-inset-left));
-    padding-right: calc(13px + env(safe-area-inset-right));
-    padding-left: calc(13px + env(safe-area-inset-left));
-  }
-  .app-title { font-size: 24px; }
-  .item-title { font-size: 14px; }
 }
 
 /* ============================================================
