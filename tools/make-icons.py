@@ -8,7 +8,7 @@ Writes into ``web/assets/img/``:
     icon.svg                  the mark on the teal tile (any size)
     safari-pinned-tab.svg     the mark alone, for Safari's pinned tabs
     favicon.ico               16, 32 and 48 px, for tabs and old crawlers
-    icon-16/32/48/96/144/192/512.png
+    icon-16/48/96/144/192/512.png
     apple-touch-icon.png      180 px, square: iOS rounds it itself
     icon-maskable-192/512.png full bleed, mark at 62% (Android's safe zone)
     og-1200x630.png           the card that shows when a link is shared
@@ -93,13 +93,6 @@ def f(v):
 def curve_d(seg):
     (x0, y0), (x1, y1), (x2, y2), (x3, y3) = seg
     return "C %s %s %s %s %s %s" % tuple(f(v) for v in (x1, y1, x2, y2, x3, y3))
-
-
-def mass_d():
-    (sx, sy) = TOP[0]
-    return "M %s %s %s %s %s L %s %s Z" % (
-        f(sx), f(sy), curve_d(TOP), curve_d(OUTER), curve_d(BOTTOM), f(sx), f(sy),
-    )
 
 
 def line_d(seg):
@@ -288,8 +281,7 @@ def main():
     write("icon.svg", icon_svg())
     write("safari-pinned-tab.svg", pinned_svg())
 
-    for size, detail, scale in ((16, "plain", 1.16), (32, "simple", 1.06),
-                                (48, "full", 1.0), (96, "full", 1.0),
+    for size, detail, scale in ((16, "plain", 1.16), (48, "full", 1.0), (96, "full", 1.0),
                                 (144, "full", 1.0), (192, "full", 1.0),
                                 (512, "full", 1.0)):
         write("icon-%d.png" % size, png_bytes(render(size, mark_scale=scale, detail=detail)))

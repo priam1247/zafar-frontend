@@ -584,13 +584,10 @@ var ZafarShell = (function () {
       count: root.querySelector("[data-count]"),
       meta: root.querySelector("[data-meta]"),
       quota: root.querySelector("[data-quota]"),
-      quotaText: root.querySelector("[data-quota-text]"),
       setQuotaSheet: function (copy) { setQuotaSheet(copy); },
-      closeDrawer: drawer.close,
       showToast: showToast,
-      svg: svg,
     };
   }
 
-  return { init: init, svg: svg, showToast: showToast };
+  return { init: init, svg: svg };
 })();

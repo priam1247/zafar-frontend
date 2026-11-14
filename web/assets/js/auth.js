@@ -68,10 +68,9 @@ var ZafarAuth = (function () {
 
       forgotTitle: "Reset password",
       forgotSubtitle: "Enter the email on your account and we'll send a code.",
-      sendCode: "Send code", sendingCode: "Sending code\u2026",
+      sendCode: "Send code",
       rememberLine: 'Remembered it? <button type="button" class="link-btn" data-back="auth">Sign in</button>',
       errForgotEmail: "Enter a valid email address.",
-      forgotNotAvailable: "Password reset isn't available yet. Please contact support.",
 
       verifyTitle: "Check your email",
       verifySubtitle: "We sent a 6-digit code to",
@@ -100,7 +99,6 @@ var ZafarAuth = (function () {
   };
 
   var mode = "signin";
-  var lang = "en";
   var resendTimer = null;
   var resendSeconds = 30;
   // The address on the verify / reset screen. Kept in sessionStorage as well as
@@ -382,13 +380,13 @@ var ZafarAuth = (function () {
   }
 
   function friendlyError(err) {
-    if (!err) return T[lang].offline;
+    if (!err) return T.en.offline;
     if (err.timeout) return err.message;
-    if (err instanceof TypeError || err.message === "Failed to fetch") return T[lang].offline;
+    if (err instanceof TypeError || err.message === "Failed to fetch") return T.en.offline;
     // A 5xx (or a gateway in front of the API) can carry internal detail; the
     // student gets a plain sentence instead.
-    if (typeof err.status === "number" && err.status >= 500) return T[lang].serverProblem;
-    if (!err.status) return T[lang].offline;
+    if (typeof err.status === "number" && err.status >= 500) return T.en.serverProblem;
+    if (!err.status) return T.en.offline;
     return err.message;
   }
   // Set when the API has accepted the password (or the Google token) and is
@@ -402,7 +400,7 @@ var ZafarAuth = (function () {
     pendingMfa = { kind: kind, credential: credential || null };
     var field = el("field-totp");
     if (field) field.hidden = false;
-    showBanner("authBanner", message || T[lang].mfaPrompt, false);
+    showBanner("authBanner", message || T.en.mfaPrompt, false);
     var input = el("totpCode");
     if (input) {
       input.value = "";
@@ -461,14 +459,8 @@ var ZafarAuth = (function () {
   // can greet the student by name afterwards. If the segment will not decode,
   // the greeting falls back to the address, and then to nothing.
   function googleProfile(credential) {
-    try {
-      var payload = String(credential).split(".")[1].replace(/-/g, "+").replace(/_/g, "/");
-      while (payload.length % 4) payload += "=";
-      var claims = JSON.parse(decodeURIComponent(escape(atob(payload))));
-      return { name: claims.name || "", email: claims.email || "" };
-    } catch (e) {
-      return {};
-    }
+    var claims = Zafar.jwtPayload(credential) || {};
+    return { name: claims.name || "", email: claims.email || "" };
   }
 
   function googleNote(text, kind) {
@@ -485,7 +477,7 @@ var ZafarAuth = (function () {
   // up. The backend verifies it with Google's keys and answers with the same
   // JWT /auth/login returns, so the rest of the app cannot tell the two apart.
   function signInWithGoogle(credential, remember, totpCode) {
-    var t = T[lang];
+    var t = T.en;
     if (!credential) return;
     var body = { credential: credential };
     if (totpCode) body.totp_code = totpCode;
@@ -617,12 +609,12 @@ var ZafarAuth = (function () {
     var input = el(btn.dataset.target);
     var showing = !!input && input.type === "text";
     btn.classList.toggle("shown", showing);
-    btn.setAttribute("aria-label", showing ? T[lang].hide : T[lang].show);
+    btn.setAttribute("aria-label", showing ? T.en.hide : T.en.show);
     btn.innerHTML = icon(showing ? "eyeoff" : "eye", 18);
   }
 
   function render() {
-    var t = T[lang];
+    var t = T.en;
     var isCreate = mode === "create";
 
     el("txt-headline").innerHTML = t.headline;
@@ -762,10 +754,10 @@ var ZafarAuth = (function () {
     var link = el("resendLink");
     if (!link) return;
     if (resendSeconds > 0) {
-      link.textContent = T[lang].resendWait(resendSeconds);
+      link.textContent = T.en.resendWait(resendSeconds);
       link.classList.add("disabled");
     } else {
-      link.textContent = T[lang].resendLink;
+      link.textContent = T.en.resendLink;
       link.classList.remove("disabled");
     }
   }
@@ -829,7 +821,7 @@ var ZafarAuth = (function () {
 
     form.addEventListener("submit", function (e) {
       e.preventDefault();
-      var t = T[lang];
+      var t = T.en;
       var isCreate = mode === "create";
 
       clearErrors(form);
@@ -948,7 +940,7 @@ var ZafarAuth = (function () {
     var forgotBtn = el("forgotBtn");
     el("forgotForm").addEventListener("submit", function (e) {
       e.preventDefault();
-      var t = T[lang];
+      var t = T.en;
       clearErrors(el("forgotForm"));
       var email = el("forgotEmail").value.trim();
       if (!isValidEmail(email)) return setError("field-forgot-email", true);
@@ -987,7 +979,7 @@ var ZafarAuth = (function () {
       showBanner("verifyBanner", "");
       Zafar.postJSON("/auth/resend", { email: pendingEmail() })
         .then(function () {
-          showBanner("verifyBanner", T[lang].resendSent, false);
+          showBanner("verifyBanner", T.en.resendSent, false);
           startResendCountdown();
         })
         .catch(function (err) { showBanner("verifyBanner", friendlyError(err), true); });
@@ -996,7 +988,7 @@ var ZafarAuth = (function () {
     var btn = el("verifyBtn");
     el("verifyForm").addEventListener("submit", function (e) {
       e.preventDefault();
-      var t = T[lang];
+      var t = T.en;
       var code = getOtp();
       if (code.length !== 6) {
         el("otpRow").classList.add("has-error");
@@ -1031,7 +1023,7 @@ var ZafarAuth = (function () {
     var btn = el("resetBtn");
     el("resetForm").addEventListener("submit", function (e) {
       e.preventDefault();
-      var t = T[lang];
+      var t = T.en;
       clearErrors(el("resetForm"));
       showBanner("resetBanner", "");
       var code = el("resetCode").value.trim();
@@ -1129,8 +1121,8 @@ var ZafarAuth = (function () {
       goToVerify(email, params.get("resend") === "1");
     } else {
       render();
-      if (params.get("verified") === "1") showBanner("authBanner", T[lang].verifiedBanner, false);
-      else if (params.get("registered") === "1") showBanner("authBanner", T[lang].registeredBanner, false);
+      if (params.get("verified") === "1") showBanner("authBanner", T.en.verifiedBanner, false);
+      else if (params.get("registered") === "1") showBanner("authBanner", T.en.registeredBanner, false);
       // Already signed in and landing on the sign-in page? Skip the form.
       // register.html stays reachable so a second account can be made.
       if (page === "login" && Zafar.getToken() && !params.get("switch") && !params.get("verified")) {

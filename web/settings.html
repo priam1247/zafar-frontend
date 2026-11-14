@@ -80,7 +80,7 @@
 
         '<section class="panel">' +
           '<h2 class="panel-title">' + t("settings.data") + "</h2>" +
-          '<div class="kv"><span>' + t("settings.history") + "</span><b>" +
+          '<div class="kv"><span>' + t("settings.history") + "</span><b data-history-count>" +
             Zafar.getRecentDownloads().length + "</b></div>" +
           '<p class="panel-note">' + t("settings.dataNote") + "</p>" +
           '<div class="panel-actions">' +
@@ -118,8 +118,8 @@
           localStorage.removeItem(Zafar.RECENT_DOWNLOADS_KEY + "_" + Zafar._currentUserSuffix());
         } catch (e) {}
         shell.showToast(t("downloads.cleared"), "check");
-        var kv = root.querySelectorAll(".kv b");
-        if (kv.length > 1) kv[1].textContent = "0";
+        var count = root.querySelector("[data-history-count]");
+        if (count) count.textContent = "0";
       });
 
       // Signing out from here uses the same one function the drawer uses, so
