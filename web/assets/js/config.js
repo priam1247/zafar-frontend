@@ -239,6 +239,81 @@ var Zafar = {
     if (!Array.isArray(list)) list = [];
     return limit ? list.slice(0, limit) : list;
   },
+  /* ---------- Confirmations that outlive the page --------------------- */
+  // The backend counts a download permanently only once POST /drive/confirm
+  // says the bytes arrived; until then the reservation expires and the
+  // allowance climbs back. That one request can be lost — a dropped
+  // connection, a tab closed mid-download, a phone that sleeps — and nothing
+  // used to send it again, so the count quietly went back up. The ids wait on
+  // the phone until the server has accepted them. Confirming twice is safe
+  // (the endpoint is idempotent), so a duplicate costs nothing.
+  PENDING_CONFIRM_KEY: "zafar_pending_confirms",
+  PENDING_CONFIRM_MAX: 20,
+
+  _pendingKey: function () {
+    return this.PENDING_CONFIRM_KEY + "_" + this._currentUserSuffix();
+  },
+
+  pendingConfirms: function () {
+    try {
+      var list = JSON.parse(localStorage.getItem(this._pendingKey()) || "[]");
+      return Array.isArray(list) ? list : [];
+    } catch (e) {
+      return [];
+    }
+  },
+
+  _savePending: function (list) {
+    try {
+      localStorage.setItem(this._pendingKey(), JSON.stringify(list.slice(-this.PENDING_CONFIRM_MAX)));
+    } catch (e) {}
+  },
+
+  queueConfirm: function (downloadId) {
+    if (downloadId == null || downloadId === "") return;
+    var list = this.pendingConfirms();
+    if (list.indexOf(downloadId) === -1) list.push(downloadId);
+    this._savePending(list);
+  },
+
+  dropConfirm: function (downloadId) {
+    this._savePending(this.pendingConfirms().filter(function (id) { return id !== downloadId; }));
+  },
+
+  // One confirmation. Forgotten once the server has answered — including with
+  // a 4xx, which is an answer too: an id the server will never accept must not
+  // be retried on every visit for the rest of the day.
+  confirmDownload: function (downloadId) {
+    var self = this;
+    return this.authPostJSON("/drive/confirm/" + encodeURIComponent(downloadId))
+      .then(function (data) {
+        self.dropConfirm(downloadId);
+        return data;
+      })
+      .catch(function (err) {
+        if (err && err.status && err.status < 500) self.dropConfirm(downloadId);
+        throw err;
+      });
+  },
+
+  // Everything still waiting from an earlier visit, one at a time. Resolves to
+  // how many the server accepted.
+  flushConfirms: function () {
+    var self = this;
+    var waiting = this.pendingConfirms();
+    var sent = 0;
+    return waiting
+      .reduce(function (chain, id) {
+        return chain.then(function () {
+          return self.confirmDownload(id).then(
+            function () { sent += 1; },
+            function () {}
+          );
+        });
+      }, Promise.resolve())
+      .then(function () { return sent; });
+  },
+
   /* ---------- Formatting -------------------------------------------- */
   escapeHTML: function (str) {
     var div = document.createElement("div");

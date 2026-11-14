@@ -434,7 +434,7 @@ backend. Endpoints used:
 | GET | `/drive/papers` | catalogue, filtered by `section`, `category`, `q`; read 50 at a time with `limit` + `offset`, on demand; the size of the whole answer in `X-Total-Count` |
 | GET | `/drive/categories` | the folder names inside a `section` |
 | POST | `/drive/download/{id}` | spend quota, return a short-lived signed URL |
-| POST | `/drive/confirm/{download_id}` | confirm the bytes actually arrived |
+| POST | `/drive/confirm/{download_id}` | confirm the bytes actually arrived — the id waits on the phone until the server accepts it, because an unconfirmed download only counts for five minutes |
 | GET | `/health` | warm-up ping, used by `Zafar.warmUp()` |
 
 `GOOGLE_CLIENT_ID` in the same file is the switch for **Continue with Google**:
