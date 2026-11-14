@@ -23,7 +23,6 @@ var ZafarShell = (function () {
     help: '<circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><path d="M12 17h.01"/>',
     logout: '<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/>',
     download: '<path d="M12 15V3"/><path d="m7 10 5 5 5-5"/><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>',
-    downloaded: '<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5"/><path d="M12 15V3"/>',
     settings: '<path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/>',
     bolt: '<path d="M14 8a1 1 0 0 1 1 1v2a1 1 0 0 0 1 1h3.293a.707.707 0 0 1 .5 1.207l-6.939 6.939a1.207 1.207 0 0 1-1.708 0l-6.94-6.94a.707.707 0 0 1 .5-1.206H8a1 1 0 0 0 1-1V9a1 1 0 0 1 1-1z"/><path d="M9 4h6"/>',
     search: '<circle cx="11" cy="11" r="7"/><path d="m20 20-3.2-3.2"/>',
@@ -31,7 +30,8 @@ var ZafarShell = (function () {
     offline: '<path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4"/><path d="M12 17h.01"/>',
     empty: '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M9 15h6"/>',
     grid: '<rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/>',
-    list: '<line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/>',
+    menu: '<path d="M4 7h16"/><path d="M4 12h16"/><path d="M4 17h16"/>',
+    close: '<path d="M18 6 6 18"/><path d="m6 6 12 12"/>',
   };
 
   // Whole pixels only, and geometricPrecision: fractional sizes land on half
@@ -63,7 +63,6 @@ var ZafarShell = (function () {
   function drawerModel() {
     var t = ZafarI18n.t;
     return navModel().concat([
-      { id: "downloads", icon: "downloaded", text: t("nav.myDownloads"), href: "downloads.html" },
       { id: "settings", icon: "settings", text: t("nav.settings"), href: "settings.html" },
       { id: "help", icon: "help", text: t("nav.help"), href: "help.html" },
     ]);
@@ -85,7 +84,7 @@ var ZafarShell = (function () {
   function drawerHTML(active) {
     var t = ZafarI18n.t;
     return (
-      '<div class="drawer" data-drawer hidden>' +
+      '<div class="drawer" id="app-drawer" data-drawer hidden>' +
         '<div class="drawer-scrim" data-drawer-close></div>' +
         '<aside class="drawer-panel" data-drawer-panel role="dialog" aria-modal="true" aria-labelledby="drawer-name">' +
           '<div class="drawer-profile">' +
@@ -94,6 +93,10 @@ var ZafarShell = (function () {
               '<h2 id="drawer-name" data-full-name>' + t("shell.student") + "</h2>" +
               '<p data-email></p>' +
             "</div>" +
+            // The panel covers the hamburger that opened it, so it carries its
+            // own way out at the corner a thumb reaches for.
+            '<button type="button" class="drawer-x" data-drawer-close aria-label="' +
+              Zafar.escapeHTML(t("shell.closeMenu")) + '">' + svg("close", 20) + "</button>" +
           "</div>" +
           '<nav class="drawer-nav" aria-label="' + Zafar.escapeHTML(t("shell.menu")) + '">' +
             drawerModel().map(function (entry) {
@@ -147,24 +150,26 @@ var ZafarShell = (function () {
   function shellHTML(opts) {
     var t = ZafarI18n.t;
     var title = Zafar.escapeHTML(opts.title || "StudyMW");
-    var crumb = Zafar.escapeHTML(opts.crumb || t("nav.studyLibrary"));
 
     return (
+      // Row one: the way into the menu, who is here, and Help. One line,
+      // no wrapping — Help is a door that must stay in the corner.
       '<header class="app-bar" data-bar>' +
-        '<button type="button" class="me" data-drawer-open aria-haspopup="dialog" aria-expanded="false">' +
-          '<span class="avatar" data-avatar aria-hidden="true">MW</span>' +
+        '<div class="bar-row">' +
+          '<button type="button" class="bar-circle" data-drawer-open aria-label="' +
+            Zafar.escapeHTML(t("shell.openMenu")) + '" aria-haspopup="dialog" aria-expanded="false" ' +
+            'aria-controls="app-drawer">' + svg("menu", 24) + "</button>" +
+          // A second, larger way in for a thumb. It repeats the hamburger, so
+          // a screen reader and the tab order skip it and keep one menu button.
+          '<button type="button" class="avatar" data-drawer-open data-avatar aria-hidden="true" ' +
+            'tabindex="-1">MW</button>' +
           '<span class="me-hi" data-greeting></span>' +
-        "</button>" +
-        '<div class="bar-actions">' +
-          '<a class="bar-btn" href="help.html" aria-label="' + Zafar.escapeHTML(t("nav.help")) + '" title="' +
-            Zafar.escapeHTML(t("nav.help")) + '">' + svg("help", 22) + "</a>" +
+          '<a class="bar-circle" href="help.html" aria-label="' + Zafar.escapeHTML(t("nav.help")) +
+            '" title="' + Zafar.escapeHTML(t("nav.help")) + '">' + svg("help", 24) + "</a>" +
         "</div>" +
-        '<div class="app-head">' +
-          '<div class="page-path">' +
-            '<span class="crumb">' + crumb + "</span>" +
-            '<span class="sep" aria-hidden="true">/</span>' +
-            '<h1 class="app-title">' + title + "</h1>" +
-          "</div>" +
+        // Row two: the section, and (on Books) what is left of its allowance.
+        '<div class="bar-row bar-row-title">' +
+          '<h1 class="app-title">' + title + "</h1>" +
           // Filled by the list page from /auth/quota — the server's number, not
           // a constant. A live region: it counts down and turns amber then red
           // without anyone touching it.
@@ -175,13 +180,15 @@ var ZafarShell = (function () {
             '<span class="quota-dot" aria-hidden="true"></span>' +
             '<span data-quota-text role="status" aria-live="polite" aria-atomic="true"></span>' +
           "</button>" +
-        "</div>" +
+          "</div>" +
       "</header>" +
 
       '<main class="sheet">' +
-        '<div class="list-meta" data-meta hidden>' +
-          '<span class="count" data-count>' + t("list.loading") + "</span>" +
-        "</div>" +
+        // A list page puts its own count above the sort control, in the flow
+        // of the page. Settings and Help have no list, so they get this line.
+        (opts.lede
+          ? '<div class="list-meta"><span class="count" data-count></span></div>'
+          : "") +
         '<div class="content" data-content></div>' +
       "</main>" +
 
@@ -337,7 +344,9 @@ var ZafarShell = (function () {
   function wireDrawer(root) {
     var drawer = root.querySelector("[data-drawer]");
     var panel = root.querySelector("[data-drawer-panel]");
-    var opener = root.querySelector("[data-drawer-open]");
+    // The hamburger and the avatar both open it. Neither is special, so both
+    // are kept in step: aria-expanded describes the drawer, not the button.
+    var openers = Array.prototype.slice.call(root.querySelectorAll("[data-drawer-open]"));
     var lastFocus = null;
     var open = false;
     var closeTimer = null;
@@ -359,13 +368,13 @@ var ZafarShell = (function () {
         lastFocus = document.activeElement;
         // Next frame, so the transition runs from the off-screen position.
         requestAnimationFrame(function () { drawer.classList.add("is-open"); });
-        opener && opener.setAttribute("aria-expanded", "true");
+        openers.forEach(function (b) { b.setAttribute("aria-expanded", "true"); });
         var first = panel.querySelector("a, button");
         if (first) first.focus();
       } else {
         drawer.classList.remove("is-open");
         panel.style.transform = "";
-        opener && opener.setAttribute("aria-expanded", "false");
+        openers.forEach(function (b) { b.setAttribute("aria-expanded", "false"); });
         var back = lastFocus;
         closeTimer = setTimeout(function () {
           closeTimer = null;
@@ -375,7 +384,11 @@ var ZafarShell = (function () {
       }
     }
 
-    opener && opener.addEventListener("click", function () { setOpen(true); });
+    // Tapping the hamburger twice is open then close: the same control, the
+    // same place, and no hunting for an X behind a dimmed page.
+    openers.forEach(function (b) {
+      b.addEventListener("click", function () { setOpen(!open); });
+    });
     drawer.addEventListener("click", function (e) {
       if (e.target.closest("[data-drawer-close]") || e.target.closest(".drawer-link")) setOpen(false);
     });
@@ -538,7 +551,7 @@ var ZafarShell = (function () {
     root.innerHTML = shellHTML({
       active: opts.active,
       title: opts.title || "StudyMW",
-      crumb: opts.crumb,
+      lede: opts.lede,
     });
 
     paintProfile(root);
@@ -578,11 +591,13 @@ var ZafarShell = (function () {
     var title = root.querySelector(".app-title");
     if (title) title.setAttribute("tabindex", "-1");
 
+    var count = root.querySelector("[data-count]");
+    if (count && opts.lede) count.textContent = opts.lede;
+
     return {
       config: config,
       content: root.querySelector("[data-content]"),
-      count: root.querySelector("[data-count]"),
-      meta: root.querySelector("[data-meta]"),
+      count: count,
       quota: root.querySelector("[data-quota]"),
       setQuotaSheet: function (copy) { setQuotaSheet(copy); },
       showToast: showToast,

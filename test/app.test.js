@@ -132,6 +132,16 @@ function openPage(pathAndQuery, hooks) {
   });
 }
 
+// One rule, out of a stylesheet, with the comments stripped: the CSS is part
+// of the contract these pages promise a 360px phone, and jsdom does no layout.
+function cssRule(file, selector) {
+  const css = read(path.join(WEB, "assets/css", file)).replace(/\/\*[\s\S]*?\*\//g, "");
+  const escaped = selector.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const found = new RegExp("(?:^|\n)" + escaped + "\\s*\\{([^}]*)\\}").exec(css);
+  assert.ok(found, file + " has no " + selector + " rule");
+  return found[1];
+}
+
 function submit(win, form) {
   form.dispatchEvent(new win.Event("submit", { bubbles: true, cancelable: true }));
 }
@@ -1307,7 +1317,12 @@ test("the bar has four tabs, in order, and Favorites is not one of them", async 
   assert.equal(tabs[0].classList.contains("active"), true);
   assert.equal(tabs[0].getAttribute("aria-current"), "page");
   assert.equal(d.querySelector(".app-title").textContent, "Books");
-  assert.equal(d.querySelector(".crumb").textContent, "Library");
+  // The eyebrow, the breadcrumb and its slash are gone: the title is the
+  // whole of row two on the left.
+  assert.equal(d.querySelector(".crumb"), null);
+  assert.equal(d.querySelector(".page-path"), null);
+  assert.equal(d.querySelector(".sep"), null);
+  assert.doesNotMatch(d.getElementById("app").textContent, /Library/);
   // Icons are 24×24 and drawn on whole pixels: the blur came from both.
   for (const glyph of tabs.map((a) => a.querySelector(".tab-ic svg"))) {
     assert.equal(glyph.getAttribute("width"), "24");
@@ -1318,7 +1333,7 @@ test("the bar has four tabs, in order, and Favorites is not one of them", async 
   dom.window.close();
 });
 
-test("the avatar opens a drawer that holds My Downloads, Settings and Log out", async () => {
+test("the hamburger opens a drawer that holds Settings, Help and Log out", async () => {
   const dom = await libraryPage("/notes.html", { storage: { zafar_me: JSON.stringify({ name: "Priam Zafar", email: "priam@gmail.com" }) } });
   await wait(700);
   const w = dom.window;
@@ -1326,20 +1341,22 @@ test("the avatar opens a drawer that holds My Downloads, Settings and Log out", 
 
   // No Log out in the bar any more: the bar has the name and Help.
   assert.equal(d.querySelector(".app-bar [data-logout]"), null);
-  assert.equal(d.querySelector(".app-bar .bar-btn").getAttribute("href"), "help.html");
+  assert.equal(d.querySelector('.app-bar a[href="help.html"]').getAttribute("aria-label"), "Help & FAQ");
   assert.equal(d.querySelector("[data-greeting]").textContent, "Hi, Priam");
   assert.equal(d.querySelector(".avatar").textContent, "PZ");
 
   const drawer = d.querySelector("[data-drawer]");
   assert.equal(drawer.hidden, true, "the drawer starts out of the way");
-  d.querySelector("[data-drawer-open]").click();
+  assert.equal(drawer.id, "app-drawer", "the hamburger says what it controls");
+  d.querySelector(".bar-circle[data-drawer-open]").click();
   assert.equal(drawer.hidden, false);
-  assert.equal(d.querySelector("[data-drawer-open]").getAttribute("aria-expanded"), "true");
+  assert.equal(d.querySelector(".bar-circle[data-drawer-open]").getAttribute("aria-expanded"), "true");
 
+  // Six destinations. My Downloads is not one of them, and neither is
+  // anything that only the drawer page could have linked to.
   const links = [...drawer.querySelectorAll(".drawer-link")].map((a) => a.textContent.trim());
-  for (const label of ["Books", "Past Papers", "Notes", "Marking Keys", "My Downloads", "Settings", "Help & FAQ"]) {
-    assert.ok(links.indexOf(label) !== -1, label + " is in the drawer: " + links.join(", "));
-  }
+  assert.deepEqual(links, ["Books", "Past Papers", "Notes", "Marking Keys", "Settings", "Help & FAQ"]);
+  assert.equal(drawer.querySelectorAll('a[href="downloads.html"]').length, 0);
   assert.equal(drawer.querySelector("[data-email]").textContent, "priam@gmail.com");
   assert.equal(drawer.querySelector("[data-full-name]").textContent, "Priam Zafar");
 
@@ -1355,7 +1372,7 @@ test("the avatar opens a drawer that holds My Downloads, Settings and Log out", 
   modal.querySelector("[data-logout-cancel]").click();
   assert.equal(modal.hidden, true);
   assert.ok(w.localStorage.getItem("zafar_token"), "cancelling changes nothing");
-  d.querySelector("[data-drawer-open]").click();
+  d.querySelector(".bar-circle[data-drawer-open]").click();
   d.querySelector("[data-logout-open]").click();
   d.querySelector("[data-logout-confirm]").click();
   await wait(60);
@@ -1364,6 +1381,238 @@ test("the avatar opens a drawer that holds My Downloads, Settings and Log out", 
   // is what makes the next page's guard send the student to sign-in.
   assert.equal(w.sessionStorage.getItem("zafar_admin_role"), null, "and the cached role");
   dom.window.close();
+});
+
+test("the hamburger is a toggle, and the drawer closes four ways", async () => {
+  const dom = await libraryPage("/books.html", {
+    storage: { zafar_me: JSON.stringify({ name: "Priam Zafar", email: "priam@gmail.com" }) },
+  });
+  await wait(700);
+  const w = dom.window;
+  const d = w.document;
+
+  const burger = d.querySelector(".app-bar .bar-circle[data-drawer-open]");
+  const avatarBtn = d.querySelector(".app-bar .avatar");
+  const drawer = d.querySelector("[data-drawer]");
+  const panel = d.querySelector("[data-drawer-panel]");
+
+  // The control announces itself, and its state, before anything is tapped.
+  assert.equal(burger.tagName, "BUTTON");
+  assert.equal(burger.getAttribute("aria-label"), "Open menu");
+  assert.equal(burger.getAttribute("aria-expanded"), "false");
+  assert.equal(burger.getAttribute("aria-controls"), drawer.id);
+  const glyph = burger.querySelector("svg");
+  assert.equal(glyph.getAttribute("width"), "24");
+  assert.equal(glyph.getAttribute("height"), "24");
+  assert.equal(glyph.getAttribute("shape-rendering"), "geometricPrecision");
+
+  // Open.
+  burger.click();
+  await wait(30);
+  assert.equal(drawer.hidden, false);
+  assert.equal(drawer.classList.contains("is-open"), true);
+  assert.equal(burger.getAttribute("aria-expanded"), "true");
+  assert.equal(avatarBtn.getAttribute("aria-expanded"), "true", "both openers agree");
+
+  // The same thumb, the same place: tapping it again closes.
+  burger.click();
+  await wait(300);
+  assert.equal(drawer.classList.contains("is-open"), false);
+  assert.equal(drawer.hidden, true, "and it is out of the way after the slide");
+  assert.equal(burger.getAttribute("aria-expanded"), "false");
+
+  // The avatar is a second way in.
+  avatarBtn.click();
+  await wait(30);
+  assert.equal(drawer.hidden, false);
+  // …and the X on the profile card is a way out.
+  const x = panel.querySelector(".drawer-x");
+  assert.ok(x, "the panel carries its own close button");
+  assert.equal(x.getAttribute("aria-label"), "Close menu");
+  x.click();
+  await wait(300);
+  assert.equal(drawer.hidden, true);
+
+  // Escape closes it too.
+  burger.click();
+  await wait(30);
+  panel.dispatchEvent(new w.KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+  await wait(300);
+  assert.equal(drawer.hidden, true);
+  assert.equal(burger.getAttribute("aria-expanded"), "false");
+  dom.window.close();
+});
+
+test("the header is two rows: the bar, then the section and its allowance", async () => {
+  const dom = await libraryPage("/books.html");
+  await wait(900);
+  const d = dom.window.document;
+  const bar = d.querySelector(".app-bar");
+  const rows = [...bar.querySelectorAll(".bar-row")];
+  assert.equal(rows.length, 2, "two rows, not three and not one wrapping one");
+
+  // Row one, in order: menu, avatar, greeting, Help. Nothing else, and Help
+  // is inside the row rather than below it.
+  const top = [...rows[0].children];
+  assert.deepEqual(
+    top.map((node) => node.getAttribute("class")),
+    ["bar-circle", "avatar", "me-hi", "bar-circle"]
+  );
+  assert.equal(top[0].getAttribute("aria-label"), "Open menu");
+  assert.equal(top[1].hasAttribute("data-avatar"), true);
+  assert.equal(top[2].hasAttribute("data-greeting"), true);
+  assert.equal(top[3].tagName, "A");
+  assert.equal(top[3].getAttribute("href"), "help.html");
+
+  // Row two: the section alone on the left, the allowance on the right.
+  const second = [...rows[1].children];
+  assert.deepEqual(second.map((node) => node.className), ["app-title", "quota"]);
+  assert.equal(second[0].textContent, "Books");
+  assert.equal(second[1].hidden, false, "the pill is on Books");
+  assert.equal(d.querySelector(".app-bar .bar-row [data-quota]"), second[1]);
+
+  // The pill is Books-only; the title is still the whole of the left side.
+  dom.window.close();
+  const notes = await libraryPage("/notes.html");
+  await wait(900);
+  const nd = notes.window.document;
+  assert.equal(nd.querySelector(".app-bar [data-quota]").hidden, true);
+  assert.equal(nd.querySelector(".bar-row-title .app-title").textContent, "Notes");
+  notes.window.close();
+
+  // The CSS contract the phone relies on: one line, a truncating greeting, and
+  // 40px circles at both ends.
+  const row = cssRule("app.css", ".bar-row");
+  assert.match(row, /display:\s*flex/);
+  assert.match(row, /flex-wrap:\s*nowrap/);
+  assert.match(row, /align-items:\s*center/);
+  const greeting = cssRule("app.css", ".me-hi");
+  assert.match(greeting, /flex:\s*1/);
+  assert.match(greeting, /min-width:\s*0/);
+  assert.match(greeting, /text-overflow:\s*ellipsis/);
+  assert.match(greeting, /white-space:\s*nowrap/);
+  const circle = cssRule("app.css", ".bar-circle");
+  assert.match(circle, /width:\s*40px/);
+  assert.match(circle, /height:\s*40px/);
+  assert.match(cssRule("app.css", ".bar-row-title"), /align-items:\s*baseline/);
+});
+
+test("the favorites and downloads addresses lead to Books, not to a 404", async () => {
+  for (const pathname of ["/favorites", "/favorites/", "/favorites.html", "/downloads", "/downloads.html"]) {
+    const res = await fetch(origin + pathname, { redirect: "manual" });
+    assert.equal(res.status, 301, pathname + " should redirect");
+    assert.equal(res.headers.get("location"), "/books.html", pathname + " should land on Books");
+  }
+  assert.equal((await fetch(origin + "/books.html")).status, 200, "and Books is there to land on");
+
+  // The deployed site is static: Cloudflare reads _redirects, so the same two
+  // rules have to be in the file that actually ships.
+  const redirects = read(path.join(WEB, "_redirects"));
+  assert.match(redirects, /^\/favorites\s+\/books\.html\s+301$/m);
+  assert.match(redirects, /^\/favorites\/\s+\/books\.html\s+301$/m);
+  assert.match(redirects, /^\/downloads\s+\/books\.html\s+301$/m);
+});
+
+test("the university note is on Past Papers only, and stays dismissed", async () => {
+  const papers = await libraryPage("/dashboard.html");
+  await wait(900);
+  const pd = papers.window.document;
+  const note = pd.querySelector("[data-note]");
+  assert.ok(note, "Past Papers carries the note");
+  assert.equal(note.hidden, false);
+  assert.match(note.textContent, /university papers/i);
+  // In the flow of the page, not a band under the header.
+  assert.ok(note.closest(".content"), "the note sits inside the content area");
+  assert.equal(pd.querySelectorAll(".app-bar [data-note]").length, 0);
+
+  pd.querySelector(".note-x").click();
+  assert.equal(note.hidden, true);
+  assert.equal(papers.window.localStorage.getItem("zafar_note_papers"), "1",
+    "dismissal is remembered on the phone");
+  assert.equal(papers.window.sessionStorage.getItem("zafar_note_papers"), null,
+    "not just for this visit");
+  papers.window.close();
+
+  // The next visit starts dismissed.
+  const again = await libraryPage("/dashboard.html", { storage: { zafar_note_papers: "1" } });
+  await wait(900);
+  assert.equal(again.window.document.querySelector("[data-note]").hidden, true);
+  again.window.close();
+
+  // Every other shelf is clean.
+  for (const page of ["/books.html", "/notes.html", "/marking-keys.html"]) {
+    const other = await libraryPage(page);
+    await wait(900);
+    assert.equal(other.window.document.querySelector("[data-note]"), null, page + " has no note");
+    other.window.close();
+  }
+});
+
+test("the controls are three rows, and the list has one layout", async () => {
+  const dom = await libraryPage("/books.html");
+  await wait(900);
+  const d = dom.window.document;
+
+  // A: one search field, full width.
+  assert.equal(d.querySelectorAll("[data-search]").length, 1);
+  // The grid/list switch is gone, with its icons and its stored preference.
+  assert.equal(d.querySelector(".view-toggle"), null);
+  assert.equal(d.querySelectorAll("[data-view]").length, 0);
+  assert.equal(dom.window.localStorage.getItem("zafar_view"), null);
+  assert.equal(d.querySelectorAll(".grid.list-view").length, 0);
+
+  // B: one scrolling chip row, and the first chip says "All".
+  assert.equal(d.querySelectorAll(".cat-chips").length, 1);
+  const chips = [...d.querySelectorAll(".cat-chip")].map((c) => c.textContent);
+  assert.equal(chips[0], "All");
+  assert.deepEqual(chips, ["All", "Senior", "Junior"]);
+
+  // C: the count and the sort, on one line. No SORT label, no results pill.
+  assert.equal(d.querySelector(".sort-label"), null);
+  const row = d.querySelector(".results-row");
+  assert.ok(row, "a results row");
+  assert.equal(row.querySelector("[data-count]").textContent, "1 result");
+  assert.equal(row.querySelector("[data-sort]").tagName, "SELECT");
+  assert.equal(d.querySelectorAll(".results-row").length, 1);
+  assert.equal(d.querySelectorAll(".results-row [data-count]").length, 1);
+  // The count is words, not a pill.
+  assert.doesNotMatch(cssRule("app.css", ".count"), /border-radius|background/);
+  assert.match(cssRule("app.css", ".search"), /width:\s*100%/);
+  dom.window.close();
+});
+
+test("nothing is dragged off the side of a 360px phone", () => {
+  // The page clips, the scroller scrolls, and every flex or grid child is
+  // allowed to be narrower than its own content.
+  assert.match(cssRule("app.css", ".app"), /overflow-x:\s*clip/);
+  for (const selector of [".content", ".sheet", ".item", ".item-body", ".item-meta", ".cat-chips", ".bar-row"]) {
+    assert.match(cssRule("app.css", selector), /min-width:\s*0/, selector + " needs min-width: 0");
+  }
+  // The chips scroll; they are not merely hidden.
+  const chips = cssRule("app.css", ".cat-chips");
+  assert.match(chips, /overflow-x:\s*auto/);
+  assert.doesNotMatch(chips, /overflow-x:\s*hidden/);
+  // …and fade out at the right edge, so the cut-off is legible.
+  assert.match(chips, /mask-image:[^;]*linear-gradient\(to right/);
+  // One padding scale, and 16px of it at both sides.
+  assert.match(cssRule("app.css", ".sheet"), /16px/);
+  assert.match(cssRule("app.css", ".app-bar"), /calc\(16px/);
+  // A card is compact: 84px floor, five of them above the tabs.
+  const item = cssRule("app.css", ".item");
+  assert.match(item, /min-height:\s*84px/);
+  assert.match(cssRule("app.css", ".item-title"), /-webkit-line-clamp:\s*2/);
+});
+
+test("the tab bar carries its own safe-area padding", () => {
+  const tabbar = cssRule("app.css", ".tabbar");
+  assert.match(tabbar, /padding(-bottom)?:[^;]*env\(safe-area-inset-bottom\)/,
+    "the white background has to reach the bottom edge of the screen");
+  assert.match(tabbar, /border-top:\s*1px solid/);
+  assert.match(tabbar, /background:\s*#FFFFFF/);
+  // Solid, not blurred: no backdrop filter, no translucent white.
+  assert.doesNotMatch(tabbar, /backdrop-filter|opacity|rgba\(255, 255, 255/);
+  // The sheet still leaves room to scroll the last card clear of it.
+  assert.match(cssRule("app.css", ".sheet"), /env\(safe-area-inset-bottom\)/);
 });
 
 test("the allowance reads as a sentence, and the colour follows the count", async () => {
@@ -1493,7 +1742,6 @@ const PAGES = [
   ["books.html", "/books.html"],
   ["notes.html", "/notes.html"],
   ["marking-keys.html", "/marking-keys.html"],
-  ["downloads.html", "/downloads.html"],
   ["settings.html", "/settings.html"],
 ];
 
@@ -1630,6 +1878,11 @@ test("the manifest and robots.txt agree with what is on disk", () => {
   assert.equal(manifest.theme_color, "#006D7C");
   assert.equal(manifest.background_color, "#FAF5E9");
 
+  // The long-press shortcuts point at pages that exist. My Downloads was the
+  // third, and the file it opened is gone.
+  assert.equal(manifest.shortcuts.some((s) => /downloads/.test(s.url)), false);
+  assert.deepEqual(manifest.shortcuts.map((s) => s.url), ["dashboard.html", "marking-keys.html"]);
+
   const sizes = manifest.icons.map((icon) => icon.sizes);
   for (const wanted of ["48x48", "96x96", "144x144", "192x192", "512x512"]) {
     assert.ok(sizes.includes(wanted), "the manifest is missing " + wanted);
@@ -1657,7 +1910,6 @@ test("the manifest and robots.txt agree with what is on disk", () => {
     "books.html",
     "notes.html",
     "marking-keys.html",
-    "downloads.html",
     "settings.html",
   ]) {
     assert.match(robots, new RegExp("^Disallow: /" + page + "$", "m"));

@@ -11,20 +11,8 @@ var ZafarI18n = (function () {
     nav: {
       pastPapers: "Past Papers",
       books: "Books", notes: "Notes", markingKeys: "Marking Keys",
-      myDownloads: "My Downloads", settings: "Settings", admin: "Admin portal",
+      settings: "Settings", admin: "Admin portal",
       help: "Help & FAQ",
-      studyLibrary: "Study library",
-    },
-
-    downloads: {
-      count: function (n) { return n + (n === 1 ? " document" : " documents"); },
-      emptyTitle: "Nothing downloaded yet",
-      emptyBody: "Every document you download on this phone is listed here, so you can find it again quickly.",
-      browseBooks: "Browse Books",
-      find: "Find it again",
-      note: "This list is kept on this phone, for this account only. Clearing it does not delete the files you already have.",
-      clear: "Clear this list",
-      cleared: "List cleared",
     },
 
     settings: {
@@ -36,8 +24,9 @@ var ZafarI18n = (function () {
       accountNote: "Your name and address come from how you signed in. To use a different account, log out and sign in again.",
       data: "Kept on this phone",
       history: "Download history",
-      dataNote: "StudyMW keeps no library pages offline. The only thing stored here is the list of files you have downloaded, used by My Downloads.",
+      dataNote: "StudyMW keeps no library pages offline. The only thing stored here is the list of files you have downloaded on this phone, which is what puts \u201cDownloaded\u201d on a card you already have.",
       clearHistory: "Clear history",
+      cleared: "History cleared",
       password: "Password",
       passwordNote: "Send yourself a reset link from the sign-in page. It arrives by email and works for fifteen minutes.",
       resetPassword: "Reset my password",
@@ -52,6 +41,8 @@ var ZafarI18n = (function () {
       student: "Student",
       noEmail: "Signed in",
       menu: "Menu",
+      openMenu: "Open menu",
+      closeMenu: "Close menu",
       sections: "Sections",
       logOut: "Log out",
       logOutTitle: "Log out?",
@@ -71,21 +62,24 @@ var ZafarI18n = (function () {
       },
     },
     pages: {
-      papers:    { title: "Past Papers", crumb: "Library", itemLabel: "paper",
+      papers:    { title: "Past Papers", itemLabel: "paper",
                    // One section, two shelves. Both spend the papers allowance.
                    levels: [
                      { key: "papers", label: "Secondary" },
                      { key: "primary", label: "Primary" },
-                   ] },
-      books:     { title: "Books", crumb: "Library", itemLabel: "book" },
-      notes:     { title: "Notes", crumb: "Library", itemLabel: "note" },
-      keys:      { title: "Marking Keys", crumb: "Library", itemLabel: "marking key" },
-      downloads: { title: "My Downloads", crumb: "Yours" },
-      settings:  { title: "Settings", crumb: "Yours" },
-      help:      { title: "Help & FAQ", crumb: "Support" },
+                   ],
+                   // The library is MSCE and JCE. Said once, on the shelf a
+                   // university student would look in first, and dismissible:
+                   // after the first read it is a line in the way.
+                   note: "We do not have university papers yet \u2014 the library covers MSCE and JCE." },
+      books:     { title: "Books", itemLabel: "book" },
+      notes:     { title: "Notes", itemLabel: "note" },
+      keys:      { title: "Marking Keys", itemLabel: "marking key" },
+      settings:  { title: "Settings" },
+      help:      { title: "Help & FAQ" },
     },
     list: {
-      allCategories: "All categories",
+      all: "All",
       chooseLevel: "Choose a level",
       loadMore: "Load more",
       loadingMore: "Loading…",
@@ -178,7 +172,6 @@ var ZafarI18n = (function () {
       partialTitle: "Some sections didn't load",
       partialBody: "Part of the library couldn't be reached, so this list may be missing " +
         "documents. Try again in a moment.",
-      sortLabel: "Sort",
       clearAll: "Clear all",
       clearSearch: "Clear search",
       couldntLoad: function (item) { return "Couldn't load " + item + "s"; },
@@ -207,8 +200,10 @@ var ZafarI18n = (function () {
       saved: "Saved",
       preparing: "Preparing…",
       download: "Download",
-      document: "Document",
-      pdfDocument: "PDF document",
+      // On a card whose file is already on this phone. The list that used to
+      // show them is gone; the fact that one is yours is still worth saying.
+      downloaded: "Downloaded \u2713",
+      dismiss: "Dismiss",
     },
     help: {
       heroTitle: "How can we help?",
@@ -254,11 +249,6 @@ var ZafarI18n = (function () {
           a: "<p>Downloads are prepared on demand: the app asks the server for a short-lived signed link, then " +
              "fetches the file and hands it to your browser. If that link expires before the file finishes, just " +
              "press <b>Download</b> again — an unfinished download doesn't count against your daily limit.</p>" },
-        { id: "downloads-list", q: "Where do I find something I downloaded before?",
-          a: "<p>Open the menu (tap your name at the top) and choose <b>My Downloads</b>. It lists the " +
-             "documents you have downloaded on this phone, newest first, with a link back to the shelf each " +
-             "one came from. The list is kept on this phone and belongs to your account alone, so two people " +
-             "sharing it never see each other's.</p>" },
         { id: "password", q: "I forgot my password.",
           a: "<p>Self-service reset is coming — the sign-in screen already has the flow, but the server side " +
              "isn't live yet. In the meantime, message the StudyMW admin from the email address on your account " +

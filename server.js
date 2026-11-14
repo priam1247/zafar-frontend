@@ -317,6 +317,16 @@ const server = http.createServer((req, res) => {
     headers["Set-Cookie"] = "zafar_demo=1; Path=/; SameSite=Lax";
   }
 
+  // Old bookmarks for the two pages that no longer exist. The site is static,
+  // so web/_redirects does this in production; the dev server answers the same
+  // way, or a test of the redirect could only ever be a test of Cloudflare.
+  var GONE = { "/favorites": "/books.html", "/downloads": "/books.html" };
+  var goneTarget = GONE[urlPath.replace(/\.html$/, "").replace(/\/+$/, "")];
+  if (goneTarget) {
+    res.writeHead(301, { Location: goneTarget, "Content-Length": 0 }).end();
+    return;
+  }
+
   if (urlPath === "/" || urlPath === "") urlPath = "/login.html";
   // Cloudflare serves these pages at their clean paths (/login, /register,
   // /verify), so the dev server answers those too. Without this, a page-name

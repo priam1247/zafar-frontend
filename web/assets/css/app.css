@@ -95,6 +95,10 @@ a { color: inherit; }
   width: 100%;
   max-width: var(--shell);
   margin-inline: auto;
+  /* Nothing on this page may be dragged sideways off the phone. `clip` rather
+     than `hidden`: hidden would make this element the scrolling ancestor and
+     the sticky bar inside it would stop sticking. */
+  overflow-x: clip;
   min-height: 100vh;
   min-height: 100dvh;
   display: flex;
@@ -105,41 +109,49 @@ a { color: inherit; }
 }
 
 /* ============================================================
-   Bar — avatar and greeting, page path, allowance, Help
+   Bar — two rows, neither of them wrapping
 
-   Two lines and no empty band above them: the person's name, then
-   "Library / Books" with the allowance beside it. It gets a few pixels
-   shorter once the list starts scrolling, so reading costs less chrome.
+   Row one: menu, who is here, Help. Row two: the section, and on Books the
+   allowance beside it. Nothing above the rows, so the list starts high.
    ============================================================ */
 
 .app-bar {
   position: sticky;
   top: 0;
   z-index: 30;
-  padding: calc(6px + env(safe-area-inset-top)) calc(14px + env(safe-area-inset-right)) 9px
-    calc(14px + env(safe-area-inset-left));
+  padding: calc(4px + env(safe-area-inset-top)) calc(16px + env(safe-area-inset-right)) 6px
+    calc(16px + env(safe-area-inset-left));
   background: var(--brand);
   color: var(--on);
   transition: padding .2s var(--ease);
 }
 
-/* Who is here, and the way into the drawer. A button, not a link: it opens a
-   dialog. 44px tall so a thumb hits it first time. */
-.me {
+.bar-row {
   display: flex;
+  flex-wrap: nowrap;
   align-items: center;
-  gap: 10px;
-  min-height: 44px;
-  padding: 2px 4px 2px 2px;
-  border: 0;
+  gap: 8px;
+  min-width: 0;
+}
+
+/* The hamburger and Help: 40px circles, one in each corner of the row. */
+.bar-circle {
+  flex: none;
+  width: 40px;
+  height: 40px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 1px solid var(--on-16);
   border-radius: 999px;
   background: transparent;
   color: var(--on);
-  font: inherit;
-  text-align: left;
+  text-decoration: none;
   cursor: pointer;
+  transition: background .18s var(--ease), border-color .18s var(--ease);
 }
-.me:active { background: var(--on-16); }
+.bar-circle:hover,
+.bar-circle:active { background: var(--on-16); border-color: var(--on-30); }
 
 .avatar {
   flex: none;
@@ -147,21 +159,28 @@ a { color: inherit; }
   height: 36px;
   display: grid;
   place-items: center;
+  padding: 0;
+  border: 0;
   border-radius: 999px;
   /* Teal on teal would vanish; the initials sit on mint, the same tile the
      brand mark uses, with ink on it (14:1). */
   background: var(--mint);
   color: var(--brand-deep);
+  font-family: inherit;
   font-size: 13px;
   font-weight: 700;
   letter-spacing: .02em;
   text-transform: uppercase;
+  cursor: pointer;
   transition: width .2s var(--ease), height .2s var(--ease);
 }
 
 .avatar-lg { width: 52px; height: 52px; font-size: 17px; }
 
+/* The greeting is the only thing in the row allowed to shrink: one line, an
+   ellipsis, and Help keeps its corner. */
 .me-hi {
+  flex: 1 1 auto;
   min-width: 0;
   font-size: 14px;
   font-weight: 700;
@@ -170,64 +189,25 @@ a { color: inherit; }
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  max-width: 52vw;
 }
 
-.bar-actions {
-  margin-left: auto;
-  display: flex;
-  align-items: center;
-  gap: 7px;
-}
-
-.bar-btn {
-  width: 44px;
-  height: 44px;
-  display: grid;
-  place-items: center;
-  border-radius: 999px;
-  border: 1px solid var(--on-16);
-  background: transparent;
-  color: var(--on);
-  text-decoration: none;
-  cursor: pointer;
-  transition: background .18s var(--ease), border-color .18s var(--ease);
-}
-.bar-btn:hover,
-.bar-btn:active { background: var(--on-16); border-color: var(--on-30); }
-
-/* "Library / Books" on one line, with the page name carrying the weight. */
-.app-head {
-  display: flex;
-  align-items: center;
+/* Row two sits on the text baseline of the title, so the pill reads as part
+   of the same line rather than floating beside it. */
+.bar-row-title {
+  align-items: baseline;
   justify-content: space-between;
   gap: 10px;
   margin-top: 2px;
-  padding-left: 2px;
 }
-
-.page-path {
-  display: flex;
-  align-items: baseline;
-  gap: 6px;
-  min-width: 0;
-}
-
-.crumb {
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--on-72);
-  white-space: nowrap;
-}
-
-.sep { color: var(--on-45); font-size: 12px; }
 
 .app-title {
   margin: 0;
-  font-size: 19px;
+  flex: 1 1 auto;
+  min-width: 0;
+  font-size: 24px;
   font-weight: 700;
   line-height: 1.15;
-  letter-spacing: -.028em;
+  letter-spacing: -.03em;
   color: var(--on);
   white-space: nowrap;
   overflow: hidden;
@@ -236,10 +216,10 @@ a { color: inherit; }
 }
 
 /* Slimmer once the list is moving. */
-.app-bar.is-slim { padding-top: calc(2px + env(safe-area-inset-top)); padding-bottom: 6px; }
+.app-bar.is-slim { padding-top: calc(2px + env(safe-area-inset-top)); padding-bottom: 4px; }
 .app-bar.is-slim .avatar { width: 30px; height: 30px; font-size: 11px; }
-.app-bar.is-slim .app-title { font-size: 17px; }
-.app-bar.is-slim .me { min-height: 38px; }
+.app-bar.is-slim .bar-circle { width: 34px; height: 34px; }
+.app-bar.is-slim .app-title { font-size: 19px; }
 
 /* ---------- The allowance pill ----------
    "3 books left today" on the Books tab, and its own noun on the others, from
@@ -249,6 +229,7 @@ a { color: inherit; }
 .quota {
   flex: none;
   max-width: 54%;
+  align-self: baseline;
   display: inline-flex;
   align-items: center;
   gap: 6px;
@@ -291,31 +272,25 @@ a { color: inherit; }
   font-size: 11.5px;
 }
 
-/* The count at the top of the sheet: a caption for the list. */
+/* A caption for the list: a sentence, not a pill. Settings and Help keep one
+   under the bar; a list page puts its own beside the sort control. */
 .list-meta {
   display: flex;
   align-items: center;
   gap: 8px;
   margin: 0 0 10px;
-}
-
-.list-meta .count {
-  border-color: var(--line);
-  color: var(--muted);
+  min-width: 0;
 }
 
 .count {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 4px 11px;
-  border-radius: 999px;
-  background: transparent;
-  border: 1px solid var(--line);
+  min-width: 0;
   color: var(--muted);
-  font-size: 11.5px;
+  font-size: 12.5px;
   font-weight: 600;
   letter-spacing: .01em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 /* ============================================================
@@ -358,12 +333,32 @@ a { color: inherit; }
 .drawer.is-open .drawer-panel { transform: none; }
 
 .drawer-profile {
+  position: relative;
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 4px 6px 16px;
+  padding: 4px 44px 16px 6px;
   border-bottom: 1px solid var(--line);
 }
+
+/* The panel covers the hamburger that opened it, so it carries its own X in
+   the corner a thumb reaches for. 40px, like the two in the bar. */
+.drawer-x {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 40px;
+  height: 40px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+}
+.drawer-x:active { background: var(--field); }
 
 .drawer-who { min-width: 0; }
 
@@ -458,6 +453,7 @@ a { color: inherit; }
 .sheet {
   flex: 1;
   min-width: 0;
+  overflow-x: clip;
   /* Room for the fixed tabs so the last card can still be scrolled clear. */
   padding: 14px calc(16px + env(safe-area-inset-right))
     calc(var(--bar) + 20px + env(safe-area-inset-bottom))
@@ -469,8 +465,45 @@ a { color: inherit; }
 .content {
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 10px;
+  min-width: 0;
 }
+
+/* ============================================================
+   The note a student can dismiss (Past Papers: "no university papers")
+   ============================================================ */
+
+.note {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  min-width: 0;
+  padding: 8px 8px 8px 12px;
+  border-radius: 12px;
+  background: var(--field);
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.note-text { flex: 1 1 auto; min-width: 0; }
+
+.note-x {
+  flex: none;
+  width: 24px;
+  height: 24px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--muted);
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+}
+.note-x:active { background: rgba(var(--brand-rgb), .10); }
 
 /* ============================================================
    Limit notice — shown only when the allowance is spent
@@ -512,22 +545,16 @@ a { color: inherit; }
 }
 
 /* ============================================================
-   Toolbar — search + view switch
+   Row A — search. One field, the whole width of the sheet.
    ============================================================ */
-
-.toolbar {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
 
 .search {
   position: relative;
-  flex: 1;
-  min-width: 0;
   display: flex;
   align-items: center;
   gap: 10px;
+  width: 100%;
+  min-width: 0;
   height: 48px;
   padding: 0 16px;
   border-radius: 16px;
@@ -555,39 +582,13 @@ a { color: inherit; }
 .search input::placeholder { color: var(--placeholder); /* 5.0:1 */ }
 .search input::-webkit-search-cancel-button { -webkit-appearance: none; }
 
-.view-toggle {
-  display: flex;
-  gap: 2px;
-  padding: 3px;
-  border-radius: 999px;
-  background: var(--field);
-}
-
-.view-btn {
-  width: 44px;
-  height: 44px;
-  display: grid;
-  place-items: center;
-  border: 1px solid transparent;
-  border-radius: 999px;
-  background: transparent;
-  color: var(--ink-45);
-  cursor: pointer;
-  transition: color .18s var(--ease), background .18s var(--ease);
-}
-.view-btn:hover { color: var(--ink); }
-.view-btn.active {
-  background: var(--sheet);
-  border-color: var(--line);
-  color: var(--ink);
-}
-
 /* ============================================================
    Category chips
    ============================================================ */
 
 .cat-chips {
   display: flex;
+  min-width: 0;
   gap: 8px;
   /* A left-to-right fade over the last 28px: on a phone the row runs off the
      edge, and this is the cheapest honest way to say "keep going" without an
@@ -724,25 +725,21 @@ a { color: inherit; }
 }
 
 /* ============================================================
-   Sort
+   Row C — how many results, and the one control that orders them
    ============================================================ */
 
-.sort-row {
+.results-row {
   display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: 10px;
-  margin-top: -2px;
+  min-width: 0;
 }
 
-.sort-label {
-  font-size: 9.5px;
-  font-weight: 650;
-  letter-spacing: .16em;
-  text-transform: uppercase;
-  color: var(--muted);
-}
+.results-row .count { flex: 1 1 auto; }
 
 .select {
+  flex: none;
   margin-left: auto;
   appearance: none;
   -webkit-appearance: none;
@@ -763,7 +760,7 @@ a { color: inherit; }
 .select:hover { border-color: var(--line-2); }
 
 /* ============================================================
-   Cards
+   Cards — one row each: tile, title and facts, download
    ============================================================ */
 
 .grid {
@@ -772,15 +769,18 @@ a { color: inherit; }
      width, and a long single-line title can push the whole track — and the
      cards — past the sheet's right edge. */
   grid-template-columns: minmax(0, 1fr);
-  gap: 10px;
+  gap: 8px;
 }
 
+/* 84px at rest, so five fit above the tabs on a 640px-tall phone. The height
+   is a floor, not a box: a two-line title grows it, and nothing is clipped. */
 .item {
   display: flex;
-  flex-direction: column;
-  gap: 12px;
+  align-items: center;
+  gap: 10px;
   min-width: 0;
-  padding: 14px;
+  min-height: 84px;
+  padding: 10px 12px;
   border: 1px solid var(--line);
   border-radius: 16px;
   background: #FFFFFF;
@@ -790,32 +790,24 @@ a { color: inherit; }
   transition: border-color .18s var(--ease), box-shadow .18s var(--ease);
 }
 .item:hover { border-color: var(--line-2); box-shadow: 0 2px 4px rgba(16, 20, 19, .05), 0 10px 24px rgba(16, 20, 19, .07); }
-.item:active { transform: none; }
-
-.item-top {
-  display: flex;
-  align-items: flex-start;
-  gap: 12px;
-  min-width: 0;
-}
 
 .glyph-tile {
-  width: 40px;
-  height: 40px;
+  width: 36px;
+  height: 36px;
   flex: none;
   display: grid;
   place-items: center;
-  border-radius: 12px;
+  border-radius: 11px;
   background: var(--mint);
   color: var(--ink);
 }
 
-.item-head { flex: 1; min-width: 0; }
+.item-body { flex: 1 1 auto; min-width: 0; }
 
 .item-title {
   margin: 0;
   min-width: 0;
-  font-size: 14.5px;
+  font-size: 13.5px;
   font-weight: 620;
   line-height: 1.28;
   letter-spacing: -.012em;
@@ -826,47 +818,57 @@ a { color: inherit; }
   overflow: hidden;
 }
 
-.item-cat {
-  margin-top: 6px;
-  display: inline-flex;
+/* "15.4 MB · PDF", then whatever else the card knows. */
+.item-meta {
+  display: flex;
   align-items: center;
-  padding: 2px 8px;
+  gap: 6px;
+  min-width: 0;
+  margin: 4px 0 0;
+  font-size: 11.5px;
+  line-height: 1.3;
+  color: var(--muted);
+}
+
+.item-size { flex: none; white-space: nowrap; }
+
+/* A category worth naming (JCE, MSCE, a subject). Never "Document": a chip
+   that only repeats the section is a chip in the way. */
+.item-cat {
+  flex: 0 1 auto;
+  min-width: 0;
+  padding: 1px 8px;
   border-radius: 999px;
   border: 1px solid var(--line);
   color: var(--muted);
   font-size: 10.5px;
   font-weight: 600;
   letter-spacing: .01em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
-.item-foot {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding-top: 12px;
-  border-top: 1px solid var(--line);
+/* This file is already on the phone. */
+.item-dl {
+  flex: none;
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: var(--mint);
+  color: var(--brand-deep);
+  font-size: 10.5px;
+  font-weight: 700;
+  white-space: nowrap;
 }
 
-.file-meta {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  min-width: 0;
-  /* The size and type under every card. It was 2.0:1, which on a phone in
-     daylight is not there at all. */
-  color: var(--muted);
-}
-
-.file-meta .lines { display: block; line-height: 1.25; }
-.file-meta .size { display: block; font-size: 11.5px; font-weight: 600; color: var(--t-80); }
-.file-meta .type { display: block; font-size: 10.5px; }
-
-.item-foot .btn { margin-left: auto; }
+/* 44px tall and only as wide as its word: "Download" and "Limit reached"
+   both have to fit beside a two-line title on a 360px phone. */
+.item .btn { flex: none; height: 44px; padding: 0 12px; gap: 5px; }
 
 /* While a file is being fetched the button says so, and the bar under its
    label fills — a phone on a slow connection needs to see movement, not a
    spinner that could equally be a stuck page. */
-.btn[data-download] { position: relative; overflow: hidden; min-width: 104px; }
+.btn[data-download] { position: relative; overflow: hidden; min-width: 92px; }
 
 .btn-progress {
   position: absolute;
@@ -897,40 +899,28 @@ a { color: inherit; }
   cursor: not-allowed;
 }
 
-/* ---------- List view ---------- */
-
-.grid.list-view .item {
-  flex-direction: row;
-  align-items: center;
-  gap: 9px;
-  padding: 8px 12px;
-  border-radius: 16px;
-}
-.grid.list-view .item-top { flex: 1; align-items: center; gap: 11px; }
-.grid.list-view .glyph-tile { width: 34px; height: 34px; border-radius: 10px; }
-.grid.list-view .item-title { -webkit-line-clamp: 1; font-size: 13.5px; }
-.grid.list-view .item-cat { display: none; }
-.grid.list-view .item-foot { padding: 0; border: 0; gap: 0; }
-.grid.list-view .file-meta { display: none; }
-.grid.list-view .btn { height: 44px; width: 44px; padding: 0; }
-.grid.list-view .btn .btn-label { display: none; }
-
 /* ============================================================
    Skeleton
    ============================================================ */
 
 .skeleton {
   display: grid;
-  gap: 10px;
+  gap: 8px;
 }
 
+/* The same box as a card, so nothing moves when the page arrives. */
 .sk-card {
-  display: grid;
-  gap: 9px;
-  padding: 14px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 84px;
+  padding: 10px 12px;
   border: 1px solid var(--line);
-  border-radius: 18px;
+  border-radius: 16px;
 }
+
+.sk-tile { width: 36px; height: 36px; flex: none; border-radius: 11px; }
+.sk-lines { flex: 1 1 auto; min-width: 0; display: grid; gap: 6px; }
 
 .sk {
   border-radius: 7px;
@@ -939,13 +929,9 @@ a { color: inherit; }
   animation: shimmer 1.4s linear infinite;
 }
 
-.sk-badge { width: 68px; height: 16px; }
-.sk-title { width: 84%; height: 13px; }
-.sk-title2 { width: 52%; height: 13px; }
-.sk-foot { display: flex; align-items: center; gap: 9px; margin-top: 3px; }
-.sk-glyph { width: 26px; height: 26px; border-radius: 8px; }
-.sk-meta { width: 62px; height: 11px; }
-.sk-btn { margin-left: auto; width: 88px; height: 30px; border-radius: 999px; }
+.sk-title { width: 82%; height: 12px; }
+.sk-meta { width: 48%; height: 10px; }
+.sk-btn { flex: none; width: 92px; height: 44px; border-radius: 999px; }
 
 /* ============================================================
    States
@@ -1575,57 +1561,6 @@ a { color: inherit; }
   margin-top: 14px;
 }
 .panel-actions .btn { flex: 1 1 auto; }
-
-/* My Downloads: one row per document, the who/what on the left and the way
-   back on the right. */
-.saved-list {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.saved-row {
-  display: flex;
-  align-items: center;
-  gap: 11px;
-  padding: 10px 12px;
-  border: 1px solid var(--line);
-  border-radius: 16px;
-  background: #FFFFFF;
-  box-shadow: 0 1px 2px rgba(16, 20, 19, .04);
-}
-
-.saved-text { flex: 1; min-width: 0; display: block; }
-
-.saved-title {
-  display: block;
-  font-size: 14px;
-  font-weight: 620;
-  line-height: 1.3;
-  color: var(--brand);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.saved-meta {
-  display: block;
-  margin-top: 2px;
-  font-size: 11.5px;
-  color: var(--muted);
-}
-
-.saved-row .btn { flex: none; }
-
-.saved-note {
-  margin: 14px 0 10px;
-  font-size: 12.5px;
-  line-height: 1.5;
-  color: var(--muted);
-}
 
 .contact-card {
   display: flex;

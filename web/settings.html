@@ -56,11 +56,14 @@
     document.addEventListener("DOMContentLoaded", function () {
       var t = ZafarI18n.t;
       var p = t("pages.settings");
-      var shell = ZafarShell.init({ active: "settings", title: p.title, crumb: p.crumb });
+      var shell = ZafarShell.init({
+        active: "settings",
+        title: p.title,
+        lede: t("settings.subtitle"),
+      });
       if (!shell) return;
 
       var root = shell.content;
-      shell.count.textContent = t("settings.subtitle");
       var me = Zafar.getMe();
 
       // Nothing on this page is a preference the API can store — there is no
@@ -84,7 +87,6 @@
             Zafar.getRecentDownloads().length + "</b></div>" +
           '<p class="panel-note">' + t("settings.dataNote") + "</p>" +
           '<div class="panel-actions">' +
-            '<a class="btn btn-ghost" href="downloads.html">' + t("nav.myDownloads") + "</a>" +
             '<button type="button" class="btn btn-ghost" data-clear-history>' +
               t("settings.clearHistory") + "</button>" +
           "</div>" +
@@ -117,7 +119,7 @@
         try {
           localStorage.removeItem(Zafar.RECENT_DOWNLOADS_KEY + "_" + Zafar._currentUserSuffix());
         } catch (e) {}
-        shell.showToast(t("downloads.cleared"), "check");
+        shell.showToast(t("settings.cleared"), "check");
         var count = root.querySelector("[data-history-count]");
         if (count) count.textContent = "0";
       });

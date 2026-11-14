@@ -28,6 +28,16 @@ var ZafarList = (function () {
     var t = ZafarI18n.t;
     var activeCat = (new URLSearchParams(location.search).get("category")) || "";
     return (
+      // A slim note, once, on the shelf a university student would try first.
+      // Dismissing it is remembered on this phone; it never comes back.
+      (cfg.note
+        ? '<div class="note" data-note hidden>' +
+            '<span class="note-text" data-note-text></span>' +
+            '<button type="button" class="note-x" data-note-close aria-label="' +
+              Zafar.escapeHTML(t("list.dismiss")) + '">&times;</button>' +
+          "</div>"
+        : "") +
+
       // The explanation of a spent allowance, in the page, where a student
       // who has scrolled past the pill will still meet it. No other page to
       // send them to: the allowance is this section's, and the pill above
@@ -49,26 +59,25 @@ var ZafarList = (function () {
             Zafar.escapeHTML(t("list.chooseLevel")) + '"></div>'
         : "") +
 
-      '<div class="toolbar">' +
-        '<label class="search">' + svg("search", 18) +
-          '<input type="search" data-search placeholder="' +
-          Zafar.escapeHTML(cfg.searchPlaceholder || t("list.searchPlaceholder")) +
-          '" aria-label="' + Zafar.escapeHTML(t("list.searchPlaceholderAria")) + '" enterkeyhint="search">' +
-        "</label>" +
-        '<div class="view-toggle" role="group" aria-label="View">' +
-          '<button type="button" class="view-btn" data-view="grid" aria-label="Grid view" aria-pressed="true">' + svg("grid", 16) + "</button>" +
-          '<button type="button" class="view-btn" data-view="list" aria-label="List view" aria-pressed="false">' + svg("list", 16) + "</button>" +
-        "</div>" +
-      "</div>" +
+      // Row A — one search field, full width. There is one layout for the
+      // list, so there is nothing to switch between.
+      '<label class="search">' + svg("search", 18) +
+        '<input type="search" data-search placeholder="' +
+        Zafar.escapeHTML(cfg.searchPlaceholder || t("list.searchPlaceholder")) +
+        '" aria-label="' + Zafar.escapeHTML(t("list.searchPlaceholderAria")) + '" enterkeyhint="search">' +
+      "</label>" +
 
+      // Row B — the categories, in one scrolling line with a fade at the edge.
       (cfg.categories && cfg.categories.length
         ? '<div class="cat-chips" data-cat-chips></div>'
         : "") +
 
       '<div class="chips" data-chips style="display:none"></div>' +
 
-      '<div class="sort-row">' +
-        '<span class="sort-label">' + t("list.sortLabel") + "</span>" +
+      // Row C — how many, and in what order. Plain words on the left, the one
+      // control on the right.
+      '<div class="results-row">' +
+        '<span class="count" data-count>' + t("list.loading") + "</span>" +
         '<select class="select" data-sort aria-label="Sort results">' +
           '<option value="name-asc">' + t("list.sortNameAsc") + "</option>" +
           '<option value="name-desc">' + t("list.sortNameDesc") + "</option>" +
@@ -101,19 +110,20 @@ var ZafarList = (function () {
     );
   }
 
+  // Same shape and height as a real card, so the list does not jump when the
+  // answer arrives: tile, two lines of text, one button.
   function skeletonHTML(n) {
     var one =
-      '<div class="sk-card"><div class="sk sk-badge"></div>' +
-      '<div class="sk sk-title"></div><div class="sk sk-title2"></div>' +
-      '<div class="sk-foot"><div class="sk sk-glyph"></div><div class="sk sk-meta"></div>' +
-      '<div class="sk sk-btn"></div></div></div>';
+      '<div class="sk-card"><div class="sk sk-tile"></div>' +
+      '<div class="sk-lines"><div class="sk sk-title"></div><div class="sk sk-meta"></div></div>' +
+      '<div class="sk sk-btn"></div></div>';
     return new Array(n).fill(one).join("");
   }
 
   function catChipsHTML(categories, activeCat) {
     var chips = [
       '<button type="button" class="cat-chip' + (activeCat ? "" : " active") + '" data-cat="" aria-pressed="' + (!activeCat) + '">' +
-        ZafarI18n.t("list.allCategories") + "</button>",
+        ZafarI18n.t("list.all") + "</button>",
     ];
     categories.forEach(function (c) {
       chips.push(
@@ -130,37 +140,62 @@ var ZafarList = (function () {
   // mean inventing file names, so this shows the truth: "this one is featured".
   var featured = [];
 
+  // What is already on this phone, by id. The list of downloads as a page is
+  // gone; the one thing worth keeping from it is the badge on the card.
+  var downloaded = {};
+
+  function loadDownloaded() {
+    downloaded = {};
+    Zafar.getRecentDownloads().forEach(function (row) {
+      if (row && row.id) downloaded[String(row.id)] = true;
+    });
+  }
+
   // pageSection is the shelf the card is on. A download is charged to that
   // shelf's allowance, so the card carries it into the request.
+  //
+  // One row: a tile, the title over its facts, and the one action. The title
+  // gets two lines and no more; the facts are one muted line, "15.4 MB · PDF",
+  // with the category beside them when the library has one to name (JCE,
+  // MSCE, a subject) and nothing when it would only repeat the section.
   function cardHTML(doc, pageSection) {
     var t = ZafarI18n.t;
     var section = doc._section || pageSection || "";
     var title = Zafar.escapeHTML(doc.name.replace(/\.pdf$/i, ""));
     var filename = /\.pdf$/i.test(doc.name) ? doc.name : doc.name + ".pdf";
+    var category = (doc.category || "").trim();
     return (
       '<article class="item" data-id="' + Zafar.escapeHTML(doc.id) + '">' +
-        '<div class="item-top">' +
-          '<span class="glyph-tile">' + svg("file", 19) + "</span>" +
-          '<div class="item-head">' +
-            '<h3 class="item-title">' + title +
-              (featured.indexOf(doc.id) !== -1 ? '<span class="item-featured">Featured</span>' : "") + "</h3>" +
-            '<span class="item-cat">' + Zafar.escapeHTML(doc.category || t("list.document")) + "</span>" +
-          "</div>" +
+        '<span class="glyph-tile">' + svg("file", 18) + "</span>" +
+        '<div class="item-body">' +
+          '<h3 class="item-title">' + title +
+            (featured.indexOf(doc.id) !== -1 ? '<span class="item-featured">Featured</span>' : "") + "</h3>" +
+          '<p class="item-meta">' +
+            '<span class="item-size">' + Zafar.escapeHTML(Zafar.formatSize(doc.size_bytes)) + " \u00b7 PDF</span>" +
+            (category ? '<span class="item-cat">' + Zafar.escapeHTML(category) + "</span>" : "") +
+            (downloaded[String(doc.id)] ? '<span class="item-dl">' + t("list.downloaded") + "</span>" : "") +
+          "</p>" +
         "</div>" +
-        '<div class="item-foot">' +
-          '<div class="file-meta">' +
-            '<span class="lines"><span class="size">' + Zafar.formatSize(doc.size_bytes) +
-            '</span><span class="type">' + t("list.pdfDocument") + "</span></span>" +
-          "</div>" +
-          '<button class="btn btn-primary btn-sm" data-download="' + Zafar.escapeHTML(doc.id) +
-            '" data-filename="' + Zafar.escapeHTML(filename) +
-            (section ? '" data-section="' + Zafar.escapeHTML(section) : "") +
-            '" aria-label="' + t("list.download") + " " + Zafar.escapeHTML(filename) + '">' +
-            svg("download", 16) + '<span class="btn-label">' + t("list.download") + "</span>" +
-            '<span class="btn-progress" aria-hidden="true"></span></button>' +
-        "</div>" +
+        '<button class="btn btn-primary btn-sm" data-download="' + Zafar.escapeHTML(doc.id) +
+          '" data-filename="' + Zafar.escapeHTML(filename) +
+          (section ? '" data-section="' + Zafar.escapeHTML(section) : "") +
+          '" aria-label="' + t("list.download") + " " + Zafar.escapeHTML(filename) + '">' +
+          svg("download", 16) + '<span class="btn-label">' + t("list.download") + "</span>" +
+          '<span class="btn-progress" aria-hidden="true"></span></button>' +
       "</article>"
     );
+  }
+
+  // The card a download just landed on says so, without waiting for a repaint.
+  function markDownloaded(card, id) {
+    downloaded[String(id)] = true;
+    if (!card) return;
+    var meta = card.querySelector(".item-meta");
+    if (!meta || meta.querySelector(".item-dl")) return;
+    var badge = document.createElement("span");
+    badge.className = "item-dl";
+    badge.textContent = t("list.downloaded");
+    meta.appendChild(badge);
   }
 
   function init(cfg, shell) {
@@ -186,8 +221,7 @@ var ZafarList = (function () {
     var current = "loading";
     var renderedCount = 0;
 
-    // Pages without a list (Help) leave this hidden.
-    if (shell.meta) shell.meta.hidden = false;
+    loadDownloaded();
 
     var el = {
       grid: root.querySelector("[data-grid]"),
@@ -200,8 +234,12 @@ var ZafarList = (function () {
       notice: root.querySelector("[data-notice]"),
       noticeTitle: root.querySelector("[data-notice-title]"),
       noticeBody: root.querySelector("[data-notice-body]"),
+      count: root.querySelector("[data-count]"),
       search: root.querySelector("[data-search]"),
       sort: root.querySelector("[data-sort]"),
+      note: root.querySelector("[data-note]"),
+      noteText: root.querySelector("[data-note-text]"),
+      noteClose: root.querySelector("[data-note-close]"),
       switch: root.querySelector("[data-switch]"),
       more: root.querySelector("[data-more]"),
       moreBtn: root.querySelector("[data-more-btn]"),
@@ -225,25 +263,25 @@ var ZafarList = (function () {
     };
     if (state.q) el.search.value = state.q;
 
-    /* ---------- View: grid / list ---------- */
-    var view = "grid";
-    try { view = localStorage.getItem("zafar_view") === "list" ? "list" : "grid"; } catch (e) {}
-    function applyView() {
-      el.grid.classList.toggle("list-view", view === "list");
-      root.querySelectorAll("[data-view]").forEach(function (b) {
-        var on = b.dataset.view === view;
-        b.classList.toggle("active", on);
-        b.setAttribute("aria-pressed", String(on));
+    /* ---------- The one note on this page ----------
+       Shown until it is read and dismissed, then never again on this phone.
+       localStorage, not sessionStorage: a note that returns on every visit is
+       not dismissible, it is a nag. */
+    if (el.note && el.noteClose) {
+      var noteKey = "zafar_note_" + cfg.section;
+      var seen = false;
+      try { seen = localStorage.getItem(noteKey) === "1"; } catch (e) {}
+      if (seen) {
+        el.note.hidden = true;
+      } else {
+        el.noteText.textContent = t(cfg.note);
+        el.note.hidden = false;
+      }
+      el.noteClose.addEventListener("click", function () {
+        el.note.hidden = true;
+        try { localStorage.setItem(noteKey, "1"); } catch (e) {}
       });
     }
-    root.querySelectorAll("[data-view]").forEach(function (b) {
-      b.addEventListener("click", function () {
-        view = b.dataset.view;
-        try { localStorage.setItem("zafar_view", view); } catch (e) {}
-        applyView();
-      });
-    });
-    applyView();
 
     /* ---------- Daily allowances — one per section ----------------------------
        The server keeps four buckets, each on its own UTC day: papers 10, books
@@ -590,14 +628,14 @@ var ZafarList = (function () {
       // is charged to that shelf's allowance.
       var section = btn.dataset.section || state.section;
       var card = btn.closest(".item");
+      var catNode = card ? card.querySelector(".item-cat") : null;
       // Remembered only once the file is actually on the phone — a reservation
-      // that never delivered anything is not a download.
+      // that never delivered anything is not a download. The id is what puts
+      // the badge back on this card the next time the list is drawn.
       var file = {
         id: id,
-        name: card ? card.querySelector(".item-title").textContent : btn.dataset.filename,
-        category: card ? card.querySelector(".item-cat").textContent : "",
-        // Kept with the row so My Downloads can send the student back to the
-        // shelf it came from rather than guessing at Books.
+        name: btn.dataset.filename || (card ? card.querySelector(".item-title").textContent : ""),
+        category: catNode ? catNode.textContent : "",
         section: section,
       };
       Zafar.authPostJSON(
@@ -643,6 +681,7 @@ var ZafarList = (function () {
               // the click. A minute is long enough for the browser to take it.
               setTimeout(function () { URL.revokeObjectURL(url); }, 60000);
               Zafar.recordDownload(file);
+              markDownloaded(card, id);
               markSaved();
               // Tell the backend the bytes actually arrived, so this counts
               // permanently against today's quota. A reservation that never
@@ -886,11 +925,11 @@ var ZafarList = (function () {
       var done = !failure && !hasMore();
       var total = totalAcross();
       if (total !== null) {
-        shell.count.textContent = t("list.results", groupCount(total));
+        el.count.textContent = t("list.results", groupCount(total));
       } else if (done) {
-        shell.count.textContent = t("list.results", groupCount(n));
+        el.count.textContent = t("list.results", groupCount(n));
       } else {
-        shell.count.textContent = t("list.resultsAtLeast", groupCount(n));
+        el.count.textContent = t("list.resultsAtLeast", groupCount(n));
       }
     }
 
@@ -934,7 +973,7 @@ var ZafarList = (function () {
         // A second attempt is about to start. Say so rather than leave a
         // still skeleton looking like a dead page — the first visit can start a
         // full Drive scan on the server.
-        if (shell.count) shell.count.textContent = t("list.loadingSlow");
+        if (el.count) el.count.textContent = t("list.loadingSlow");
       })).then(
         function (answer) {
           entry.loading = false;
@@ -989,7 +1028,7 @@ var ZafarList = (function () {
       renderedCount = 0;
       failure = null;
       show("loading");
-      shell.count.textContent = t("list.loading");
+      el.count.textContent = t("list.loading");
       // Nothing to continue until something is on screen.
       if (el.more) el.more.hidden = true;
       watchTail(false);
@@ -1055,10 +1094,10 @@ var ZafarList = (function () {
       // Nothing came back, and something went wrong getting it.
       if (!docs.length && failure) {
         if (!navigator.onLine) {
-          shell.count.textContent = t("list.offline");
+          el.count.textContent = t("list.offline");
           show("offline");
         } else {
-          shell.count.textContent = "\u2014";
+          el.count.textContent = "\u2014";
           show("error");
           shell.showToast(
             failure.status === 429
