@@ -194,28 +194,38 @@ var Zafar = {
   _migrateLegacyKey: function (legacyKey, scopedKey) {
     if (this._migrated[legacyKey]) return;
     this._migrated[legacyKey] = true;
-    var legacy = localStorage.getItem(legacyKey);
-    if (legacy !== null && localStorage.getItem(scopedKey) === null) {
-      localStorage.setItem(scopedKey, legacy);
-    }
-    localStorage.removeItem(legacyKey);
+    // A phone that refuses storage (a locked-down browser, a full quota)
+    // throws on every one of these. History is a convenience; it is never
+    // worth a broken download.
+    try {
+      var legacy = localStorage.getItem(legacyKey);
+      if (legacy !== null && localStorage.getItem(scopedKey) === null) {
+        localStorage.setItem(scopedKey, legacy);
+      }
+      localStorage.removeItem(legacyKey);
+    } catch (e) {}
   },
 
   /* ---------- Recent downloads (local history) ------------------------ */
+  // Reads and writes here are wrapped because they run *after* a file has
+  // landed on the phone: an exception on the way to the badge would otherwise
+  // be reported as a failed download of a file the student is looking at.
   recordDownload: function (item) {
-    var list = this.getRecentDownloads();
-    list.unshift({
-      id: item.id || "",
-      name: item.name || "Document",
-      category: item.category || "",
-      section: item.section || "",
-      at: new Date().toISOString(),
-    });
-    if (list.length > this.RECENT_DOWNLOADS_MAX) list = list.slice(0, this.RECENT_DOWNLOADS_MAX);
-    localStorage.setItem(
-      this.RECENT_DOWNLOADS_KEY + "_" + this._currentUserSuffix(),
-      JSON.stringify(list)
-    );
+    try {
+      var list = this.getRecentDownloads();
+      list.unshift({
+        id: item.id || "",
+        name: item.name || "Document",
+        category: item.category || "",
+        section: item.section || "",
+        at: new Date().toISOString(),
+      });
+      if (list.length > this.RECENT_DOWNLOADS_MAX) list = list.slice(0, this.RECENT_DOWNLOADS_MAX);
+      localStorage.setItem(
+        this.RECENT_DOWNLOADS_KEY + "_" + this._currentUserSuffix(),
+        JSON.stringify(list)
+      );
+    } catch (e) {}
   },
   getRecentDownloads: function (limit) {
     var scopedKey = this.RECENT_DOWNLOADS_KEY + "_" + this._currentUserSuffix();
@@ -226,6 +236,7 @@ var Zafar = {
     } catch (e) {
       list = [];
     }
+    if (!Array.isArray(list)) list = [];
     return limit ? list.slice(0, limit) : list;
   },
   /* ---------- Formatting -------------------------------------------- */
@@ -315,6 +326,13 @@ var Zafar = {
   // request therefore has a deadline — 15 s for an answer, 90 s for a file.
   REQUEST_TIMEOUT_MS: 15000,
   FILE_TIMEOUT_MS: 90000,
+  // Asking for a download ticket is a *write*: the server reserves the slot
+  // before it answers. Giving up on it early is worse than waiting, because
+  // the reservation can already be committed — the phone would be told the
+  // download failed while the allowance was quietly spent. So this one request
+  // gets a generous deadline of its own (it may also have to walk the library
+  // tree first, exactly like the list request that is allowed 45 s).
+  TICKET_TIMEOUT_MS: 60000,
   // The catalogue is a different animal. On a cold start the server walks the
   // whole Drive tree before it can answer, and each of those Drive calls is
   // allowed twenty seconds on its own — so the *server* can legitimately take
@@ -545,8 +563,9 @@ var Zafar = {
     }, conf);
   },
 
-  authPostJSON: function (path, body) {
+  authPostJSON: function (path, body, opts) {
     var self = this;
+    var conf = opts || {};
     return this._fetch(API_BASE_URL + path, {
       method: "POST",
       headers: {
@@ -554,7 +573,7 @@ var Zafar = {
         Authorization: "Bearer " + this.getToken(),
       },
       body: JSON.stringify(body || {}),
-    })
+    }, conf.timeout)
       .then(function (res) {
         if (res.status === 401) return self._unauthorized();
         return self._json(res);

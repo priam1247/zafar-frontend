@@ -196,7 +196,12 @@ var ZafarI18n = (function () {
       noInternet: "No internet connection",
       backOnline: "Back online",
       downloadStarted: "Download started",
+      // The bytes did not arrive.
       downloadFailed: "Could not download the file — try again",
+      // The ticket did not arrive, so the file was never even asked for. The
+      // difference matters: a saved file must never be called a failure, and a
+      // download that never started must never be called saved.
+      downloadNotStarted: "Could not start the download — try again",
       saved: "Saved",
       preparing: "Preparing…",
       download: "Download",
