@@ -19,17 +19,10 @@ var API_BASE_URL = "https://bloody-brigitta-ahzafar-de9b1709.koyeb.app";
 // hours after a first download. The chips, the help page and the FAQ all say
 // so.
 //
-// These numbers are the published policy the Help page lists. The app never
-// quotes them as if it had measured anything: /auth/quota reports each
-// section's real limit (they are env settings on the server, DAILY_*_LIMIT),
-// and a chip with no reported ceiling stays hidden rather than borrowing the
-// number below.
-var DAILY_LIMITS = {
-  papers: 10,
-  books: 3,
-  notes: 3,
-  "marking-keys": 10,
-};
+// /auth/quota reports each section's real limit (they are env settings on the
+// server, DAILY_*_LIMIT). Nothing in the app carries a copy of those numbers:
+// a limit nobody measured is not a limit, and a copy would be wrong the day an
+// administrator changes one.
 
 // The section key in the API is not always the field prefix in /auth/quota:
 // the section is "marking-keys", the four numbers are "marking_keys_*".

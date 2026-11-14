@@ -214,12 +214,12 @@ is amber, none is muted red; tapping the pill opens a small sheet that says how
 many you get a day, how many are left, and that the allowance starts again at
 **02:00 in Malawi (00:00 UTC)**.
 
-Every other section has its own allowance too — Past Papers 10 a day, Notes 3,
-Marking Keys 10 — and keeps the same behaviour at zero (the notice, *Limit
-reached* on the buttons, the server re-check on the next tap); only the counter
-is Books-only, which is what was asked for. A section whose numbers the server
-does not report shows no counter and no notice, and its buttons stay as they
-are: saying nothing is the honest option when there is nothing to say.
+Every section counts its own allowance the same way, in its own words —
+**10 papers left today**, **3 notes left today**, **10 marking keys left
+today** — and keeps the same behaviour at zero (the notice, *Limit reached* on
+the buttons, the server re-check on the next tap). A section whose numbers the
+server does not report shows no counter and no notice, and its buttons stay as
+they are: saying nothing is the honest option when there is nothing to say.
 
 At zero the pill is not the only signal: every *Download* button on the page
 becomes *Limit reached* and stops accepting taps — `aria-disabled`, not
@@ -243,12 +243,12 @@ the one it spends: **10 papers, 3 books, 3 notes, 10 marking keys** a day, each 
 to the field prefix its numbers live under — the `marking-keys` section reads
 `marking_keys_left` / `marking_keys_limit`, with the underscore the API uses.
 Both the count and the ceiling come from that answer, because both are server
-settings (`DAILY_*_LIMIT`). The Help page reads the same answer for its table,
-so a retuned allowance shows up in both places at once; the numbers in
-`DAILY_LIMITS` are printed only if that request fails, with a note that says
-they are the published defaults and may not be your account's. Where the server
-reports no count — or no ceiling — the chip stays hidden instead of quoting a
-policy the backend does not keep.
+settings (`DAILY_*_LIMIT`). The app carries no copy of those numbers: there is
+no `DAILY_LIMITS` any more, so a retuned allowance cannot leave a stale figure
+on screen. The Help page reads the same answer for its table; if that request
+fails the rows keep a dash and the note says the limits could not be read,
+rather than printing a policy the backend may not be keeping. Where the server
+reports no count — or no ceiling — the pill stays hidden for the same reason.
 
 When a section runs out, a plain-English notice appears above the catalogue —
 and again if a download is refused. It is written for a Form 3 student reading
@@ -593,8 +593,9 @@ a same-origin blob so the filename survives.
   every `/auth/quota` and download response. The section key and the field
   prefix differ for one page (`marking-keys` → `marking_keys`), which is what
   `QUOTA_FIELD` in `config.js` is for. The Help table is filled from
-  `/auth/quota` too, so the two never disagree; `DAILY_LIMITS` appears only
-  when that request fails, labelled as the published defaults.
+  `/auth/quota` too, so the two never disagree, and nothing in the app keeps a
+  copy of the numbers to disagree with: if that request fails the table shows
+  dashes and says so.
 
 - **Legacy download rows cannot be split.** Rows created before this change
   carry `category` of `paper` for anything charged to the old shared bucket, so

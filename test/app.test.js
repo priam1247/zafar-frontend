@@ -1245,9 +1245,10 @@ test("Primary swaps the shelf, not the allowance", async () => {
   assert.equal(levels()[0].getAttribute("aria-pressed"), "true", "Secondary first");
   assert.match(papers()[0], /section=papers/);
   assert.match(papers()[0], /limit=50/);
-  // The allowance pill is Books-only (as asked); Past Papers spends the same
-  // kind of allowance but reports it through the notice and the buttons.
-  assert.equal(d.querySelector("[data-quota]").hidden, true);
+  // Past Papers counts its own allowance, in its own words — the same pill
+  // every section gets.
+  assert.equal(d.querySelector("[data-quota]").hidden, false);
+  assert.equal(d.querySelector("[data-quota-text]").textContent, "10 papers left today");
 
   levels()[1].dispatchEvent(new dom.window.MouseEvent("click", { bubbles: true }));
   await wait(700);
@@ -1471,12 +1472,13 @@ test("the header is two rows: the bar, then the section and its allowance", asyn
   assert.equal(second[1].hidden, false, "the pill is on Books");
   assert.equal(d.querySelector(".app-bar .bar-row [data-quota]"), second[1]);
 
-  // The pill is Books-only; the title is still the whole of the left side.
+  // Every section puts its own allowance in the same place.
   dom.window.close();
   const notes = await libraryPage("/notes.html");
   await wait(900);
   const nd = notes.window.document;
-  assert.equal(nd.querySelector(".app-bar [data-quota]").hidden, true);
+  assert.equal(nd.querySelector(".app-bar [data-quota]").hidden, false);
+  assert.equal(nd.querySelector("[data-quota-text]").textContent, "3 notes left today");
   assert.equal(nd.querySelector(".bar-row-title .app-title").textContent, "Notes");
   notes.window.close();
 
@@ -1844,18 +1846,106 @@ test("the allowance is the server's number, not a constant in the page", async (
   dom.window.close();
 });
 
-test("other sections keep their limit without the pill, and still stop at zero", async () => {
+test("every section counts its own allowance, in its own words", async () => {
+  // The same sentence shape on all four shelves, from the same endpoint: what,
+  // how many, and when. One section's number never appears on another.
+  const cases = [
+    ["/books.html", "3 books left today"],
+    ["/dashboard.html", "10 papers left today"],
+    ["/notes.html", "3 notes left today"],
+    ["/marking-keys.html", "10 marking keys left today"],
+  ];
+  for (const [page, copy] of cases) {
+    const dom = await libraryPage(page);
+    await wait(900);
+    const d = dom.window.document;
+    const pill = d.querySelector("[data-quota]");
+    assert.equal(pill.hidden, false, page + " shows its allowance");
+    assert.equal(pill.querySelector("[data-quota-text]").textContent, copy, page);
+    assert.equal(pill.classList.contains("is-low"), false);
+    dom.window.close();
+  }
+});
+
+test("a section that runs out says so in its own words, and still stops at zero", async () => {
   const dom = await libraryPage("/notes.html", {
-    quota: { notes_left: 0, notes_limit: 3 },
+    quota: Object.assign({}, QUOTA, { notes_left: 0 }),
   });
   await wait(900);
   const d = dom.window.document;
-  assert.equal(d.querySelector("[data-quota]").hidden, true, "no pill outside Books");
+  const pill = d.querySelector("[data-quota]");
+  assert.equal(pill.hidden, false);
+  assert.equal(pill.querySelector("[data-quota-text]").textContent, "0 notes left · resets at midnight");
+  assert.equal(pill.classList.contains("is-out"), true);
   assert.equal(d.querySelector("[data-notice]").hidden, false, "the notice explains it");
   const btn = d.querySelector("[data-download]");
   assert.equal(btn.getAttribute("aria-disabled"), "true");
   assert.equal(btn.querySelector(".btn-label").textContent, "Limit reached");
   dom.window.close();
+});
+
+test("the category row is the library's, not the page's", async () => {
+  // No page carries a list of categories: a guessed folder that does not exist
+  // filters to nothing and reads as broken search.
+  for (const page of ["books.html", "dashboard.html", "notes.html", "marking-keys.html"]) {
+    assert.doesNotMatch(read(path.join(WEB, page)), /categories:\s*\[/, page + " still hard-codes folders");
+  }
+
+  // The folders the server reports become chips — except the one that only
+  // repeats the shelf ("Books" on Books is not a filter, it is the page name).
+  const seen = [];
+  const dom = await openPage("/books.html", {
+    storage: { zafar_token: token("student") },
+    fetch: (input) => {
+      const u = new URL(String(input && input.url ? input.url : input), origin + "/");
+      seen.push(u.pathname);
+      if (/\/site-config$/.test(u.pathname)) return reply({ featured: [] });
+      if (/\/admin\/whoami/.test(u.pathname)) return reply({}, 403);
+      if (/\/auth\/quota/.test(u.pathname)) return reply(QUOTA);
+      if (/\/drive\/categories/.test(u.pathname)) return reply(["Books", "Senior", "Junior"]);
+      if (/\/drive\/papers/.test(u.pathname)) {
+        return reply(
+          [
+            { id: "b1", name: "Senior Mathematics 3.pdf", category: "Books", size_bytes: 8420000 },
+            { id: "b2", name: "Junior Science 2.pdf", category: "Junior", size_bytes: 6110000 },
+          ],
+          200,
+          { "X-Total-Count": "2" }
+        );
+      }
+      return reply({});
+    },
+  });
+  await wait(900);
+  const d = dom.window.document;
+  assert.ok(seen.some((p) => /categories/.test(p)), "the folders are asked for");
+  const chips = [...d.querySelectorAll(".cat-chip")].map((c) => c.textContent);
+  assert.deepEqual(chips, ["All", "Senior", "Junior"], "the shelf's own name is not a category");
+  // …and the same word is not a chip on the card either.
+  const cards = [...d.querySelectorAll(".item")];
+  const card = (needle) => cards.find((c) => c.querySelector(".item-title").textContent.includes(needle));
+  assert.equal(card("Senior").querySelector(".item-cat"), null, "'Books' adds nothing on Books");
+  assert.equal(card("Junior").querySelector(".item-cat").textContent, "Junior");
+  dom.window.close();
+
+  // No folders reported: no chip row at all, rather than a lone "All".
+  const bare = await openPage("/notes.html", {
+    storage: { zafar_token: token("student") },
+    fetch: (input) => {
+      const u = new URL(String(input && input.url ? input.url : input), origin + "/");
+      if (/\/site-config$/.test(u.pathname)) return reply({ featured: [] });
+      if (/\/admin\/whoami/.test(u.pathname)) return reply({}, 403);
+      if (/\/auth\/quota/.test(u.pathname)) return reply(QUOTA);
+      if (/\/drive\/categories/.test(u.pathname)) return reply([]);
+      if (/\/drive\/papers/.test(u.pathname)) return reply([], 200, { "X-Total-Count": "0" });
+      return reply({});
+    },
+  });
+  await wait(900);
+  const bd = bare.window.document;
+  assert.equal(bd.querySelector("[data-cat-chips]").hidden, true);
+  assert.equal(bd.querySelectorAll(".cat-chip").length, 0);
+  bare.window.close();
 });
 
 test("no card carries a report control or a heart any more", async () => {

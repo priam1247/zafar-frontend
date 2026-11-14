@@ -219,10 +219,11 @@ var ZafarI18n = (function () {
         "marking-keys": "Marking keys",
       },
       limitsNote: "Each section has its own limit. Every limit starts again at 02:00 in Malawi " +
-        "(00:00 UTC). The number at the top of a page shows what is left there.",
-      limitsNoteDefaults: "We could not read your own limits just now, so these are the usual ones. " +
-        "Yours may be different. Each section has its own limit, and every limit starts again at " +
-        "02:00 in Malawi (00:00 UTC).",
+        "(00:00 UTC). The pill at the top of each page shows how many are left there today.",
+      // The table could not be filled. It says so instead of quoting numbers.
+      limitsNoteUnavailable: "We could not read your limits just now. Each section has its own " +
+        "limit \u2014 open one and its pill shows what the server says is left. Every limit starts " +
+        "again at 02:00 in Malawi (00:00 UTC).",
       faqTitle: "Frequently asked",
       shortcutsTitle: "Keyboard shortcuts",
       shortcutSlash: "Focus the search box on any list page",

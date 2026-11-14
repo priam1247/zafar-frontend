@@ -68,9 +68,9 @@ var ZafarList = (function () {
       "</label>" +
 
       // Row B — the categories, in one scrolling line with a fade at the edge.
-      (cfg.categories && cfg.categories.length
-        ? '<div class="cat-chips" data-cat-chips></div>'
-        : "") +
+      // Empty and hidden until the library answers: the folders are the
+      // library's, not this page's, and a guessed list is a fake filter.
+      '<div class="cat-chips" data-cat-chips hidden></div>' +
 
       '<div class="chips" data-chips style="display:none"></div>' +
 
@@ -120,6 +120,23 @@ var ZafarList = (function () {
     return new Array(n).fill(one).join("");
   }
 
+  // A category that only repeats the page — "Books" on Books, "Marking Keys"
+  // on Marking Keys — filters nothing and tells a student nothing. The only
+  // categories this page shows are the ones the library reports, and the ones
+  // that name the shelf itself are dropped.
+  function usefulCategory(cfg, name) {
+    var t = ZafarI18n.t;
+    var key = String(name == null ? "" : name).trim().toLowerCase().replace(/[\s_-]+/g, " ");
+    if (!key) return false;
+    var shelf = [cfg.section, cfg.quotaKey, cfg.itemLabel, cfg.itemLabel + "s",
+      t("nav.books"), t("nav.pastPapers"), t("nav.notes"), t("nav.markingKeys")];
+    (cfg.sectionChoices || []).forEach(function (choice) { shelf.push(choice.label); });
+    return shelf.every(function (own) {
+      if (!own) return true;
+      return String(own).trim().toLowerCase().replace(/[\s_-]+/g, " ") !== key;
+    });
+  }
+
   function catChipsHTML(categories, activeCat) {
     var chips = [
       '<button type="button" class="cat-chip' + (activeCat ? "" : " active") + '" data-cat="" aria-pressed="' + (!activeCat) + '">' +
@@ -139,6 +156,11 @@ var ZafarList = (function () {
   // need an API that returns those files directly, and inventing one here would
   // mean inventing file names, so this shows the truth: "this one is featured".
   var featured = [];
+
+  // The page being drawn: cardHTML needs it to know which words the page has
+  // already said (the section's own name) and which categories are worth a
+  // chip. Set once, in init.
+  var sectionCfg = {};
 
   // What is already on this phone, by id. The list of downloads as a page is
   // gone; the one thing worth keeping from it is the badge on the card.
@@ -164,7 +186,10 @@ var ZafarList = (function () {
     var section = doc._section || pageSection || "";
     var title = Zafar.escapeHTML(doc.name.replace(/\.pdf$/i, ""));
     var filename = /\.pdf$/i.test(doc.name) ? doc.name : doc.name + ".pdf";
+    // The library's own folder name, when it says something the page has not
+    // already said. No fallback word is invented for a file that has none.
     var category = (doc.category || "").trim();
+    if (category && !usefulCategory(sectionCfg, category)) category = "";
     var saved = !!downloaded[String(doc.id)];
     var tags = (category ? '<span class="item-cat">' + Zafar.escapeHTML(category) + "</span>" : "") +
       (saved ? '<span class="item-dl">' + t("list.downloaded") + "</span>" : "");
@@ -233,6 +258,7 @@ var ZafarList = (function () {
     var renderedCount = 0;
 
     loadDownloaded();
+    sectionCfg = cfg;
 
     var el = {
       grid: root.querySelector("[data-grid]"),
@@ -383,12 +409,6 @@ var ZafarList = (function () {
       };
     }
 
-    // The pill is asked for on Books only. Every section still has its own
-    // allowance and still shows the plain-English notice when it runs out, and
-    // its buttons still stop at zero — the counter is the only part that is
-    // Books-only.
-    var SHOW_PILL = cfg.quotaKey === "books";
-
     function renderLimit() {
       if (!el.limit) return;
 
@@ -413,14 +433,9 @@ var ZafarList = (function () {
 
       var allowed = left > 0;
 
-      // A section without the pill still stops at zero; it just says so in the
-      // notice and on the buttons.
-      if (!SHOW_PILL) {
-        el.limit.hidden = true;
-        setDownloadsEnabled(allowed);
-        return;
-      }
-
+      // Every section counts its own allowance the same way: "10 papers left
+      // today", "3 notes left today". The number is the server's, the noun is
+      // the section's.
       el.limit.hidden = false;
       // Teal while comfortable, amber at one, muted red at none.
       el.limit.classList.toggle("is-low", left === 1);
@@ -739,16 +754,19 @@ var ZafarList = (function () {
     var catList = [];
     function renderCatChips() {
       if (!el.catChips) return;
-      el.catChips.innerHTML = catChipsHTML(catList, state.category);
+      // No real folders, no chip row: "All" on its own is a control that does
+      // nothing.
+      el.catChips.hidden = !catList.length;
+      el.catChips.innerHTML = catList.length ? catChipsHTML(catList, state.category) : "";
     }
     function loadCategories() {
       if (!el.catChips) return;
       var wanted = state.section;
-      // Until the server answers: this section's own list. Primary has no
-      // static list — its folders are whatever the library has.
-      catList = wanted === cfg.section ? (cfg.categories || []).slice() : [];
-      if (state.category && catList.indexOf(state.category) === -1) {
-        catList = [state.category].concat(catList);
+      // Nothing is drawn until the library says what its folders are: a
+      // guessed chip filters to nothing and looks like broken search.
+      catList = [];
+      if (state.category && usefulCategory(cfg, state.category)) {
+        catList = [state.category];
       }
       renderCatChips();
 
@@ -756,11 +774,12 @@ var ZafarList = (function () {
         .then(function (names) {
           // The student switched again while this was in the air.
           if (wanted !== state.section) return;
-          if (!Array.isArray(names) || !names.length) return;
-          catList = names.slice();
+          if (!Array.isArray(names)) return;
+          catList = names.filter(function (name) { return usefulCategory(cfg, name); });
           // A category that arrived in the URL but is no longer a folder keeps
           // its chip, so the page never claims a filter it is not applying.
-          if (state.category && catList.indexOf(state.category) === -1) {
+          if (state.category && usefulCategory(cfg, state.category) &&
+              catList.indexOf(state.category) === -1) {
             catList = [state.category].concat(catList);
           }
           renderCatChips();

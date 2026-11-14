@@ -172,27 +172,26 @@
       renderCount(QA.length);
 
       /* ---------- Daily allowances, as the server keeps them ----------
-         The chips on each section page report the allowance the server is
+         The pill on each section page reports the allowance the server is
          actually enforcing, so this table has to read the same answer or the
          two disagree the moment an administrator changes DAILY_*_LIMIT. A
          number the server did not send is not invented here: the rows keep a
-         dash until the answer arrives, and if it never arrives the published
-         defaults appear marked as such. */
+         dash, and if the answer never arrives the dashes stay with a line
+         saying so. There are no default numbers to fall back on, because a
+         number nobody measured is not an answer. */
       var limitCells = {};
       QUOTA_SECTIONS.forEach(function (section) {
         limitCells[section] = shell.content.querySelector('[data-limit="' + section + '"]');
       });
       var limitNote = shell.content.querySelector("[data-limits-note]");
-      var limitList = shell.content.querySelector(".limit-rows");
 
-      function showLimits(numbers, note, areDefaults) {
+      function showLimits(numbers, note) {
         QUOTA_SECTIONS.forEach(function (section) {
           var cell = limitCells[section];
           if (!cell) return;
           var n = numbers[section];
           cell.textContent = typeof n === "number" ? String(n) : "—";
         });
-        if (limitList) limitList.classList.toggle("is-default", !!areDefaults);
         if (limitNote && note) limitNote.textContent = note;
       }
 
@@ -206,10 +205,12 @@
             numbers[section] = typeof n === "number" ? n : null;
           });
           if (!complete) throw new Error("quota answer missing a limit");
-          showLimits(numbers, t("help.limitsNote"), false);
+          showLimits(numbers, t("help.limitsNote"));
         })
         .catch(function () {
-          showLimits(DAILY_LIMITS, t("help.limitsNoteDefaults"), true);
+          // Dashes stay. The pill on a section page reads the same endpoint,
+          // so a student who wants the real number is one tap away from it.
+          showLimits({}, t("help.limitsNoteUnavailable"));
         });
 
       /* ---------- Live FAQ filter ---------- */
