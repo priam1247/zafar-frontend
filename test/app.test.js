@@ -2052,6 +2052,86 @@ function toastText(d) {
   return node ? node.textContent : "";
 }
 
+/* ---------- 9c. a control you cannot see is a control you cannot use ---------- */
+
+function parseColor(value) {
+  const m = /rgba?\(([^)]+)\)/.exec(value || "");
+  if (!m) return null;
+  const parts = m[1].split(",").map((n) => Number(n.trim()));
+  return { r: parts[0], g: parts[1], b: parts[2], a: parts.length > 3 ? parts[3] : 1 };
+}
+
+function luminance({ r, g, b }) {
+  const channel = (v) => {
+    const c = v / 255;
+    return c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
+  };
+  return 0.2126 * channel(r) + 0.7152 * channel(g) + 0.0722 * channel(b);
+}
+
+function contrast(a, b) {
+  const [hi, lo] = [luminance(a), luminance(b)].sort((x, y) => y - x);
+  return (hi + 0.05) / (lo + 0.05);
+}
+
+// What an element actually sits on: the first ancestor with a background that
+// is not transparent.
+function behind(win, el) {
+  let node = el;
+  while (node && node.nodeType === 1) {
+    const bg = parseColor(win.getComputedStyle(node).backgroundColor);
+    if (bg && bg.a > 0.5) return bg;
+    node = node.parentElement;
+  }
+  return { r: 255, g: 255, b: 255, a: 1 };
+}
+
+test("Log out is a red button, not white text on a white sheet", async () => {
+  // `.btn` sets `background: transparent` as a default. A one-class selector
+  // that lands before it in the file loses to it at equal specificity, so
+  // `.btn-danger` was transparent with white text: a 48px-tall, fully tappable,
+  // completely invisible button. Rendered, not read.
+  const dom = await libraryPage("/books.html");
+  await wait(900);
+  const win = dom.window;
+  const d = win.document;
+
+  const confirm = d.querySelector("[data-logout-confirm]");
+  assert.ok(confirm, "the confirmation exists");
+  const style = win.getComputedStyle(confirm);
+  assert.equal(style.backgroundColor, "rgb(155, 44, 44)", "the confirmation is red");
+  assert.equal(style.color, "rgb(255, 255, 255)");
+  assert.ok(contrast(parseColor(style.color), parseColor(style.backgroundColor)) > 4.5);
+
+  // The drawer's row keeps its own soft red, its left alignment and its text.
+  const open = d.querySelector("[data-logout-open]");
+  const openStyle = win.getComputedStyle(open);
+  assert.equal(openStyle.backgroundColor, "rgb(251, 231, 228)");
+  assert.equal(openStyle.color, "rgb(140, 47, 34)");
+  assert.equal(openStyle.justifyContent, "flex-start");
+
+  // And no other control on any page is drawn in the colour behind it.
+  dom.window.close();
+
+  for (const page of ["/books.html", "/dashboard.html", "/notes.html", "/marking-keys.html", "/settings.html", "/login.html"]) {
+    const dom2 = await libraryPage(page);
+    await wait(900);
+    const w = dom2.window;
+    const doc = w.document;
+    for (const el of doc.querySelectorAll("button, a.btn, .cat-chip, .chip")) {
+      if (!el.offsetParent && el.closest("[hidden]")) continue;
+      const cs = w.getComputedStyle(el);
+      const fg = parseColor(cs.color);
+      if (!fg) continue;
+      const bg = behind(w, el);
+      const ratio = contrast(fg, bg);
+      const label = (el.textContent || el.getAttribute("aria-label") || el.className || "?").trim().slice(0, 32);
+      assert.ok(ratio >= 3, page + " draws \"" + label + "\" at " + ratio.toFixed(2) + ":1 against what is behind it");
+    }
+    dom2.window.close();
+  }
+});
+
 test("a file that lands is marked downloaded on every shelf, and is never called a failure", async () => {
   // The whole point: the card says what the phone has. Same code, same words,
   // four shelves — a download that marks on Notes and not on Past Papers is

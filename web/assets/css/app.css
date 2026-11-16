@@ -428,33 +428,6 @@ a { color: inherit; }
 
 .drawer-foot { margin-top: auto; padding-top: 12px; border-top: 1px solid var(--line); }
 
-/* Soft red: it is an exit, not a danger to a student's work. */
-/* The one destructive action in the app, and it is a confirmation, so it is
-   allowed to be a solid, unmistakable red. */
-.btn-danger {
-  background: #9B2C2C;
-  color: #FFFFFF;
-  border-color: #9B2C2C;
-}
-@media (hover: hover) {
-  .btn-danger:hover { background: #84231F; border-color: #84231F; }
-}
-
-.btn-danger-soft {
-  width: 100%;
-  min-height: 48px;
-  justify-content: flex-start;
-  gap: 12px;
-  padding: 0 12px;
-  border-radius: 12px;
-  background: #FBE7E4;
-  color: #8C2F22;
-  border: 0;
-  font-size: 15px;
-  font-weight: 650;
-}
-.btn-danger-soft svg { color: #8C2F22; }
-
 /* ============================================================
    Sheet
    ============================================================ */
@@ -1079,6 +1052,35 @@ a { color: inherit; }
 @media (hover: hover) {
   .btn-ghost:hover { border-color: var(--brand); }
 }
+
+/* The destructive pair. They come after `.btn` on purpose: `.btn` sets a
+   transparent background as a *default*, and a one-class selector that lands
+   earlier loses to it — which is how "Log out" spent months as white text on a
+   white sheet, still 48px tall, still tappable, and completely invisible. */
+.btn-danger {
+  background: #9B2C2C;
+  color: #FFFFFF;
+  border-color: #9B2C2C;
+}
+@media (hover: hover) {
+  .btn-danger:hover { background: #84231F; border-color: #84231F; }
+}
+
+/* Soft red: in the drawer it is an exit, not a danger to a student's work. */
+.btn-danger-soft {
+  width: 100%;
+  min-height: 48px;
+  justify-content: flex-start;
+  gap: 12px;
+  padding: 0 12px;
+  border-radius: 12px;
+  background: #FBE7E4;
+  color: #8C2F22;
+  border: 0;
+  font-size: 15px;
+  font-weight: 650;
+}
+.btn-danger-soft svg { color: #8C2F22; }
 
 .btn-sm { height: 40px; padding: 0 16px; font-size: 12.5px; }
 
