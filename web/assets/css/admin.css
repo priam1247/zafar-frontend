@@ -76,6 +76,8 @@ a { color: var(--brand); }
   padding: calc(8px + env(safe-area-inset-top)) calc(14px + env(safe-area-inset-right)) 8px
     calc(14px + env(safe-area-inset-left));
 }
+/* The wordmark is the brand: capital letters and wide tracking are how it is
+   drawn, on the site and in the app icon. Everything else lost them here. */
 .mark {
   display: inline-flex;
   align-items: center;
@@ -83,6 +85,7 @@ a { color: var(--brand); }
   font-size: 12px;
   font-weight: 700;
   letter-spacing: .16em;
+  /* unslopovich-ignore tracked-caps-label */
   text-transform: uppercase;
   color: var(--paper);
   text-decoration: none;
@@ -115,10 +118,8 @@ a { color: var(--brand); }
   border-radius: 999px;
   background: rgba(250, 245, 233, .16);
   color: var(--paper);
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: .1em;
-  text-transform: uppercase;
+  font-size: 11.5px;
+  font-weight: 600;
 }
 
 /* ---------- tabs ---------- */
@@ -157,7 +158,10 @@ a { color: var(--brand); }
   white-space: nowrap;
   cursor: pointer;
 }
-.tab:hover { color: var(--brand); }
+.tab:active { background: rgba(var(--brand-rgb), .06); }
+@media (hover: hover) {
+  .tab:hover { color: var(--brand); }
+}
 .tab[aria-selected="true"] { color: var(--brand); border-bottom-color: var(--brand); }
 
 /* ---------- layout ---------- */
@@ -184,11 +188,9 @@ a { color: var(--brand); }
 }
 .card > h3 {
   margin: 0 0 12px;
-  font-size: 13px;
-  font-weight: 700;
-  letter-spacing: .1em;
-  text-transform: uppercase;
-  color: var(--muted);
+  font-size: 14px;
+  font-weight: 650;
+  color: var(--ink);
 }
 
 .grid { display: grid; gap: 12px; }
@@ -201,7 +203,7 @@ a { color: var(--brand); }
   border-radius: 16px;
   padding: 14px 16px;
 }
-.kpi-card .k-label { font-size: 12px; font-weight: 650; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+.kpi-card .k-label { font-size: 12.5px; font-weight: 600; color: var(--muted); }
 .kpi-card .k-value { font-size: 26px; font-weight: 700; letter-spacing: -.03em; margin-top: 4px; color: var(--brand); }
 .kpi-card .k-note { font-size: 12px; color: var(--muted); margin-top: 2px; }
 
@@ -223,10 +225,8 @@ td .k-note {
 table { width: 100%; border-collapse: collapse; font-size: 14px; }
 th, td { text-align: left; padding: 9px 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
 th {
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: .09em;
-  text-transform: uppercase;
+  font-size: 12px;
+  font-weight: 650;
   color: var(--muted);
   white-space: nowrap;
 }
@@ -286,12 +286,19 @@ td.num { text-align: right; font-variant-numeric: tabular-nums; }
   text-decoration: none;
   white-space: nowrap;
 }
-.btn:hover { background: var(--brand-deep); border-color: var(--brand-deep); }
+@media (hover: hover) {
+  .btn:hover { background: var(--brand-deep); border-color: var(--brand-deep); }
+}
 .btn.ghost { background: none; color: var(--brand); }
-.btn.ghost:hover { background: rgba(var(--brand-rgb), .08); }
+@media (hover: hover) {
+  .btn.ghost:hover { background: rgba(var(--brand-rgb), .08); }
+}
 .btn.small { min-height: 40px; padding: 7px 12px; font-size: 12.5px; }
 .btn.danger { background: none; border-color: var(--danger); color: var(--danger); }
-.btn.danger:hover { background: var(--danger-wash); }
+@media (hover: hover) {
+  .btn.danger:hover { background: var(--danger-wash); }
+}
+.btn:active { transform: translateY(1px); }
 .btn:disabled { opacity: .55; cursor: default; }
 
 .actions { display: flex; gap: 6px; flex-wrap: wrap; }
@@ -440,10 +447,8 @@ td.num { text-align: right; font-variant-numeric: tabular-nums; }
     content: attr(data-label);
     flex: 0 0 38%;
     min-width: 0;
-    font-size: 11.5px;
-    font-weight: 700;
-    letter-spacing: .06em;
-    text-transform: uppercase;
+    font-size: 12px;
+    font-weight: 650;
     color: var(--muted);
   }
 

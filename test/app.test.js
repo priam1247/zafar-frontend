@@ -2288,6 +2288,108 @@ function headOf(page) {
   return html.slice(html.indexOf("<head>"), html.indexOf("</head>"));
 }
 
+/* ---------- 10a. the design floor: hover, capitals, controls, copy ---------- */
+
+function cssWithoutComments(file) {
+  return read(path.join(WEB, "assets/css", file)).replace(/\/\*[\s\S]*?\*\//g, "");
+}
+
+// Every selector that reacts to a pointer, and whether a `@media (hover: hover)`
+// block is open around it. A phone fires :hover on a tap and leaves the style
+// stuck on whatever was touched last: the button stays lit, the card stays
+// lifted, and it reads as "still selected".
+function unguardedHovers(file) {
+  const css = cssWithoutComments(file);
+  const stack = [];
+  const found = [];
+  let buffer = "";
+  for (const ch of css) {
+    if (ch === "{") {
+      const prelude = buffer.trim();
+      const guarded = /@media[^{]*\(hover:\s*hover\)/.test(prelude);
+      const inside = stack.length ? stack[stack.length - 1] : false;
+      if (/:hover\b/.test(prelude) && !inside && !guarded) found.push(prelude);
+      stack.push(inside || guarded);
+      buffer = "";
+    } else if (ch === "}") {
+      stack.pop();
+      buffer = "";
+    } else {
+      buffer += ch;
+    }
+  }
+  return found;
+}
+
+test("hover is for mice; a tap does not leave a control looking selected", () => {
+  for (const file of ["app.css", "auth.css", "admin.css"]) {
+    assert.deepEqual(unguardedHovers(file), [], file + " has hover outside (hover: hover)");
+  }
+  // …and the press is still answered, on the controls a thumb uses.
+  for (const [file, selector] of [
+    ["app.css", ".btn"],
+    ["app.css", ".btn-primary"],
+    ["app.css", ".cat-chip"],
+    ["auth.css", ".submit"],
+    ["admin.css", ".btn"],
+    ["admin.css", ".tab"],
+  ]) {
+    assert.match(cssWithoutComments(file), new RegExp(selector.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + ":active"),
+      file + " answers a tap on " + selector);
+  }
+});
+
+test("a heading is a heading, not an eyebrow in tracked capitals", () => {
+  // The generated look in its newest form: every section title in small gray
+  // capitals with letter spacing. These are named headings; they say their name.
+  const labelled = [
+    ["app.css", ".section-head h2"],
+    ["app.css", ".panel-title"],
+    ["app.css", ".drawer-role"],
+    ["app.css", ".item-featured"],
+    ["admin.css", ".card > h3"],
+    ["admin.css", ".role-chip"],
+    ["auth.css", ".sheet-footer"],
+  ];
+  for (const [file, selector] of labelled) {
+    const rule = cssRule(file, selector);
+    assert.doesNotMatch(rule, /text-transform:\s*uppercase/, selector + " shouts");
+    assert.doesNotMatch(rule, /letter-spacing:\s*\.0[5-9]/, selector + " is tracked");
+    assert.match(rule, /font-size:\s*1[1-5]/, selector + " needs a size a phone can read");
+  }
+  // Header cells and the label each stacked cell carries on a phone.
+  assert.doesNotMatch(cssRule("admin.css", "th"), /text-transform:\s*uppercase/);
+  // The wordmark keeps its capitals: that is the brand, and it is drawn in
+  // them everywhere, including the icon.
+  assert.match(cssRule("admin.css", ".mark"), /text-transform:\s*uppercase/);
+});
+
+test("clear all is a control, not a decorated span", async () => {
+  const dom = await libraryPage("/notes.html?q=pauls");
+  await wait(900);
+  const d = dom.window.document;
+  const clear = d.querySelector("[data-chip-clear]");
+  assert.ok(clear, "the chip row has a clear");
+  assert.equal(clear.tagName, "BUTTON", "a span with a click handler is silent to a keyboard");
+  assert.equal(clear.getAttribute("type"), "button");
+  assert.equal(clear.textContent, "Clear all");
+  // It still does its job, and it takes the typed search with it.
+  clear.click();
+  await wait(400);
+  assert.equal(d.querySelector("[data-search]").value, "");
+  dom.window.close();
+});
+
+test('an error says what failed and what to do, not "something went wrong"', () => {
+  for (const file of ["i18n.js", "auth.js", "list.js", "admin.js", "shell.js"]) {
+    assert.doesNotMatch(read(path.join(WEB, "assets/js", file)), /[Ss]omething went wrong/, file);
+  }
+  const i18n = read(path.join(WEB, "assets/js/i18n.js"));
+  assert.match(i18n, /loadError: "[^"]*did not answer[^"]*try again/);
+  const auth = read(path.join(WEB, "assets/js/auth.js"));
+  assert.match(auth, /serverProblem: "[^"]*did not answer[^"]*Try again/);
+});
+
 test("the mark exists at every size the pages promise", () => {
   // Google will only use a favicon it can fetch, and it prefers squares that are
   // a multiple of 48. These are the sizes the <link> tags claim, so they must be

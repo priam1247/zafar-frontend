@@ -248,7 +248,9 @@ img { display: block; }
   text-decoration-thickness: 2px;
   text-underline-offset: 3px;
 }
-.link-btn:hover { text-decoration-thickness: 2px; opacity: .8; }
+@media (hover: hover) {
+  .link-btn:hover { text-decoration-thickness: 2px; opacity: .8; }
+}
 
 /* ---------- Google ---------- */
 
@@ -364,7 +366,9 @@ img { display: block; }
   transition: border-color .16s var(--ease), box-shadow .16s var(--ease), background .16s var(--ease);
 }
 .input::placeholder { color: var(--placeholder); opacity: 1; }
-.input:hover { border-color: rgba(var(--brand-rgb), .85); }
+@media (hover: hover) {
+  .input:hover { border-color: rgba(var(--brand-rgb), .85); }
+}
 .input:focus {
   outline: none;
   border-color: var(--brand);
@@ -389,8 +393,13 @@ img { display: block; }
   cursor: pointer;
   transition: color .16s var(--ease);
 }
-.toggle-show:hover, .toggle-show.shown { color: var(--brand); }
+.toggle-show.shown { color: var(--brand); }
+@media (hover: hover) {
+  .toggle-show:hover { color: var(--brand); }
+}
 
+/* A ring, not a glow: 3px, flat, on the field that needs fixing. */
+/* unslopovich-ignore glow-shadow */
 .field.has-error .input { border-color: var(--warn); box-shadow: 0 0 0 3px rgba(178, 106, 20, .14); }
 
 .error-msg {
@@ -496,7 +505,9 @@ img { display: block; }
   cursor: pointer;
   transition: background .16s var(--ease), transform .06s var(--ease);
 }
-.submit:hover { background: var(--brand-deep); }
+@media (hover: hover) {
+  .submit:hover { background: var(--brand-deep); }
+}
 .submit:active { transform: translateY(1px); }
 .submit:disabled { cursor: default; opacity: .92; }
 
@@ -527,7 +538,9 @@ img { display: block; }
   cursor: pointer;
   transition: border-color .16s var(--ease), background .16s var(--ease);
 }
-.back:hover { border-color: var(--brand); background: var(--field); }
+@media (hover: hover) {
+  .back:hover { border-color: var(--brand); background: var(--field); }
+}
 
 /* ---------- OTP ---------- */
 
@@ -611,10 +624,8 @@ img { display: block; }
   padding-top: 14px;
   margin-top: 16px;
   border-top: 1px solid var(--line);
-  font-size: 10px;
-  font-weight: 650;
-  letter-spacing: .12em;
-  text-transform: uppercase;
+  font-size: 12px;
+  font-weight: 500;
   color: var(--muted);
   text-align: center;
 }

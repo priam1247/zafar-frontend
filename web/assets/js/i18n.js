@@ -175,7 +175,9 @@ var ZafarI18n = (function () {
       clearAll: "Clear all",
       clearSearch: "Clear search",
       couldntLoad: function (item) { return "Couldn't load " + item + "s"; },
-      loadError: "Something went wrong reaching the library.",
+      // What failed and what to do about it — the heading above already names
+      // the section that did not load.
+      loadError: "The library did not answer. Check your connection, then try again.",
       tryAgain: "Try again",
       offlineTitle: "You're offline",
       offlineBody: "Check your connection and try again.",
