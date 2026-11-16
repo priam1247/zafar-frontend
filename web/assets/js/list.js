@@ -884,7 +884,9 @@ var ZafarList = (function () {
         chips.push('<span class="chip" data-chip="q">“' + Zafar.escapeHTML(state.q) +
           '<button aria-label="' + t("list.clearSearch") + '">✕</button></span>');
       }
-      if (chips.length) chips.push('<span class="chip clear" data-chip-clear>' + t("list.clearAll") + "</span>");
+      // A control, not a decorated span: it is reachable by Tab and Space,
+      // and a screen reader announces it as the button it is.
+      if (chips.length) chips.push('<button type="button" class="chip clear" data-chip-clear>' + t("list.clearAll") + "</button>");
       el.chips.innerHTML = chips.join("");
       el.chips.style.display = chips.length ? "flex" : "none";
     }
@@ -1173,7 +1175,7 @@ var ZafarList = (function () {
         if (entry) docs = docs.concat(entry.rows);
       });
 
-      // Nothing came back, and something went wrong getting it.
+      // Nothing came back, and the request itself failed.
       if (!docs.length && failure) {
         if (!navigator.onLine) {
           el.count.textContent = t("list.offline");

@@ -94,7 +94,7 @@ var ZafarAuth = (function () {
       backToSignin: "Back to sign in",
 
       offline: "Could not reach the server. Check your connection.",
-      serverProblem: "Something went wrong on our side. Try again in a minute."
+      serverProblem: "The server did not answer. Try again in a minute."
     }
   };
 
