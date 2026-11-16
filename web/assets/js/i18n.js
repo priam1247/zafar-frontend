@@ -67,11 +67,7 @@ var ZafarI18n = (function () {
                    levels: [
                      { key: "papers", label: "Secondary" },
                      { key: "primary", label: "Primary" },
-                   ],
-                   // The library is MSCE and JCE. Said once, on the shelf a
-                   // university student would look in first, and dismissible:
-                   // after the first read it is a line in the way.
-                   note: "We do not have university papers yet \u2014 the library covers MSCE and JCE." },
+                   ] },
       books:     { title: "Books", itemLabel: "book" },
       notes:     { title: "Notes", itemLabel: "note" },
       keys:      { title: "Marking Keys", itemLabel: "marking key" },
@@ -210,7 +206,6 @@ var ZafarI18n = (function () {
       // On a card whose file is already on this phone. The list that used to
       // show them is gone; the fact that one is yours is still worth saying.
       downloaded: "Downloaded \u2713",
-      dismiss: "Dismiss",
     },
     help: {
       heroTitle: "How can we help?",
