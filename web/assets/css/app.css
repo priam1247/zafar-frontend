@@ -454,42 +454,6 @@ a { color: inherit; }
 }
 
 /* ============================================================
-   The note a student can dismiss (Past Papers: "no university papers")
-   ============================================================ */
-
-.note {
-  display: flex;
-  align-items: flex-start;
-  gap: 8px;
-  min-width: 0;
-  padding: 8px 8px 8px 12px;
-  border-radius: 12px;
-  background: var(--field);
-  color: var(--muted);
-  font-size: 12px;
-  line-height: 1.45;
-}
-
-.note-text { flex: 1 1 auto; min-width: 0; }
-
-.note-x {
-  flex: none;
-  width: 24px;
-  height: 24px;
-  display: grid;
-  place-items: center;
-  padding: 0;
-  border: 0;
-  border-radius: 999px;
-  background: transparent;
-  color: var(--muted);
-  font-size: 16px;
-  line-height: 1;
-  cursor: pointer;
-}
-.note-x:active { background: rgba(var(--brand-rgb), .10); }
-
-/* ============================================================
    Limit notice — shown only when the allowance is spent
    ============================================================ */
 

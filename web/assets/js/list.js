@@ -28,16 +28,6 @@ var ZafarList = (function () {
     var t = ZafarI18n.t;
     var activeCat = (new URLSearchParams(location.search).get("category")) || "";
     return (
-      // A slim note, once, on the shelf a university student would try first.
-      // Dismissing it is remembered on this phone; it never comes back.
-      (cfg.note
-        ? '<div class="note" data-note hidden>' +
-            '<span class="note-text" data-note-text></span>' +
-            '<button type="button" class="note-x" data-note-close aria-label="' +
-              Zafar.escapeHTML(t("list.dismiss")) + '">&times;</button>' +
-          "</div>"
-        : "") +
-
       // The explanation of a spent allowance, in the page, where a student
       // who has scrolled past the pill will still meet it. No other page to
       // send them to: the allowance is this section's, and the pill above
@@ -280,9 +270,6 @@ var ZafarList = (function () {
       count: root.querySelector("[data-count]"),
       search: root.querySelector("[data-search]"),
       sort: root.querySelector("[data-sort]"),
-      note: root.querySelector("[data-note]"),
-      noteText: root.querySelector("[data-note-text]"),
-      noteClose: root.querySelector("[data-note-close]"),
       switch: root.querySelector("[data-switch]"),
       more: root.querySelector("[data-more]"),
       moreBtn: root.querySelector("[data-more-btn]"),
@@ -305,26 +292,6 @@ var ZafarList = (function () {
       sort: "name-asc",
     };
     if (state.q) el.search.value = state.q;
-
-    /* ---------- The one note on this page ----------
-       Shown until it is read and dismissed, then never again on this phone.
-       localStorage, not sessionStorage: a note that returns on every visit is
-       not dismissible, it is a nag. */
-    if (el.note && el.noteClose) {
-      var noteKey = "zafar_note_" + cfg.section;
-      var seen = false;
-      try { seen = localStorage.getItem(noteKey) === "1"; } catch (e) {}
-      if (seen) {
-        el.note.hidden = true;
-      } else {
-        el.noteText.textContent = t(cfg.note);
-        el.note.hidden = false;
-      }
-      el.noteClose.addEventListener("click", function () {
-        el.note.hidden = true;
-        try { localStorage.setItem(noteKey, "1"); } catch (e) {}
-      });
-    }
 
     /* ---------- Daily allowances — one per section ----------------------------
        The server keeps four buckets, each on its own UTC day: papers 10, books

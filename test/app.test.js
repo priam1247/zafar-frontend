@@ -1536,39 +1536,28 @@ test("the favorites and downloads addresses lead to Books, not to a 404", async 
   assert.match(redirects, /^\/downloads\s+\/books\.html\s+301$/m);
 });
 
-test("the university note is on Past Papers only, and stays dismissed", async () => {
-  const papers = await libraryPage("/dashboard.html");
-  await wait(900);
-  const pd = papers.window.document;
-  const note = pd.querySelector("[data-note]");
-  assert.ok(note, "Past Papers carries the note");
-  assert.equal(note.hidden, false);
-  assert.match(note.textContent, /university papers/i);
-  // In the flow of the page, not a band under the header.
-  assert.ok(note.closest(".content"), "the note sits inside the content area");
-  assert.equal(pd.querySelectorAll(".app-bar [data-note]").length, 0);
-
-  pd.querySelector(".note-x").click();
-  assert.equal(note.hidden, true);
-  assert.equal(papers.window.localStorage.getItem("zafar_note_papers"), "1",
-    "dismissal is remembered on the phone");
-  assert.equal(papers.window.sessionStorage.getItem("zafar_note_papers"), null,
-    "not just for this visit");
-  papers.window.close();
-
-  // The next visit starts dismissed.
-  const again = await libraryPage("/dashboard.html", { storage: { zafar_note_papers: "1" } });
-  await wait(900);
-  assert.equal(again.window.document.querySelector("[data-note]").hidden, true);
-  again.window.close();
-
-  // Every other shelf is clean.
-  for (const page of ["/books.html", "/notes.html", "/marking-keys.html"]) {
-    const other = await libraryPage(page);
+test("no page carries a written note about what the library does not have", async () => {
+  // A sentence about the catalogue is a claim that goes stale the day a folder
+  // appears — and it was the app writing it, not the library. What a page may
+  // say about the catalogue is what the server sent: the files, the folders,
+  // the allowance.
+  for (const page of ["/books.html", "/dashboard.html", "/notes.html", "/marking-keys.html"]) {
+    const dom = await libraryPage(page);
     await wait(900);
-    assert.equal(other.window.document.querySelector("[data-note]"), null, page + " has no note");
-    other.window.close();
+    const d = dom.window.document;
+    assert.equal(d.querySelector("[data-note]"), null, page + " still has a written note");
+    assert.doesNotMatch(d.body.textContent, /university papers/i, page);
+    dom.window.close();
   }
+
+  // Nothing left to render it, either.
+  for (const file of ["i18n.js", "list.js"]) {
+    const source = read(path.join(WEB, "assets/js", file));
+    assert.doesNotMatch(source, /university papers/i, file + " still carries the sentence");
+    assert.doesNotMatch(source, /data-note|cfg\.note|zafar_note_/, file + " still carries the plumbing");
+  }
+  assert.doesNotMatch(read(path.join(WEB, "dashboard.html")), /note:/, "dashboard.html still passes one");
+  assert.doesNotMatch(read(path.join(WEB, "assets/css/app.css")), /\.note-x|\.note-text/);
 });
 
 test("the controls are three rows, and the list has one layout", async () => {
